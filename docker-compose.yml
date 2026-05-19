@@ -1,0 +1,49 @@
+services:
+  app:
+    build: .
+    container_name: sdo_app
+    ports:
+      - "8080:80"
+      - "5173:5173" # Vite Dev Server Port
+    volumes:
+      - .:/var/www/html
+    environment:
+      - DATABASE_URL=mysql://sdo_admin:password@db:3306/sdo
+      - REDIS_URL=redis://redis:6379
+      - APP_ENV=development
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: mariadb:11.4
+    container_name: sdo_db
+    ports:
+      - "3306:3306"
+    environment:
+      - MARIADB_ROOT_PASSWORD=root
+      - MARIADB_DATABASE=sdo
+      - MARIADB_USER=sdo_admin
+      - MARIADB_PASSWORD=password
+    volumes:
+      - db_data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    container_name: sdo_redis
+    volumes:
+      - redis_data:/data
+
+  scheduler:
+    build: .
+    container_name: sdo_scheduler
+    command: bash -c "while true; do php bin/tick-worker.php; sleep 600; done"
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  db_data:
+  redis_data:

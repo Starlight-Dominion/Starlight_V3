@@ -1,0 +1,17 @@
+/vendor/
+/node_modules/
+/public/css/style.css
+/.env
+/docker-compose.override.yml
+/.phpunit.cache/
+/.php-cs-fixer.cache
+
+# macOS
+.DS_Store
+
+# IDEs
+/.idea/
+/.vscode/
+
+#File Types
+*.zip

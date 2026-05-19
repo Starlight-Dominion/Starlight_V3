@@ -1,0 +1,81 @@
+<?php
+
+declare(strict_types=1);
+
+namespace sdo\Controllers;
+
+use sdo\Services\GameService;
+use sdo\Services\AdvisorService;
+use sdo\Services\BattlefieldService;
+use sdo\Services\AuthService;
+
+class BattlefieldController extends BaseController
+{
+public function __construct(
+GameService $gameService,
+AdvisorService $advisorService,
+private BattlefieldService $battlefieldService,
+private AuthService $authService
+) {
+parent::__construct($gameService, $advisorService);
+}
+
+public function index(): string
+{
+if (!$this->authService->isLoggedIn($_SESSION)) {
+$this->redirect('/login');
+}
+
+return $this->render('battlefield/index', [
+'title' => 'The Battlefield',
+'players' => $this->battlefieldService->getBattlefieldList()
+]);
+}
+
+    public function attack(): void
+    {
+        header('Content-Type: application/json');
+
+        if (!$this->authService->isLoggedIn($_SESSION)) {
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            return;
+        }
+
+        $targetId = (int)($_POST['target_id'] ?? 0);
+        $turns = (int)($_POST['turns'] ?? 1);
+        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+
+        if (!$kingdom) {
+            echo json_encode(['success' => false, 'message' => 'Kingdom not found.']);
+            return;
+        }
+
+        try {
+            $result = $this->battlefieldService->executeAttack($kingdom->id, $targetId, $turns);
+            echo json_encode($result);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function report(int $id): string
+    {
+        if (!$this->authService->isLoggedIn($_SESSION)) {
+            $this->redirect('/login');
+        }
+
+        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $log = $this->battlefieldService->getBattleLog($id);
+
+        if (!$log || ($log->attacker_kingdom_id !== $kingdom->id && $log->defender_kingdom_id !== $kingdom->id)) {
+            $this->redirect('/battlefield');
+        }
+
+        return $this->render('battlefield/report', [
+            'title' => 'Battle Report',
+            'log' => $log,
+            'attacker' => $this->gameService->getKingdomById($log->attacker_kingdom_id),
+            'defender' => $this->gameService->getKingdomById($log->defender_kingdom_id),
+        ]);
+    }
+}

@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    body {
+        @apply bg-[#0a0a0a] text-[#d1d5db] font-sans antialiased selection:bg-[#c5a059]/30;
+    }
+}
+
+@layer components {
+    /* Medieval Button: Forged Green/Gold */
+    .btn-primary {
+        @apply bg-[#3f6b2f] border border-[#c5a059]/30 text-[#c5a059] px-6 py-3 rounded-sm font-black text-xs tracking-widest uppercase hover:bg-[#4d7d3a] hover:border-[#c5a059] transition-all shadow-[0_4px_10px_rgba(0,0,0,0.5)];
+    }
+
+    /* Stone/Wood Cards */
+    .card-medieval {
+        @apply bg-[#0f0f0f] border border-[#2a231e] rounded-sm shadow-[0_15px_35px_rgba(0,0,0,0.6)] relative overflow-hidden;
+    }
+
+    .card-header-medieval {
+        @apply bg-[#1a1a1a] px-6 py-3 border-b border-[#2a231e] flex justify-between items-center;
+    }
+
+    /* Earthy Accents */
+    .text-gold { @apply text-[#c5a059]; }
+    .text-green { @apply text-[#3f6b2f]; }
+    .text-rust { @apply text-[#8b0000]; }
+
+    /* Custom Progress Bars */
+    .bar-gold { @apply bg-gradient-to-r from-[#5c4a3e] to-[#c5a059]; }
+    .bar-green { @apply bg-gradient-to-r from-[#1a2e15] to-[#3f6b2f]; }
+    .bar-rust { @apply bg-gradient-to-r from-[#3b0000] to-[#8b0000]; }
+}
