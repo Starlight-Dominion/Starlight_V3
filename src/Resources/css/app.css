@@ -2,34 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500;700&display=swap');
+
 @layer base {
     body {
-        @apply bg-[#0a0a0a] text-[#d1d5db] font-sans antialiased selection:bg-[#c5a059]/30;
+        /* Reference the file from the public directory */
+        background-color: #030712;
+        @apply text-gray-300 font-sans antialiased overflow-x-hidden;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+        @apply font-title;
     }
 }
 
 @layer components {
-    /* Medieval Button: Forged Green/Gold */
-    .btn-primary {
-        @apply bg-[#3f6b2f] border border-[#c5a059]/30 text-[#c5a059] px-6 py-3 rounded-sm font-black text-xs tracking-widest uppercase hover:bg-[#4d7d3a] hover:border-[#c5a059] transition-all shadow-[0_4px_10px_rgba(0,0,0,0.5)];
+    .font-title {
+        font-family: 'Orbitron', sans-serif;
     }
 
-    /* Stone/Wood Cards */
-    .card-medieval {
-        @apply bg-[#0f0f0f] border border-[#2a231e] rounded-sm shadow-[0_15px_35px_rgba(0,0,0,0.6)] relative overflow-hidden;
+    .bg-dark-translucent {
+        background-color: rgba(6, 10, 25, 0.8);
+        @apply backdrop-blur-xl;
     }
 
-    .card-header-medieval {
-        @apply bg-[#1a1a1a] px-6 py-3 border-b border-[#2a231e] flex justify-between items-center;
+    .text-shadow-glow {
+        text-shadow: 0 0 15px rgba(34, 211, 238, 0.4);
     }
 
-    /* Earthy Accents */
-    .text-gold { @apply text-[#c5a059]; }
-    .text-green { @apply text-[#3f6b2f]; }
-    .text-rust { @apply text-[#8b0000]; }
+    .nav-link-public {
+        @apply px-0 py-2 border-b-2 border-transparent transition-all duration-300 text-gray-400 hover:text-cyan-400 font-medium uppercase text-xs tracking-[2px];
+    }
 
-    /* Custom Progress Bars */
-    .bar-gold { @apply bg-gradient-to-r from-[#5c4a3e] to-[#c5a059]; }
-    .bar-green { @apply bg-gradient-to-r from-[#1a2e15] to-[#3f6b2f]; }
-    .bar-rust { @apply bg-gradient-to-r from-[#3b0000] to-[#8b0000]; }
+    .nav-link-public.active {
+        @apply text-white border-cyan-500;
+    }
+
+    .btn-launch {
+        @apply bg-cyan-600 hover:bg-cyan-500 text-white font-black py-4 px-12 rounded-lg text-lg transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(8,145,178,0.3)] uppercase tracking-[4px] font-title border border-cyan-400/50;
+    }
+
+    .input-terminal {
+        @apply w-full bg-black/40 border border-cyan-900/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all font-mono placeholder:text-gray-700;
+    }
 }
