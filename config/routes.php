@@ -82,4 +82,11 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/structures/armory/sell', [\sdo\Controllers\ArmoryController::class, 'sell']);
     $r->addRoute('POST', '/structures/armory/toggle-hide', [\sdo\Controllers\ArmoryController::class, 'toggleHide']);
     $r->addRoute('POST', '/structures/armory/upgrade', [\sdo\Controllers\ArmoryController::class, 'upgrade']);
+
+    // Settings Routes
+    $r->addRoute('GET', '/settings', [\sdo\Controllers\SettingsController::class, 'index']);
+    $r->addRoute('POST', '/settings/identity', [\sdo\Controllers\SettingsController::class, 'updateIdentity']);
+    $r->addRoute('POST', '/settings/cipher', [\sdo\Controllers\SettingsController::class, 'updateCipher']);
+    $r->addRoute('POST', '/settings/stasis', [\sdo\Controllers\SettingsController::class, 'toggleStasis']);
+    $r->addRoute('POST', '/settings/avatar', [\sdo\Controllers\SettingsController::class, 'updateAvatar']);
 };
