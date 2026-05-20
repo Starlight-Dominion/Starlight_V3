@@ -6,6 +6,8 @@ namespace sdo\Models;
 class User extends Model
 {
     protected $table = 'users';
+    
+    public $timestamps = true;
 
     protected $hidden = ['password'];
 
@@ -14,21 +16,15 @@ class User extends Model
         'updated_at' => 'datetime',
         'is_bot' => 'boolean',
         'is_admin' => 'boolean',
+        'stasis_until' => 'datetime',
+        'handle_last_changed' => 'datetime'
     ];
 
-    /**
-     * Relationship to the core game state.
-     * Theming calls it a "Dominion", but the structural architecture remains "Kingdom" 
-     * to ensure seamless integration with the core game loop.
-     */
-    public function kingdom()
+    public function dominion()
     {
-        return $this->hasOne(Kingdom::class, 'user_id');
+        return $this->hasOne(Dominion::class, 'user_id');
     }
 
-    /**
-     * Mutator to automatically hash passwords before they are stored in the database.
-     */
     public function setPasswordAttribute(string $password): void
     {
         $this->attributes['password'] = password_hash($password, PASSWORD_DEFAULT);

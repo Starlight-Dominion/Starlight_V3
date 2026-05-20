@@ -67,12 +67,20 @@ class SettingsController extends BaseController
         ));
     }
 
+    /**
+     * Handle multipart avatar upload
+     */
     public function updateAvatar(): string
     {
-        return $this->jsonResponse(fn() => $this->settingsService->updateAvatar(
-            (int)$_SESSION['user_id'],
-            (string)($_POST['avatar_path'] ?? '')
-        ));
+        return $this->jsonResponse(function() {
+            if (!isset($_FILES['avatar'])) {
+                throw new \Exception("No sigil data provided.");
+            }
+            return $this->settingsService->processAvatarUpload(
+                (int)$_SESSION['user_id'],
+                $_FILES['avatar']
+            );
+        });
     }
 
     public function toggleStasis(): string

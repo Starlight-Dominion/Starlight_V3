@@ -21,12 +21,15 @@
         confirm: ''
     });
 
-    let avatarForm = $state({
-        path: user_profile.avatar || ''
-    });
+    // Avatar Logic
+    let avatarPreview = $state(user_profile.avatar || '');
+    let fileInput = $state(null);
 
     const isStasisActive = $derived(user_profile.stasis_until && new Date(user_profile.stasis_until) > new Date());
 
+    /**
+     * Standard JSON submission for text fields
+     */
     async function submitRequest(endpoint, body) {
         loading = true;
         message = null;
@@ -43,9 +46,8 @@
             });
             const data = await res.json();
             message = data;
-            if (data.success) {
-                // Refresh local game state if handle changed
-                if (body.username) game.user.username = body.username;
+            if (data.success && body.username) {
+                game.user.username = body.username;
             }
         } catch (e) {
             message = { success: false, message: "Terminal link lost." };
@@ -53,14 +55,47 @@
             loading = false;
         }
     }
+
+    /**
+     * Specialized Binary Submission for Avatar Upload
+     */
+    async function uploadAvatar(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Local Preview
+        avatarPreview = URL.createObjectURL(file);
+        
+        loading = true;
+        message = null;
+
+        const fd = new FormData();
+        fd.append('avatar', file);
+        fd.append('_csrf', game.csrf);
+
+        try {
+            const res = await fetch('/settings/avatar', {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await res.json();
+            message = data;
+            if (data.success) {
+                avatarPreview = data.path;
+            }
+        } catch (e) {
+            message = { success: false, message: "Sigil transmission failed." };
+        } finally {
+            loading = false;
+        }
+    }
 </script>
 
 <div in:fade class="space-y-8 pb-20">
-    <header class="border-b border-cyan-500/20 pb-6 flex justify-between items-end">
-        <div>
-            <h1 class="text-4xl font-title font-black text-white uppercase tracking-tighter text-shadow-glow">System Settings</h1>
-            <p class="text-cyan-500/60 text-[9px] font-bold uppercase tracking-[4px] mt-2">Commander Profile & Life Support</p>
-        </div>
+    <header class="border-b border-cyan-500/20 pb-6">
+        <h1 class="text-4xl font-title font-black text-white uppercase tracking-tighter text-shadow-glow">System Settings</h1>
+        <p class="text-cyan-500/60 text-[9px] font-bold uppercase tracking-[4px] mt-2">Commander Profile & Life Support</p>
     </header>
 
     {#if message}
@@ -84,7 +119,6 @@
 
         <main class="lg:col-span-3">
             <div class="bg-dark-translucent border border-cyan-500/10 rounded-3xl p-10 relative overflow-hidden shadow-2xl">
-                <!-- HUD Decorations -->
                 <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                     <span class="text-8xl font-title font-black text-white">{activeTab.toUpperCase()}</span>
                 </div>
@@ -134,14 +168,14 @@
                     <div in:fly={{ x: 20 }} class="space-y-8">
                         <h2 class="text-white font-title text-xl uppercase tracking-widest">Stasis Control</h2>
                         <div class="bg-black/40 border border-white/5 p-8 rounded-2xl space-y-6">
-                            <p class="text-gray-400 text-sm leading-relaxed">
-                                Stasis mode suspends all dominion activities. You will be protected from all sorties and espionage, but resource production and citizen growth will cease. 
+                            <p class="text-gray-400 text-sm leading-relaxed font-sans">
+                                Stasis mode suspends all dominion activities. Sorties and espionage against your sector are disabled. Resource extraction ceases immediately.
                             </p>
                             
                             {#if isStasisActive}
-                                <div class="p-6 bg-cyan-900/20 border border-cyan-500 rounded-xl text-center space-y-2">
-                                    <span class="text-cyan-400 font-black uppercase text-xs tracking-widest">Life Support Active</span>
-                                    <p class="text-white font-mono text-sm">Protected Until: {user_profile.stasis_until}</p>
+                                <div class="p-6 bg-cyan-900/20 border border-cyan-500 rounded-xl text-center">
+                                    <span class="text-cyan-400 font-black uppercase text-[10px] tracking-widest">Life Support: STABLE</span>
+                                    <p class="text-white font-mono text-xs mt-1">Expiration: {user_profile.stasis_until}</p>
                                 </div>
                             {/if}
 
@@ -156,31 +190,47 @@
                     </div>
 
                 {:else if activeTab === 'uplink'}
-                    <div in:fly={{ x: 20 }} class="space-y-8 text-center">
-                        <h2 class="text-white font-title text-xl uppercase tracking-widest text-left">Avatar Uplink</h2>
+                    <div in:fly={{ x: 20 }} class="space-y-8">
+                        <h2 class="text-white font-title text-xl uppercase tracking-widest">Visual Sigil Uplink</h2>
                         
-                        <div class="relative inline-block group">
-                            <div class="w-40 h-40 rounded-full border-4 border-cyan-500/30 overflow-hidden bg-black mx-auto shadow-[0_0_30px_rgba(34,211,238,0.2)]">
-                                {#if avatarForm.path}
-                                    <img src={avatarForm.path} alt="Commander" class="w-full h-full object-cover" />
-                                {:else}
-                                    <div class="w-full h-full flex items-center justify-center text-cyan-900 font-title text-4xl">NO_SIG</div>
-                                {/if}
+                        <div class="flex flex-col items-center gap-10">
+                            <div class="relative group">
+                                <div class="w-48 h-48 rounded-full border-4 border-cyan-500/30 overflow-hidden bg-black shadow-[0_0_50px_rgba(34,211,238,0.15)] transition-all group-hover:border-cyan-400">
+                                    {#if avatarPreview}
+                                        <img src={avatarPreview} alt="Sigil" class="w-full h-full object-cover" />
+                                    {:else}
+                                        <div class="w-full h-full flex items-center justify-center text-cyan-950 font-title text-4xl">NO_SIG</div>
+                                    {/if}
+                                </div>
+                                <div class="absolute inset-0 bg-cyan-500/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                             </div>
-                        </div>
 
-                        <div class="space-y-4 pt-6 text-left">
-                            <div class="space-y-2">
-                                <label class="text-[9px] font-black text-cyan-800 uppercase ml-2">Direct Image URL</label>
-                                <input type="text" bind:value={avatarForm.path} class="input-terminal" placeholder="https://..." />
+                            <div class="bg-black/40 border border-white/5 p-8 rounded-2xl w-full space-y-6">
+                                <div class="space-y-2 text-center md:text-left">
+                                    <h3 class="text-cyan-400 font-bold uppercase text-xs tracking-widest">Sigil Upload Constraints</h3>
+                                    <ul class="text-[9px] text-gray-500 uppercase tracking-widest space-y-1 font-mono">
+                                        <li>• Max Payload: 10.0 MB</li>
+                                        <li>• Max Resolution: 500 x 500 px</li>
+                                        <li>• Formats: JPEG, PNG, WEBP</li>
+                                    </ul>
+                                </div>
+
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    class="hidden" 
+                                    bind:this={fileInput} 
+                                    onchange={uploadAvatar} 
+                                />
+
+                                <button 
+                                    onclick={() => fileInput.click()} 
+                                    class="btn-launch w-full py-5 text-sm" 
+                                    disabled={loading}
+                                >
+                                    {loading ? 'Transmitting Binary...' : 'Uplink Local Sigil'}
+                                </button>
                             </div>
-                            <button 
-                                onclick={() => submitRequest('/settings/avatar', { avatar_path: avatarForm.path })} 
-                                class="btn-launch w-full py-4 text-sm" 
-                                disabled={loading}
-                            >
-                                Update Visual Sigil
-                            </button>
                         </div>
                     </div>
                 {/if}

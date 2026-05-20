@@ -45,12 +45,14 @@ abstract class BaseController
                 $userData = [
                     'username' => $vm->username,
                     'kingdomName' => $vm->kingdomName,
+                    'raceName' => $vm->raceName,
                     'level' => $vm->level,
                     'xpProgress' => $vm->xpProgress,
                     'advice' => $vm->advice,
                     'realmTime' => $vm->realmTime,
                     'secondsToNextTick' => $vm->secondsToNextTick,
                     'kingdom' => $kingdom->toArray(),
+                    'avatar_path' => $kingdom->user->avatar_path, // CRITICAL FIX: Explicitly pass the path
                     'advisorHistory' => $vm->advisorHistory
                 ];
             }

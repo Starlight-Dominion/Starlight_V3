@@ -5,6 +5,8 @@
 /docker-compose.override.yml
 /.phpunit.cache/
 /.php-cs-fixer.cache
+/legacy_files/
+
 
 # macOS
 .DS_Store

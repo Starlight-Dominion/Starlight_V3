@@ -18,7 +18,6 @@ return function (RouteCollector $r) {
 
     // Protected Routes
     $r->addRoute('GET', '/dashboard', [\sdo\Controllers\DashboardController::class, 'index']);
-    $r->addRoute('GET', '/settings', [\sdo\Controllers\SettingsController::class, 'index']);
     $r->addRoute('POST', '/settings/profile', [\sdo\Controllers\SettingsController::class, 'updateProfile']);
     $r->addRoute('GET', '/structures', [\sdo\Controllers\StructureController::class, 'index']);
     $r->addRoute('GET', '/structures/foundation', [\sdo\Controllers\FoundationController::class, 'index']);
@@ -89,4 +88,6 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/settings/cipher', [\sdo\Controllers\SettingsController::class, 'updateCipher']);
     $r->addRoute('POST', '/settings/stasis', [\sdo\Controllers\SettingsController::class, 'toggleStasis']);
     $r->addRoute('POST', '/settings/avatar', [\sdo\Controllers\SettingsController::class, 'updateAvatar']);
+
+    
 };

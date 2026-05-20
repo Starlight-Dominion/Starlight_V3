@@ -4,107 +4,76 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\User;
-use sdo\Models\Kingdom;
+use sdo\Models\Dominion;
 use sdo\Models\Race;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class AuthService
 {
-    /**
-     * Register a new sovereign identity and initialize their dominion.
-     * Returns an array with 'success' boolean and optional 'message'.
-     */
-    public function register(
-        string $username, 
-        string $email, 
-        string $password, 
-        string $dominionName, 
-        string $raceName
-    ): array {
+    public function register(string $username, string $email, string $password, string $dominionName, string $raceName): array
+    {
         try {
-            // 1. Explicit Duplicate Checks (Fail Loudly with exact reasons)
-            if (User::where('username', $username)->exists()) {
-                return ['success' => false, 'message' => "The Identity Handle '{$username}' is already registered."];
-            }
-            if (User::where('email', $email)->exists()) {
-                return ['success' => false, 'message' => "The Comms Frequency '{$email}' is already in use."];
-            }
-            if (Kingdom::where('kingdom_name', $dominionName)->exists()) {
-                return ['success' => false, 'message' => "The Dominion Designation '{$dominionName}' is already claimed by another sector."];
-            }
+            if (User::where('username', $username)->exists()) return ['success' => false, 'message' => "Handle taken."];
+            if (User::where('email', $email)->exists()) return ['success' => false, 'message' => "Email in use."];
+            if (Dominion::where('name', $dominionName)->exists()) return ['success' => false, 'message' => "Designation claimed."];
 
-            // 2. Auto-Seed Fallback (Protects against missing seeders)
-            $race = Race::where('name', $raceName)->first();
-            if (!$race) {
-                $race = Race::create([
-                    'name' => $raceName,
-                    'description' => 'System initialized evolutionary strain.',
-                    'bonus_value' => 0
-                ]);
-            }
+            $race = Race::where('name', $raceName)->firstOrFail();
 
-            // 3. ACID Transaction for Data Integrity
             Capsule::transaction(function () use ($username, $email, $password, $dominionName, $race) {
-                // Persist Identity
                 $user = User::create([
                     'username' => $username,
                     'email'    => $email,
-                    'password' => $password, // Mutator handles hashing
-                    'is_bot'   => false,
-                    'is_admin' => false
+                    'password' => $password,
                 ]);
 
-                // Initialize Dominion
-                $user->kingdom()->create([
-                    'kingdom_name' => $dominionName,
-                    'race_id'      => $race->id,
-                    'gold'         => 10000,
-                    'citizens'     => 500,
-                    'turns'        => 100,
-                    'xp'           => 0
+                $dominion = $user->dominion()->create([
+                    'name'    => $dominionName,
+                    'race_id' => $race->id,
+                    'credits' => 10000,
+                    'citizens' => 500,
+                    'turns'    => 100,
+                    'foundation_hp' => 1000,
+                    'foundation_max_hp' => 1000
                 ]);
+
+                // Initialize empty Manpower for all unit types
+                $units = Capsule::table('units')->get();
+                foreach ($units as $u) {
+                    Capsule::table('dominion_manpower')->insert([
+                        'dominion_id' => $dominion->id,
+                        'unit_id' => $u->id,
+                        'total_quantity' => 0,
+                        'stabled_quantity' => 0
+                    ]);
+                }
+
+                // Initialize level 0 for all structures
+                $structures = Capsule::table('structures')->get();
+                foreach ($structures as $s) {
+                    Capsule::table('dominion_structures')->insert([
+                        'dominion_id' => $dominion->id,
+                        'structure_id' => $s->id,
+                        'level' => 0
+                    ]);
+                }
             });
 
             return ['success' => true, 'message' => 'Sector initialized.'];
-
         } catch (Exception $e) {
-            // Log deep system errors (like SQL syntax issues) for admins
-            error_log("CRITICAL AUTH FAILURE: " . $e->getMessage());
-            return ['success' => false, 'message' => "Core system error: " . $e->getMessage()];
+            return ['success' => false, 'message' => "System failure: " . $e->getMessage()];
         }
     }
 
-    /**
-     * Verify credentials and establish a secure neural link (session).
-     */
     public function login(string $username, string $password): ?User
     {
-        $user = User::where('username', $username)->first();
-
+        $user = User::with('dominion')->where('username', $username)->first();
         if ($user && password_verify($password, $user->password)) {
-            // Security: Prevent Session Fixation
-            if (session_status() === PHP_SESSION_ACTIVE) {
-                session_regenerate_id(true);
-            }
-            
-            // Exclude sensitive data from memory-resident model
-            $user->makeHidden('password');
+            if (session_status() === PHP_SESSION_ACTIVE) session_regenerate_id(true);
             return $user;
         }
-
         return null;
     }
 
-    public function isLoggedIn(array $session): bool
-    {
-        return isset($session['user_id']);
-    }
-
-    public function logout(): void
-    {
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            session_destroy();
-        }
-    }
+    public function logout(): void { session_destroy(); }
 }

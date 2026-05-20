@@ -1,159 +1,114 @@
 <?php
-
 declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Models\Kingdom;
+use sdo\Models\Dominion;
+use sdo\Models\User;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class FoundationService
 {
-    private function getPdo(): \PDO
+    public function getFoundationState(int $dominionId): array
     {
-        return Capsule::connection()->getPdo();
-    }
-
-    private function getStructure(): array
-    {
-        $stmt = $this->getPdo()->prepare("SELECT * FROM structures WHERE slug = 'foundation'");
-        $stmt->execute();
-        return $stmt->fetch(\PDO::FETCH_ASSOC);
-    }
-
-    private function getTiers(int $structureId): array
-    {
-        $stmt = $this->getPdo()->prepare("SELECT * FROM structure_levels WHERE structure_id = ? ORDER BY level ASC");
-        $stmt->execute([$structureId]);
-        $tiers = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $dominion = Dominion::with(['user', 'race'])->findOrFail($dominionId);
         
-        $config = [];
-        foreach ($tiers as $tier) {
-            $config[$tier['level']] = $tier;
-            // Map consistent keys
-            $config[$tier['level']]['name'] = $tier['buff_name'];
-            $config[$tier['level']]['hp'] = $tier['buff_hp'];
+        // Fetch all structure types and the dominion's current levels
+        $structures = Capsule::table('structures')->get();
+        $progress = Capsule::table('dominion_structures')
+            ->where('dominion_id', $dominionId)
+            ->get()
+            ->keyBy('structure_id');
+
+        $manifest = [];
+        foreach ($structures as $s) {
+            $currentLevel = $progress->has($s->id) ? $progress->get($s->id)->level : 0;
+            $nextLevel = $currentLevel + 1;
+            
+            $levelData = Capsule::table('structure_levels')
+                ->where('structure_id', $s->id)
+                ->where('level', $nextLevel)
+                ->first();
+
+            $manifest[$s->slug] = [
+                'id' => $s->id,
+                'name' => $s->name,
+                'description' => $s->description,
+                'current_level' => $currentLevel,
+                'max_level' => $s->max_level,
+                'next_upgrade' => $levelData,
+                'mod' => $progress->has($s->id) ? $progress->get($s->id)->mod_slot_1 : null
+            ];
         }
-        return $config;
-    }
-
-    private function getUpgrades(int $structureId): array
-    {
-        $stmt = $this->getPdo()->prepare("SELECT * FROM structure_upgrade_options WHERE structure_id = ?");
-        $stmt->execute([$structureId]);
-        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        
-        $upgrades = [];
-        foreach ($rows as $row) {
-            $upgrades[$row['slug']] = $row;
-        }
-        return $upgrades;
-    }
-
-    public function getFoundationData(int $kingdomId): array
-    {
-        $kingdom = Kingdom::findOrFail($kingdomId);
-        $currentLevel = (int)$kingdom->foundation_level;
-        $playerLevel = $kingdom->getPlayerLevel();
-
-        $structure = $this->getStructure();
-        $tiers = $this->getTiers((int)$structure['id']);
-        $upgrades = $this->getUpgrades((int)$structure['id']);
-
-        $currentTier = $tiers[$currentLevel] ?? null;
-        if ($currentTier) {
-            $currentTier['id'] = $currentLevel;
-        }
-
-        $nextLevel = $currentLevel + 1;
-        $nextTier = $tiers[$nextLevel] ?? null;
 
         return [
-            'kingdom' => $kingdom,
-            'player_level' => $playerLevel,
-            'current_tier' => $currentTier,
-            'next_tier' => $nextTier,
-            'all_tiers' => $tiers,
-            'upgrades' => $upgrades
+            'dominion' => $dominion,
+            'structures' => $manifest,
+            'repair_cost' => ($dominion->foundation_max_hp - $dominion->foundation_hp) * 10
         ];
     }
 
-    public function upgradeFoundation(int $kingdomId): array
+    public function repair(int $dominionId): array
     {
-        return Capsule::transaction(function() use ($kingdomId) {
-            $kingdom = Kingdom::lockForUpdate()->find($kingdomId);
-            $currentLevel = (int)$kingdom->foundation_level;
-            $nextLevel = $currentLevel + 1;
+        return Capsule::transaction(function() use ($dominionId) {
+            $dominion = Dominion::lockForUpdate()->find($dominionId);
+            $needed = $dominion->foundation_max_hp - $dominion->foundation_hp;
+            if ($needed <= 0) throw new Exception("Integrity is already at 100%.");
 
-            $structure = $this->getStructure();
-            $tiers = $this->getTiers((int)$structure['id']);
-            $nextTier = $tiers[$nextLevel] ?? null;
+            $cost = $needed * 10;
+            if ($dominion->gold < $cost) throw new Exception("Insufficient credits for nano-repair.");
 
-            if (!$nextTier) throw new Exception("Maximum foundation tier reached.");
+            $dominion->gold -= $cost;
+            $dominion->foundation_hp = $dominion->foundation_max_hp;
+            $dominion->save();
 
-            if ($kingdom->getPlayerLevel() < $nextTier['player_level_req']) {
-                throw new Exception("Player level {$nextTier['player_level_req']} required for this tier.");
-            }
-
-            if ($kingdom->gold < $nextTier['cost']) {
-                throw new Exception("Insufficient gold for upgrade.");
-            }
-
-            $kingdom->gold -= $nextTier['cost'];
-            $kingdom->foundation_level = $nextLevel;
-            
-            // Calculate base HP and apply upgrades
-            $baseHp = $nextTier['buff_hp'];
-            if ($kingdom->foundation_upgrade_slot_1) {
-                $upgrades = $this->getUpgrades((int)$structure['id']);
-                $installed = $upgrades[$kingdom->foundation_upgrade_slot_1] ?? null;
-                if ($installed && $installed['bonus_type'] === 'hp_percentage') {
-                    $baseHp *= (1 + $installed['bonus_value']);
-                }
-            }
-            
-            $kingdom->foundation_hp = (int)floor($baseHp);
-            $kingdom->save();
-
-            return ['success' => true, 'message' => "Foundation upgraded to Level {$nextLevel}: {$nextTier['buff_name']}."];
+            return ['success' => true, 'message' => 'Integrity restored to nominal parameters.'];
         });
     }
 
-    public function purchaseUpgrade(int $kingdomId, string $upgradeKey): array
+    public function upgrade(int $dominionId, int $structureId): array
     {
-        return Capsule::transaction(function() use ($kingdomId, $upgradeKey) {
-            $structure = $this->getStructure();
-            $upgrades = $this->getUpgrades((int)$structure['id']);
+        return Capsule::transaction(function() use ($dominionId, $structureId) {
+            $dominion = Dominion::lockForUpdate()->find($dominionId);
             
-            if (!isset($upgrades[$upgradeKey])) throw new Exception("Invalid upgrade.");
-
-            $kingdom = Kingdom::lockForUpdate()->find($kingdomId);
-            if (!empty($kingdom->foundation_upgrade_slot_1)) throw new Exception("Upgrade slot is already filled.");
-
-            $upgrade = $upgrades[$upgradeKey];
-            $tiers = $this->getTiers((int)$structure['id']);
-            $currentTier = $tiers[$kingdom->foundation_level] ?? null;
-            
-            if (!$currentTier) throw new Exception("No foundation tier found.");
-            
-            $upgradeCost = (int)($currentTier['cost'] * $upgrade['cost_multiplier']);
-
-            if ($kingdom->gold < $upgradeCost) throw new Exception("Insufficient gold.");
-
-            $kingdom->gold -= $upgradeCost;
-            $kingdom->foundation_upgrade_slot_1 = $upgradeKey;
-
-            // Recalculate HP immediately
-            $baseHp = $currentTier['buff_hp'];
-            if ($upgrade['bonus_type'] === 'hp_percentage') {
-                $baseHp *= (1 + $upgrade['bonus_value']);
+            // 1. Ensure Foundation is repaired before any structural changes
+            if ($dominion->foundation_hp < $dominion->foundation_max_hp) {
+                throw new Exception("Structural upgrade blocked. Repair integrity to 100% first.");
             }
-            
-            $kingdom->foundation_hp = (int)floor($baseHp);
-            $kingdom->save();
 
-            return ['success' => true, 'message' => "Installed {$upgrade['name']}."];
+            // 2. Determine next level
+            $current = Capsule::table('dominion_structures')
+                ->where('dominion_id', $dominionId)
+                ->where('structure_id', $structureId)
+                ->first();
+            
+            $nextLevel = ($current ? $current->level : 0) + 1;
+
+            $levelData = Capsule::table('structure_levels')
+                ->where('structure_id', $structureId)
+                ->where('level', $nextLevel)
+                ->first();
+
+            if (!$levelData) throw new Exception("Maximum tier reached for this structure.");
+            if ($dominion->gold < $levelData->cost) throw new Exception("Insufficient credits.");
+
+            // 3. Apply Upgrade
+            $dominion->gold -= $levelData->cost;
+            
+            Capsule::table('dominion_structures')->updateOrInsert(
+                ['dominion_id' => $dominionId, 'structure_id' => $structureId],
+                ['level' => $nextLevel]
+            );
+
+            // 4. If Foundation upgraded, increase max HP
+            if ($structureId == 1) { // Foundation ID
+                $dominion->foundation_max_hp = $levelData->buff_hp;
+                $dominion->foundation_hp = $levelData->buff_hp;
+            }
+
+            $dominion->save();
+            return ['success' => true, 'message' => "Upgrade to Tier {$nextLevel} initialized."];
         });
     }
 }

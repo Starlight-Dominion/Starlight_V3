@@ -12,21 +12,14 @@ use sdo\Services\TacticalService;
 
 class DashboardController extends BaseController
 {
-    private AuthService $authService;
-    private MinesService $minesService;
-    private TacticalService $tacticalService;
-
     public function __construct(
         GameService $gameService,
         AdvisorService $advisorService,
-        AuthService $authService,
-        MinesService $minesService,
-        TacticalService $tacticalService
+        private AuthService $authService,
+        private MinesService $minesService,
+        private TacticalService $tacticalService
     ) {
         parent::__construct($gameService, $advisorService);
-        $this->authService = $authService;
-        $this->minesService = $minesService;
-        $this->tacticalService = $tacticalService;
     }
 
     public function index(): string
@@ -35,13 +28,24 @@ class DashboardController extends BaseController
             $this->redirect('/login');
         }
 
-        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        // Fetch the Dominion record (replaces Kingdom)
+        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+
+        // GUARD CLAUSE: If dominion is missing, the neural link is corrupted
+        if (!$dominion) {
+            session_destroy();
+            $this->redirect('/login?error=dominion_not_found');
+        }
+
         $minesConfig = $this->minesService->getMinesConfig();
-        $productionMines = (int)$this->minesService->calculateCurrentProduction($kingdom->toArray());
-        $tactical = $this->tacticalService->getTacticalOverview($kingdom->id);
+        
+        // Pass the model array to services
+        $dominionData = $dominion->toArray();
+        $productionMines = (int)$this->minesService->calculateCurrentProduction($dominionData);
+        $tactical = $this->tacticalService->getTacticalOverview($dominion->id);
 
         return $this->render('dashboard/index', [
-            'title' => 'Kingdom Dashboard',
+            'title' => 'Sector Dashboard',
             'production_base' => (int)($minesConfig['base_gold_per_tick'] ?? 100),
             'production_mines' => $productionMines,
             'production_total' => (int)($minesConfig['base_gold_per_tick'] ?? 100) + $productionMines,

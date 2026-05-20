@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 namespace sdo\Controllers;
@@ -11,67 +10,67 @@ use sdo\Services\AuthService;
 
 class FoundationController extends BaseController
 {
-public function __construct(
-GameService $gameService,
-AdvisorService $advisorService,
-private FoundationService $foundationService,
-private AuthService $authService
-) {
-parent::__construct($gameService, $advisorService);
-}
-
-public function index(): string
-{
-    if (!$this->authService->isLoggedIn($_SESSION)) {
-        $this->redirect('/login');
+    public function __construct(
+        GameService $gameService,
+        AdvisorService $advisorService,
+        private FoundationService $foundationService,
+        private AuthService $authService
+    ) {
+        parent::__construct($gameService, $advisorService);
     }
 
-    $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-    $data = $this->foundationService->getFoundationData($kingdom->id);
+    /**
+     * Render the Structural Engineering Terminal
+     */
+    public function index(): string
+    {
+        if (!$this->authService->isLoggedIn($_SESSION)) {
+            $this->redirect('/login');
+        }
 
-    return $this->render('foundation/index', [
-        'title' => 'Kingdom Foundation',
-        'player_level' => $data['player_level'],
-        'currentTier' => $data['current_tier'],
-        'nextTier' => $data['next_tier'],
-        'allTiers' => $data['all_tiers'],
-        'upgrades' => $data['upgrades'],
-        'message' => $_SESSION['message'] ?? null,
-    ]);
-}
+        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $state = $this->foundationService->getFoundationState($dominion->id);
 
-public function upgrade(): string
-{
-    header('Content-Type: application/json');
-    if (!$this->authService->isLoggedIn($_SESSION)) {
-        return json_encode(['success' => false, 'message' => 'Unauthorized']);
+        return $this->render('foundation/index', [
+            'title' => 'Structural Engineering',
+            'dominion' => $state['dominion'],
+            'structures' => $state['structures'],
+            'repair_cost' => $state['repair_cost']
+        ]);
     }
 
-    $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-
-    try {
-        $res = $this->foundationService->upgradeFoundation($kingdom->id);
-        return json_encode($res);
-    } catch (\Exception $e) {
-        return json_encode(['success' => false, 'message' => $e->getMessage()]);
-    }
-}
-
-public function purchaseUpgrade(): string
-{
-    header('Content-Type: application/json');
-    if (!$this->authService->isLoggedIn($_SESSION)) {
-        return json_encode(['success' => false, 'message' => 'Unauthorized']);
+    /**
+     * Generic JSON response helper for structural actions
+     */
+    private function jsonResponse(callable $action): string
+    {
+        header('Content-Type: application/json');
+        try {
+            $res = $action();
+            return json_encode($res);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
     }
 
-    $key = (string)($_POST['upgrade_key'] ?? '');
-    $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-
-    try {
-        $res = $this->foundationService->purchaseUpgrade($kingdom->id, $key);
-        return json_encode($res);
-    } catch (\Exception $e) {
-        return json_encode(['success' => false, 'message' => $e->getMessage()]);
+    /**
+     * Initialize Nano-Repair sequence
+     */
+    public function repair(): string
+    {
+        return $this->jsonResponse(fn() => $this->foundationService->repair(
+            (int)$this->gameService->getKingdomByUserId((int)$_SESSION['user_id'])->id
+        ));
     }
-}
+
+    /**
+     * Initialize Structural Evolution (Upgrade)
+     */
+    public function upgrade(): string
+    {
+        return $this->jsonResponse(fn() => $this->foundationService->upgrade(
+            (int)$this->gameService->getKingdomByUserId((int)$_SESSION['user_id'])->id,
+            (int)($_POST['structure_id'] ?? 0)
+        ));
+    }
 }

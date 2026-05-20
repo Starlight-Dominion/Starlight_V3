@@ -1,12 +1,11 @@
 <?php
-
 declare(strict_types=1);
 
 namespace sdo\Services;
 
 use DateTime;
 use DateTimeZone;
-use sdo\Models\Kingdom;
+use sdo\Models\Dominion;
 use sdo\Repositories\Interfaces\KingdomRepositoryInterface;
 
 class GameService
@@ -32,30 +31,21 @@ class GameService
         return self::TICK_INTERVAL_SECONDS - $secondsIntoCurrentTick;
     }
 
-    public function getKingdomByUserId(int $userId): ?Kingdom
+    /**
+     * Maps to User -> Dominion relation
+     */
+    public function getKingdomByUserId(int $userId): ?Dominion
     {
-        return $this->kingdomRepository->findByUserId($userId);
-    }
-
-    public function getKingdomById(int $id): ?Kingdom
-    {
-        return $this->kingdomRepository->findById($id);
-    }
-
-    public function calculateLevel(int $xp): int
-    {
-        return (int)floor(sqrt($xp / 100)) + 1;
+        return Dominion::with(['user', 'race'])->where('user_id', $userId)->first();
     }
 
     public function calculateXpProgress(int $xp): int
     {
-        $level = $this->calculateLevel($xp);
+        $level = (int)floor(sqrt($xp / 100)) + 1;
         $currentThreshold = (int)pow($level - 1, 2) * 100;
         $nextThreshold = (int)pow($level, 2) * 100;
 
-        if ($nextThreshold <= $currentThreshold) {
-            return 0;
-        }
+        if ($nextThreshold <= $currentThreshold) return 0;
 
         $progress = (($xp - $currentThreshold) / ($nextThreshold - $currentThreshold)) * 100;
         return (int)max(0, min(100, $progress));
