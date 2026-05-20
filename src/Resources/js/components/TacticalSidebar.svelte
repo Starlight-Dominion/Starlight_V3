@@ -1,44 +1,86 @@
 <script>
     import { game, resources, formattedTick } from '../stores/gameStore.svelte.js';
-    import { fade } from 'svelte/transition';
+    import { fade, slide } from 'svelte/transition';
 
     const user = $derived(game.user);
     const kingdom = $derived(user?.kingdom || {});
-    const turnsCapped = $derived(resources.turns >= 200);
+    
+    // Legacy Advice Repository Integration
+    const adviceRepo = {
+        'dashboard/index': [
+            "Central command hub active. Monitor resource flow and fleet readiness.",
+            "A robust economy is the armor of a lasting dominion.",
+            "Telemetry synchronized. Dominion Time is consistent across all sectors."
+        ],
+        'default': ["Welcome to Starlight Dominion, Commander."]
+    };
+
+    const currentAdvice = $derived.by(() => {
+        const list = adviceRepo[game.component] || adviceRepo.default;
+        return list[Math.floor(Math.random() * list.length)];
+    });
 </script>
 
 <aside class="lg:col-span-1 space-y-6">
-    <div class="bg-[#0f0f0f] border border-[#2a231e] border-l-4 border-l-[#3f6b2f] shadow-2xl relative overflow-hidden">
-        <div class="bg-[#161616] px-4 py-2 border-b border-[#2a231e] flex justify-between items-center">
-            <h2 class="text-[#c5a059] text-[10px] font-black uppercase tracking-[3px]">The Advisor</h2>
-        </div>
-        <div class="p-6 space-y-4">
-            {#if turnsCapped}
-                <div in:fade class="bg-[#8b0000]/10 border border-[#8b0000]/30 p-3 rounded-sm">
-                    <p class="text-[#8b0000] text-[10px] font-black uppercase tracking-widest leading-tight">Turns are capped! Strike!</p>
+    <!-- A.I. ADVISOR MODULE -->
+    <div class="bg-dark-translucent border border-cyan-500/20 rounded-xl overflow-hidden shadow-2xl relative">
+        <div class="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-cyan-400/30"></div>
+        
+        <header class="bg-cyan-950/20 px-4 py-3 border-b border-cyan-500/10 flex justify-between items-center">
+            <h2 class="text-cyan-400 font-title text-[10px] font-black uppercase tracking-[3px]">A.I. Advisor</h2>
+            <div class="flex gap-1">
+                <span class="w-1 h-1 bg-cyan-500 rounded-full animate-ping"></span>
+            </div>
+        </header>
+
+        <div class="p-6 space-y-6">
+            <p class="text-gray-300 text-xs italic leading-relaxed font-sans border-l-2 border-cyan-500/30 pl-4">
+                "{currentAdvice}"
+            </p>
+
+            <!-- XP / LEVEL TELEMETRY -->
+            <div class="space-y-2 pt-4 border-t border-white/5">
+                <div class="flex justify-between items-end">
+                    <span class="text-[9px] font-black text-gray-500 uppercase tracking-widest">Level {user?.level} Status</span>
+                    <span class="text-[9px] font-mono text-cyan-500">{kingdom.xp?.toLocaleString() || 0} XP</span>
                 </div>
-            {/if}
-            <p class="text-[#d1d5db] text-xs italic leading-relaxed font-serif">"{user?.advice || 'Scanning horizons...'}"</p>
-            <div class="space-y-1 pt-4">
-                <div class="flex justify-between text-[9px] font-bold uppercase">
-                    <span class="text-gray-600">Level {user?.level}</span>
-                    <span class="text-[#c5a059]">{kingdom.xp?.toLocaleString() || 0} XP</span>
-                </div>
-                <div class="h-1 w-full bg-black rounded-full overflow-hidden border border-[#2a231e]">
-                    <div class="h-full bg-gradient-to-r from-[#5c4a3e] to-[#c5a059]" style="width: {user?.xpProgress || 0}%"></div>
+                <div class="h-1.5 w-full bg-black/50 rounded-full overflow-hidden border border-cyan-500/10">
+                    <div 
+                        class="h-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)] transition-all duration-1000" 
+                        style="width: {user?.xpProgress || 0}%"
+                    ></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="bg-[#0f0f0f] border border-[#2a231e] shadow-2xl">
-        <div class="bg-[#161616] px-4 py-2 border-b border-[#2a231e]"><h2 class="text-gray-500 text-[10px] font-black uppercase tracking-[3px]">Vitals</h2></div>
-        <div class="p-6 space-y-4 font-mono text-xs">
-            <div class="flex justify-between border-b border-[#2a231e]/50 pb-2"><span class="text-gray-600">Gold:</span><span class="text-white font-bold">{resources.gold.toLocaleString()}</span></div>
-            <div class="flex justify-between border-b border-[#2a231e]/50 pb-2"><span class="text-gray-600">Banked:</span><span class="text-[#c5a059] font-bold">{resources.bank.toLocaleString()}</span></div>
-            <div class="flex justify-between border-b border-[#2a231e]/50 pb-2"><span class="text-gray-600">Citizens:</span><span class="text-white font-bold">{resources.citizens.toLocaleString()}</span></div>
-            <div class="flex justify-between border-b border-[#2a231e]/50 pb-2"><span class="text-gray-600">Turns:</span><span class="text-[#3f6b2f] font-bold">{resources.turns}</span></div>
-            <div class="flex justify-between pt-2"><span class="text-gray-600">Next Heartbeat:</span><span class="text-[#3f6b2f] font-bold">{formattedTick.value}</span></div>
+    <!-- VITALS TELEMETRY -->
+    <div class="bg-dark-translucent border border-cyan-500/20 rounded-xl overflow-hidden shadow-2xl">
+        <header class="bg-cyan-950/20 px-4 py-3 border-b border-cyan-500/10">
+            <h2 class="text-gray-500 font-title text-[10px] font-black uppercase tracking-[3px]">Sector Vitals</h2>
+        </header>
+        
+        <div class="p-6 space-y-4 font-mono text-[11px]">
+            <div class="flex justify-between items-center group">
+                <span class="text-gray-600 uppercase">Credits</span>
+                <span class="text-white font-bold group-hover:text-cyan-400 transition-colors">{resources.gold.toLocaleString()}</span>
+            </div>
+            <div class="flex justify-between items-center group">
+                <span class="text-gray-600 uppercase">Secure Bank</span>
+                <span class="text-cyan-600 font-bold group-hover:text-cyan-400 transition-colors">{resources.bank.toLocaleString()}</span>
+            </div>
+            <div class="flex justify-between items-center group">
+                <span class="text-gray-600 uppercase">Population</span>
+                <span class="text-white font-bold group-hover:text-cyan-400 transition-colors">{resources.citizens.toLocaleString()}</span>
+            </div>
+            <div class="flex justify-between items-center group border-t border-white/5 pt-4">
+                <span class="text-gray-600 uppercase">Sortie Turns</span>
+                <span class="text-cyan-400 font-bold">{resources.turns}</span>
+            </div>
+            <div class="flex justify-between items-center pt-2">
+                <span class="text-gray-600 uppercase text-[9px]">Cycle Refresh</span>
+                <span class="text-cyan-400 font-bold animate-pulse">{formattedTick.value}</span>
+            </div>
         </div>
     </div>
 </aside>

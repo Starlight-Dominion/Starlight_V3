@@ -15,65 +15,48 @@
 
 <svelte:window onclick={closeAll} />
 
-<header class="sticky top-0 z-50 bg-black/95 backdrop-blur-md border-b border-[#2a231e] shadow-2xl">
-    <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
+<!-- Higher Z-Index and clear overflow context -->
+<header class="sticky top-0 z-[100] bg-dark-translucent border-b border-cyan-500/20 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center relative">
         
-        <div class="flex items-center gap-10">
-            <a href="/dashboard" class="text-[#c5a059] text-xl font-black tracking-tighter uppercase select-none">
-                Shadow Reign
+        <div class="flex items-center gap-12">
+            <a href="/dashboard" class="group flex flex-col">
+                <span class="text-cyan-400 font-title font-black text-xl tracking-[4px] uppercase text-shadow-glow group-hover:text-white transition-all">
+                    Starlight Dominion
+                </span>
+                <span class="text-[7px] font-mono text-cyan-900 uppercase tracking-[2px] -mt-1">Sector Command Interface</span>
             </a>
             
-            <nav class="hidden md:flex items-center gap-6">
-                <!-- HOME GROUP -->
+            <nav class="hidden md:flex items-center gap-8">
                 <div class="relative">
                     <button 
                         onclick={(e) => toggleMenu('home', e)}
-                        class="text-[10px] font-black tracking-[2px] uppercase flex items-center gap-1 transition-colors {activeMenu === 'home' ? 'text-white' : 'text-gray-500 hover:text-gray-300'}"
+                        class="text-[9px] font-title font-bold tracking-[2px] uppercase flex items-center gap-2 transition-colors {activeMenu === 'home' ? 'text-cyan-400' : 'text-gray-500 hover:text-gray-300'}"
                     >
-                        Home <span class="text-[8px] opacity-50">▼</span>
+                        Command <span class="text-[7px] opacity-40">▼</span>
                     </button>
                     {#if activeMenu === 'home'}
-                        <div in:fade={{ duration: 100 }} class="absolute top-full left-0 mt-4 w-48 bg-[#0f0f0f] border border-[#2a231e] rounded-xl shadow-2xl py-2 overflow-hidden">
-                            <a href="/dashboard" class="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:bg-[#1a1a1a] hover:text-[#c5a059] transition-all">Command Center</a>
-                            <a href="/settings" class="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:bg-[#1a1a1a] hover:text-[#c5a059] transition-all">Kingdom Settings</a>
+                        <div in:fade={{ duration: 100 }} class="absolute top-full left-0 mt-4 w-48 bg-[#060a19] border border-cyan-500/30 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] py-2 backdrop-blur-xl z-[110]">
+                            <a href="/dashboard" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">Dashboard</a>
+                            <a href="/settings" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">System Settings</a>
                         </div>
                     {/if}
                 </div>
 
-                <!-- STRUCTURES GROUP -->
                 <div class="relative">
                     <button 
                         onclick={(e) => toggleMenu('structures', e)}
-                        class="text-[10px] font-black tracking-[2px] uppercase flex items-center gap-1 transition-colors {activeMenu === 'structures' ? 'text-white' : 'text-gray-500 hover:text-gray-300'}"
+                        class="text-[9px] font-title font-bold tracking-[2px] uppercase flex items-center gap-2 transition-colors {activeMenu === 'structures' ? 'text-cyan-400' : 'text-gray-500 hover:text-gray-300'}"
                     >
-                        Structures <span class="text-[8px] opacity-50">▼</span>
+                        Infrastructure <span class="text-[7px] opacity-40">▼</span>
                     </button>
                     {#if activeMenu === 'structures'}
-                        <div in:fade={{ duration: 100 }} class="absolute top-full left-0 mt-4 w-56 bg-[#0f0f0f] border border-[#2a231e] rounded-xl shadow-2xl py-2 overflow-hidden">
-                            <a href="/structures" class="block px-4 py-3 text-[10px] font-black uppercase tracking-widest text-[#c5a059] bg-[#1a1a1a] hover:bg-[#222] transition-all">Structures Overview</a>
-                            <a href="/structures/foundation" class="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:bg-[#1a1a1a] hover:text-[#c5a059] transition-all">The Foundation</a>
-                            <a href="/structures/armory" class="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:bg-[#1a1a1a] hover:text-[#c5a059] transition-all">Royal Armory</a>
-                            <a href="/structures/stable" class="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:bg-[#1a1a1a] hover:text-[#c5a059] transition-all">Unit Stable</a>
-                            <a href="/structures/mines" class="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:bg-[#1a1a1a] hover:text-[#c5a059] transition-all">Deep Mines</a>
-                            <a href="/bank" class="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:bg-[#1a1a1a] hover:text-[#c5a059] transition-all">Iron Bank</a>
-                            <a href="/structures/upgrades" class="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:bg-[#1a1a1a] hover:text-[#c5a059] transition-all">Imperial Upgrades</a>
-                        </div>
-                    {/if}
-                </div>
-
-                <!-- COMBAT GROUP -->
-                <div class="relative">
-                    <button 
-                        onclick={(e) => toggleMenu('combat', e)}
-                        class="text-[10px] font-black tracking-[2px] uppercase flex items-center gap-1 transition-colors {activeMenu === 'combat' ? 'text-white' : 'text-gray-500 hover:text-gray-300'}"
-                    >
-                        Combat <span class="text-[8px] opacity-50">▼</span>
-                    </button>
-                    {#if activeMenu === 'combat'}
-                        <div in:fade={{ duration: 100 }} class="absolute top-full left-0 mt-4 w-52 bg-[#0f0f0f] border border-[#2a231e] rounded-xl shadow-2xl py-2 overflow-hidden">
-                            <a href="/combat/battlefield" class="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:bg-[#1a1a1a] hover:text-[#c5a059] transition-all">The Battlefield</a>
-                            <a href="/spy" class="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:bg-[#1a1a1a] hover:text-[#c5a059] transition-all">Espionage Hub</a>
-                            <a href="/combat/training" class="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:bg-[#1a1a1a] hover:text-[#c5a059] transition-all">Army Training</a>
+                        <div in:fade={{ duration: 100 }} class="absolute top-full left-0 mt-4 w-56 bg-[#060a19] border border-cyan-500/30 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] py-2 backdrop-blur-xl z-[110]">
+                            <a href="/structures" class="block px-4 py-3 text-[9px] font-black uppercase tracking-widest text-cyan-400 border-b border-white/5 mb-1">Structural Overview</a>
+                            <a href="/structures/foundation" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">Foundation</a>
+                            <a href="/structures/armory" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">Sector Armory</a>
+                            <a href="/structures/stable" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">Unit Stable</a>
+                            <a href="/bank" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">The Iron Bank</a>
                         </div>
                     {/if}
                 </div>
@@ -81,26 +64,22 @@
         </div>
 
         <div class="flex items-center gap-8">
-            <div class="hidden lg:flex gap-8 items-center border-l border-[#2a231e] pl-8">
+            <div class="hidden lg:flex gap-8 items-center border-l border-white/5 pl-8">
                 <div class="flex flex-col items-end">
-                    <span class="text-[8px] font-black text-gray-600 uppercase tracking-widest">Liquid Gold</span>
+                    <span class="text-[7px] font-black text-cyan-900 uppercase tracking-widest">Operational Credits</span>
                     <div class="flex items-center gap-2">
                         <span class="text-white font-mono font-bold text-sm">{resources.gold.toLocaleString()}</span>
-                        <span class="text-[#3f6b2f] text-[9px] font-bold">+{goldPerTick}</span>
+                        <span class="text-cyan-600 text-[8px] font-bold">+{goldPerTick}</span>
                     </div>
-                </div>
-                <div class="flex flex-col items-end">
-                    <span class="text-[8px] font-black text-gray-600 uppercase tracking-widest">Citizens</span>
-                    <span class="text-white font-mono font-bold text-sm">{resources.citizens.toLocaleString()}</span>
                 </div>
             </div>
 
             <div class="flex items-center gap-4">
-                <div class="bg-[#1a1a1a] px-4 py-2 rounded-lg border border-[#2a231e] flex flex-col items-center min-w-[90px]">
-                    <span class="text-[7px] font-black text-gray-600 uppercase tracking-widest">Next Tick</span>
-                    <span class="text-[#3f6b2f] font-mono font-bold text-sm leading-none mt-1">{formattedTick.value}</span>
+                <div class="bg-black/40 px-4 py-2 rounded border border-cyan-500/20 flex flex-col items-center min-w-[90px]">
+                    <span class="text-[7px] font-black text-cyan-800 uppercase tracking-widest">Cycle Sync</span>
+                    <span class="text-cyan-400 font-mono font-bold text-sm leading-none mt-1">{formattedTick.value}</span>
                 </div>
-                <a href="/logout" class="text-[9px] font-black text-red-900 uppercase hover:text-red-500 transition-colors tracking-tighter">Exit</a>
+                <a href="/logout" class="text-[8px] font-black text-red-900 uppercase hover:text-red-500 transition-all tracking-tighter">Terminate Link</a>
             </div>
         </div>
     </div>

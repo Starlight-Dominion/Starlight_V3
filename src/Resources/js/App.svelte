@@ -50,87 +50,66 @@
         'stable/index': Stable
     };
 
-    /**
-     * Active Component Resolution
-     * Determines which view to mount based on PHP routing state.
-     */
     const ActiveComponent = $derived.by(() => {
         const comp = components[game.component];
         if (comp) return comp;
-        
-        // Logical Fallback: Authenticated home should always be Dashboard
         if (game.user && game.component === 'home') return Dashboard;
-        
         return Landing;
     });
+
+    const bgUrl = "/images/backgroundMain.avif";
 </script>
 
-<div class="min-h-screen flex flex-col bg-[#030712] text-gray-300 font-sans selection:bg-cyan-500/30">
-    
-    {#if game.user}
-        <!-- Authenticated HUD -->
-        <ResourceHeader />
-        
-        <main class="flex-grow w-full max-w-7xl mx-auto px-6 py-8">
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                <TacticalSidebar />
-                <section class="lg:col-span-3">
-                    <ActiveComponent {...game.props} />
-                </section>
-            </div>
-        </main>
-    {:else}
-        <!-- Public Interface -->
-        <PublicNav />
-        <main class="flex-grow">
-            <ActiveComponent {...game.props} />
-        </main>
-    {/if}
+<!-- The root wrapper handles the starry background and ensures NO clipping -->
+<div 
+    class="min-h-screen flex flex-col bg-[#030712] text-gray-300 font-sans selection:bg-cyan-500/30 bg-cover bg-center bg-fixed relative"
+    style="background-image: url('{bgUrl}');"
+>
+    <!-- Deep Space Overlay -->
+    <div class="absolute inset-0 bg-gradient-to-b from-[#030712]/60 via-[#030712]/50 to-[#030712]/90 z-0 pointer-events-none"></div>
 
-    <!-- Futuristic Tactical Footer -->
-    <footer class="bg-[#030712]/95 backdrop-blur-md border-t border-cyan-500/10 py-12 relative overflow-hidden">
-        <!-- Subtle background scanline effect -->
-        <div class="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]"></div>
-        
-        <div class="max-w-7xl mx-auto px-6 relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
-            <div class="flex flex-col items-center md:items-start gap-2">
-                <div class="flex items-center gap-3">
-                    <span class="w-2 h-2 bg-cyan-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(6,182,212,1)]"></span>
-                    <span class="text-white font-title font-black text-xs uppercase tracking-[4px]">
-                        Starlight Dominion
-                    </span>
+    <!-- UI Layer: We use z-10 here, but the Header inside uses z-50 -->
+    <div class="flex flex-col flex-grow z-10">
+        {#if game.user}
+            <!-- ResourceHeader is now at the top of the stack -->
+            <ResourceHeader />
+            
+            <main class="flex-grow w-full max-w-7xl mx-auto px-6 py-8">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <TacticalSidebar />
+                    <section class="lg:col-span-3">
+                        <ActiveComponent {...game.props} />
+                    </section>
                 </div>
-                <span class="text-[9px] font-bold text-gray-600 uppercase tracking-[2px] ml-5">
-                    Decentralized Sector Command • v1.0.4-Alpha
-                </span>
-            </div>
+            </main>
+        {:else}
+            <PublicNav />
+            <main class="flex-grow">
+                <ActiveComponent {...game.props} />
+            </main>
+        {/if}
 
-            <nav class="flex gap-10">
-                <a href="/terms" class="text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Sector Laws</a>
-                <a href="/about" class="text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Command Manual</a>
-                <a href="/contact" class="text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Signal Uplink</a>
-            </nav>
+        <footer class="bg-[#030712]/95 backdrop-blur-md border-t border-cyan-500/10 py-12 relative overflow-hidden">
+            <div class="max-w-7xl mx-auto px-6 relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+                <div class="flex flex-col items-center md:items-start gap-2">
+                    <div class="flex items-center gap-3">
+                        <span class="w-2 h-2 bg-cyan-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(6,182,212,1)]"></span>
+                        <span class="text-white font-title font-black text-xs uppercase tracking-[4px]">
+                            Starlight Dominion
+                        </span>
+                    </div>
+                </div>
 
-            <div class="text-[9px] font-mono text-gray-700 uppercase tracking-tighter">
-                &copy; 2026 STARLIGHT DOMINION • ALL SECTORS MONITORED
+                <nav class="flex gap-10">
+                    <a href="/terms" class="text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Sector Laws</a>
+                    <a href="/about" class="text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Command Manual</a>
+                    <a href="/contact" class="text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Signal Uplink</a>
+                </nav>
+
+                <div class="text-[9px] font-mono text-gray-700 uppercase tracking-tighter">
+                    &copy; 2026 STARLIGHT DOMINION
+                </div>
             </div>
-        </div>
-    </footer>
+        </footer>
+    </div>
 </div>
-
-<style>
-    /* Global scrollbar styling for the sci-fi theme */
-    :global(::-webkit-scrollbar) {
-        width: 6px;
-    }
-    :global(::-webkit-scrollbar-track) {
-        background: #030712;
-    }
-    :global(::-webkit-scrollbar-thumb) {
-        background: #0e1a2b;
-        border-radius: 10px;
-    }
-    :global(::-webkit-scrollbar-thumb:hover) {
-        background: #162a3d;
-    }
-</style>
