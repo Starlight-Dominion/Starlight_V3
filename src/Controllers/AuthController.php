@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 namespace sdo\Controllers;
@@ -11,76 +10,96 @@ use sdo\Infrastructure\Validator;
 
 class AuthController extends BaseController
 {
-public function __construct(
-GameService $gameService,
-AdvisorService $advisorService,
-private AuthService $authService
-) {
-parent::__construct($gameService, $advisorService);
-}
+    public function __construct(
+        GameService $gameService,
+        AdvisorService $advisorService,
+        private AuthService $authService
+    ) {
+        parent::__construct($gameService, $advisorService);
+    }
 
-public function showLogin(): string
-{
-return $this->render('auth/login', ['title' => 'Login']);
-}
+    /**
+     * Standardized JSON API Response
+     */
+    private function jsonResponse(bool $success, array $errors = [], int $status = 200): void
+    {
+        header('Content-Type: application/json');
+        http_response_code($status);
+        echo json_encode(['success' => $success, 'errors' => $errors]);
+        exit;
+    }
 
-public function login(): void
-{
-$validator = Validator::make($_POST, [
-'username' => 'required',
-'password' => 'required',
-]);
+    public function showLogin(): string
+    {
+        return $this->render('auth/login', ['title' => 'Establish Link']);
+    }
 
-if ($validator->fails()) {
-$this->redirectBack($validator->errors());
-}
+    public function showRegister(): string
+    {
+        return $this->render('auth/register', ['title' => 'Initialize Sector']);
+    }
 
-$user = $this->authService->login($_POST['username'], $_POST['password']);
+    public function login(): void
+    {
+        $validator = Validator::make($_POST, [
+            'username' => 'required',
+            'password' => 'required',
+        ]);
 
-if ($user) {
-$_SESSION['user_id'] = $user->id;
-$_SESSION['username'] = $user->username;
-$this->redirect('/dashboard');
-}
+        if ($validator->fails()) {
+            $this->jsonResponse(false, ['Invalid identity handle or cipher.'], 401);
+        }
 
-$this->redirectBack(['Invalid credentials.']);
-}
+        $user = $this->authService->login($_POST['username'], $_POST['password']);
 
-public function showRegister(): string
-{
-return $this->render('auth/register', ['title' => 'Register']);
-}
+        if ($user) {
+            $_SESSION['user_id'] = $user->id;
+            $_SESSION['username'] = $user->username;
+            $this->jsonResponse(true, ['Link established.']);
+        }
 
-public function register(): void
-{
-$validator = Validator::make($_POST, [
-'username' => 'required|min:3|alpha_num',
-'email' => 'required|email',
-'password' => 'required|min:6|confirmed',
-'kingdom_name' => 'required|min:3',
-]);
+        $this->jsonResponse(false, ['Invalid identity handle or cipher.'], 401);
+    }
 
-if ($validator->fails()) {
-$this->redirectBack($validator->errors(), $_POST);
-}
+    public function register(): void
+    {
+        // 1. Initial Validation
+        $validator = Validator::make($_POST, [
+            'username' => 'required|min:3|alpha_num',
+            'email' => 'required|email',
+            'password' => 'required|min:6|confirmed',
+            'kingdom_name' => 'required|min:3',
+            'race' => 'required'
+        ]);
 
-$success = $this->authService->register(
-$_POST['username'],
-$_POST['email'],
-$_POST['password'],
-$_POST['kingdom_name']
-);
+        if ($validator->fails()) {
+            $errorMsgs = [];
+            foreach ($validator->errors() as $fieldErrors) {
+                $errorMsgs = array_merge($errorMsgs, $fieldErrors);
+            }
+            $this->jsonResponse(false, $errorMsgs, 400);
+        }
 
-if ($success) {
-$this->redirect('/login?success=1');
-}
+        // 2. Process Registration with Explicit Error Handling
+        $result = $this->authService->register(
+            $_POST['username'],
+            $_POST['email'],
+            $_POST['password'],
+            $_POST['kingdom_name'],
+            $_POST['race']
+        );
 
-$this->redirectBack(['Registration failed. User or Kingdom name may be taken.']);
-}
+        if ($result['success']) {
+            $this->jsonResponse(true, ['Sector initialized successfully.']);
+        } else {
+            // Returns the exact error (e.g. "Handle is already registered")
+            $this->jsonResponse(false, [$result['message']], 400);
+        }
+    }
 
-public function logout(): void
-{
-$this->authService->logout();
-$this->redirect('/');
-}
+    public function logout(): void
+    {
+        $this->authService->logout();
+        $this->redirect('/');
+    }
 }

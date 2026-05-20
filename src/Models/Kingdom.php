@@ -1,5 +1,4 @@
 <?php
-
 namespace sdo\Models;
 
 class Kingdom extends Model
@@ -19,6 +18,12 @@ class Kingdom extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    // NEW RELATIONSHIP
+    public function race()
+    {
+        return $this->belongsTo(Race::class, 'race_id');
     }
 
     public function getPlayerLevel(): int
