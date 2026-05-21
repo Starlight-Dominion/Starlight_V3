@@ -12,7 +12,8 @@ class GameStore {
         turns: 0,
         xp: 0,
         deposits_today: 0,
-        max_deposits: 6
+        max_deposits: 6,
+        citizens_per_tick: 0
     });
 
     nextTickSeconds = $state(900);
@@ -31,6 +32,10 @@ class GameStore {
 
         if (this.user?.kingdom) {
             this.syncResources(this.user.kingdom);
+        }
+
+        if (this.user?.citizen_growth_rate) {
+            this.resources.citizens_per_tick = this.user.citizen_growth_rate;
         }
         
         if (initialState.user?.secondsToNextTick) {

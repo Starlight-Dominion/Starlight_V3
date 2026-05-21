@@ -19,15 +19,13 @@ class AdvisorService
 
     /**
      * Return contextual advisor advice based on current level and XP progress.
-     * This provides more meaningful guidance as the kingdom develops.
      */
     public function getContextualAdvice(int $level, int $xp): string
     {
-        // Basic thresholds to tailor advice
-        // Determine progress toward next level
         $xp = max(0, $xp);
-        $currentThreshold = ($level - 1) * ($level - 1) * 100; // as used by our level formula
+        $currentThreshold = ($level - 1) * ($level - 1) * 100;
         $nextThreshold = $level * $level * 100;
+        
         $progress = 0.0;
         if ($nextThreshold > $currentThreshold) {
             $progress = (($xp - $currentThreshold) / ($nextThreshold - $currentThreshold)) * 100.0;
@@ -47,19 +45,18 @@ class AdvisorService
     
     /**
      * Return contextual advisor advice based on kingdom data when available.
-     * Falls back to getAdvice() when kingdom data is not provided.
      */
     public function getContextualAdviceFromKingdom(?array $kingdom): string
     {
         if ($kingdom && isset($kingdom['xp'])) {
             $xp = (int) $kingdom['xp'];
-            $level = floor(sqrt($xp / 100)) + 1;
+            $level = (int)floor(sqrt($xp / 100)) + 1;
             return $this->getContextualAdvice($level, $xp);
         }
         return $this->getAdvice();
     }
 
-    /** Persist advisor message in session history for DRY advisor history across pages */
+    /** Persist advisor message in session history */
     public function recordAdvisorAdvice(string $text): void
     {
         if (!isset($_SESSION)) {

@@ -46,6 +46,7 @@ abstract class BaseController
                     'advice' => $vm->advice,
                     'realmTime' => $vm->realmTime,
                     'secondsToNextTick' => $vm->secondsToNextTick,
+                    'citizen_growth_rate' => \sdo\Services\GameService::BASE_CITIZENS_PER_TICK,
                     'kingdom' => $dominion->toArray(),
                     'avatar_path' => $dominion->user->avatar_path,
                     'advisorHistory' => $vm->advisorHistory

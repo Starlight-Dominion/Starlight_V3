@@ -5,13 +5,11 @@ namespace sdo\Services;
 
 use PDO;
 use DateTime;
+use sdo\Services\GameService;
 
 class TickService
 {
-    private const BATCH_SIZE = 100;
-    private const BASE_CREDITS_PER_TICK = 100;
-    private const BASE_CITIZENS_PER_TICK = 50;
-    private const BASE_TURNS_PER_TICK = 10;
+    public const BATCH_SIZE = 100;
 
     public function __construct(private PDO $db) {}
 
@@ -52,12 +50,12 @@ class TickService
 
             foreach ($dominions as $dom) {
                 $multiplier = 1 + ((float)($dom['total_economy_buff'] ?? 0) / 100);
-                $creditsGained = (int)floor(self::BASE_CREDITS_PER_TICK * $multiplier);
+                $creditsGained = (int)floor(GameService::BASE_CREDITS_PER_TICK * $multiplier);
 
                 $updateStmt->execute([
                     ':credits_gained' => $creditsGained,
-                    ':citizens_gained' => self::BASE_CITIZENS_PER_TICK,
-                    ':turns_gained'   => self::BASE_TURNS_PER_TICK,
+                    ':citizens_gained' => GameService::BASE_CITIZENS_PER_TICK,
+                    ':turns_gained'   => GameService::BASE_TURNS_PER_TICK,
                     ':now'            => $now,
                     ':id'             => $dom['id'],
                 ]);
