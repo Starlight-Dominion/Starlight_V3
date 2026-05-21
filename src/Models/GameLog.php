@@ -7,6 +7,12 @@ class GameLog extends Model
 {
     protected $table = 'game_logs';
 
+    /**
+     * Disable automatic Eloquent timestamps.
+     * The table only has created_at.
+     */
+    public $timestamps = false;
+
     protected $fillable = [
         'dominion_id',
         'action',

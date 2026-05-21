@@ -4,16 +4,16 @@
 
     let { transactions = [] } = $props();
     
-    let amount = $state(0);
+    let depositAmount = $state(0);
+    let withdrawAmount = $state(0);
     let loading = $state(false);
     let message = $state(null);
 
     const maxDeposit = $derived(Math.floor(resources.credits * 0.8));
     const maxWithdraw = $derived(resources.bank);
-    const isOverLimit = $derived(amount > maxDeposit);
     const depositsLeft = $derived(resources.max_deposits - resources.deposits_today);
 
-    async function handleAction(action) {
+    async function handleAction(action, amount) {
         if (loading || amount <= 0) return;
         loading = true;
         message = null;
@@ -31,8 +31,6 @@
             const data = await res.json();
             message = data;
             if (data.success) {
-                // Instead of reload, we could just refresh state, 
-                // but reload is safer for transactions history
                 window.location.reload();
             }
         } catch (e) {
@@ -62,46 +60,60 @@
     {/if}
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- ACTION PANEL -->
-        <div class="bg-dark-translucent border border-cyan-500/20 rounded-3xl p-10 space-y-8 shadow-2xl relative overflow-hidden">
-            <div class="absolute top-0 right-0 p-4 opacity-10">
-                 <span class="text-6xl font-title font-black text-white italic">VAULT</span>
+        <!-- ACTION PANELS -->
+        <div class="space-y-6">
+            <!-- DEPOSIT BOX -->
+            <div class="bg-dark-translucent border border-cyan-500/20 rounded-3xl p-8 space-y-6 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                    <span class="text-4xl font-title font-black text-white italic">DEPOSIT</span>
+                </div>
+                
+                <div class="space-y-2">
+                    <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Secure Assets (Credits)</label>
+                    <input type="number" bind:value={depositAmount} class="input-terminal text-2xl font-mono text-cyan-400" placeholder="0" />
+                    <div class="flex justify-between px-2 pt-1">
+                        <span class="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Safe Limit (80%): {maxDeposit.toLocaleString()} CP</span>
+                        {#if depositAmount > maxDeposit}
+                            <span class="text-[8px] font-black text-red-500 uppercase animate-pulse">Exceeding Security Protocol</span>
+                        {/if}
+                    </div>
+                </div>
+
+                <button 
+                    onclick={() => handleAction('deposit', depositAmount)}
+                    class="w-full bg-cyan-700/50 hover:bg-cyan-600 border border-cyan-500/50 text-white font-title font-black py-4 rounded-xl uppercase tracking-[3px] transition-all disabled:opacity-30"
+                    disabled={loading || depositAmount <= 0 || depositAmount > maxDeposit || depositsLeft <= 0}
+                >Secure Assets</button>
             </div>
 
-            <div class="space-y-2">
-                <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Transaction Magnitude (Credits)</label>
-                <input type="number" bind:value={amount} class="input-terminal text-2xl font-mono text-cyan-400" placeholder="0" />
-                <div class="flex justify-between px-2 pt-1">
-                    <div class="flex flex-col">
-                        <span class="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Deposit Limit (80%): {maxDeposit.toLocaleString()} CP</span>
+            <!-- WITHDRAW BOX -->
+            <div class="bg-dark-translucent border border-white/5 rounded-3xl p-8 space-y-6 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                    <span class="text-4xl font-title font-black text-white italic">LIQUIDATE</span>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-[9px] font-black text-gray-600 uppercase tracking-[2px] ml-2">Liquidate Assets (Credits)</label>
+                    <input type="number" bind:value={withdrawAmount} class="input-terminal text-2xl font-mono text-gray-400 border-white/10" placeholder="0" />
+                    <div class="px-2 pt-1">
                         <span class="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Withdraw Max: {maxWithdraw.toLocaleString()} CP</span>
                     </div>
-                    {#if isOverLimit}
-                        <span class="text-[8px] font-black text-red-500 uppercase animate-pulse">Exceeding Security Protocol</span>
-                    {/if}
                 </div>
-            </div>
 
-            <div class="grid grid-cols-2 gap-4">
                 <button 
-                    onclick={() => handleAction('deposit')}
-                    class="bg-cyan-700/50 hover:bg-cyan-600 border border-cyan-500/50 text-white font-title font-black py-5 rounded-xl uppercase tracking-[3px] transition-all disabled:opacity-30"
-                    disabled={loading || isOverLimit || amount <= 0 || depositsLeft <= 0}
-                >Secure Assets</button>
-                <button 
-                    onclick={() => handleAction('withdraw')}
-                    class="bg-black/40 hover:bg-black/60 border border-white/5 text-gray-400 py-5 rounded-xl uppercase font-title font-black tracking-[3px] transition-all disabled:opacity-30"
-                    disabled={loading || amount <= 0 || amount > maxWithdraw}
+                    onclick={() => handleAction('withdraw', withdrawAmount)}
+                    class="w-full bg-black/40 hover:bg-black/60 border border-white/5 text-gray-400 py-4 rounded-xl uppercase font-title font-black tracking-[3px] transition-all disabled:opacity-30"
+                    disabled={loading || withdrawAmount <= 0 || withdrawAmount > maxWithdraw}
                 >Liquidate</button>
             </div>
         </div>
 
         <!-- HISTORY PANEL -->
-        <div class="bg-dark-translucent border border-cyan-500/10 rounded-3xl overflow-hidden shadow-2xl">
+        <div class="bg-dark-translucent border border-cyan-500/10 rounded-3xl overflow-hidden shadow-2xl h-fit">
             <header class="bg-cyan-950/20 px-8 py-4 border-b border-cyan-500/10">
                 <h2 class="text-[10px] font-black text-gray-500 uppercase tracking-[4px]">Audit Trail</h2>
             </header>
-            <div class="max-h-[350px] overflow-y-auto">
+            <div class="max-h-[580px] overflow-y-auto">
                 <table class="w-full text-left font-mono text-[10px]">
                     <thead class="bg-black/40 text-gray-600 uppercase">
                         <tr>
