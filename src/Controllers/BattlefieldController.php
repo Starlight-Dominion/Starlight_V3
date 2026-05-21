@@ -11,26 +11,26 @@ use sdo\Services\AuthService;
 
 class BattlefieldController extends BaseController
 {
-public function __construct(
-GameService $gameService,
-AdvisorService $advisorService,
-private BattlefieldService $battlefieldService,
-private AuthService $authService
-) {
-parent::__construct($gameService, $advisorService);
-}
+    public function __construct(
+        GameService $gameService,
+        AdvisorService $advisorService,
+        private BattlefieldService $battlefieldService,
+        private AuthService $authService
+    ) {
+        parent::__construct($gameService, $advisorService);
+    }
 
-public function index(): string
-{
-if (!$this->authService->isLoggedIn($_SESSION)) {
-$this->redirect('/login');
-}
+    public function index(): string
+    {
+        if (!$this->authService->isLoggedIn($_SESSION)) {
+            $this->redirect('/login');
+        }
 
-return $this->render('battlefield/index', [
-'title' => 'The Battlefield',
-'players' => $this->battlefieldService->getBattlefieldList()
-]);
-}
+        return $this->render('battlefield/index', [
+            'title' => 'The Battlefield',
+            'players' => $this->battlefieldService->getBattlefieldList()
+        ]);
+    }
 
     public function attack(): void
     {
@@ -67,15 +67,16 @@ return $this->render('battlefield/index', [
         $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
         $log = $this->battlefieldService->getBattleLog($id);
 
-        if (!$log || ($log->attacker_kingdom_id !== $kingdom->id && $log->defender_kingdom_id !== $kingdom->id)) {
+        // Security check: Must be attacker or defender
+        if (!$log || ((int)$log->attacker_id !== $kingdom->id && (int)$log->defender_id !== $kingdom->id)) {
             $this->redirect('/battlefield');
         }
 
         return $this->render('battlefield/report', [
             'title' => 'Battle Report',
             'log' => $log,
-            'attacker' => $this->gameService->getKingdomById($log->attacker_kingdom_id),
-            'defender' => $this->gameService->getKingdomById($log->defender_kingdom_id),
+            'attacker' => $this->gameService->getKingdomById((int)$log->attacker_id),
+            'defender' => $this->gameService->getKingdomById((int)$log->defender_id),
         ]);
     }
 }

@@ -37,6 +37,11 @@ class GameService
         return Dominion::with(['user', 'race'])->where('user_id', $userId)->first();
     }
 
+    public function getKingdomById(int $id): ?Dominion
+    {
+        return Dominion::with(['user', 'race'])->find($id);
+    }
+
     public function calculateXpProgress(int $xp): int
     {
         $level = (int)floor(sqrt($xp / 100)) + 1;

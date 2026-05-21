@@ -8,6 +8,7 @@ use sdo\Models\User;
 use sdo\Services\LogService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
+use DateTime;
 
 class BattlefieldService
 {
@@ -46,48 +47,53 @@ class BattlefieldService
             $atkDom = Dominion::lockForUpdate()->find($attackerId);
             $defDom = Dominion::lockForUpdate()->find($targetId);
 
-            if ($atkDom->turns < $turns) throw new Exception("Insufficient turns.");
+            if (!$atkDom || !$defDom) throw new Exception("Targeting uplink lost.");
+            if ($atkDom->turns < $turns) throw new Exception("Insufficient strike capacity.");
             if ($attackerId === $targetId) throw new Exception("Self-harm protocol prohibited.");
 
             // 1. Anti-Farm & Fatigue Checks
+            $hourAgo = (new DateTime('-1 hour'))->format('Y-m-d H:i:s');
             $hourlyCount = Capsule::table('battle_logs')
                 ->where('attacker_id', $attackerId)
                 ->where('defender_id', $targetId)
-                ->where('battle_time', '>', Capsule::raw('NOW() - INTERVAL 1 HOUR'))
+                ->where('battle_time', '>', $hourAgo)
                 ->count();
 
             $lootFactor = 1.0;
             if ($hourlyCount >= self::HOURLY_FULL_LOOT_CAP) $lootFactor = 0.25;
             if ($hourlyCount >= self::HOURLY_REDUCED_LOOT_MAX) $lootFactor = 0.0;
 
-            $fatigueLoss = 0;
-            if ($hourlyCount >= 10) {
-                $fatigueLoss = (int)floor($atkDom->user->soldiers * 0.01 * ($hourlyCount - 9));
-            }
-
             // 2. Power Calculation
             $atkRatings = $this->tacticalService->calculateTacticalRatings($attackerId);
             $defRatings = $this->tacticalService->calculateTacticalRatings($targetId);
 
-            if ($atkRatings['soldiers'] <= 0) throw new Exception("No expeditionary force available.");
+            $atkSoldiers = (int)($atkRatings['army']['soldiers'] ?? 0);
+            $defGuards = (int)($defRatings['army']['guards'] ?? 0);
+
+            if ($atkSoldiers <= 0) throw new Exception("No expeditionary force available.");
+
+            $fatigueLoss = 0;
+            if ($hourlyCount >= 10) {
+                $fatigueLoss = (int)floor($atkSoldiers * 0.01 * ($hourlyCount - 9));
+            }
 
             // Turns Multiplier: 1 + 0.5 * (pow(turns, 0.5) - 1)
             $turnsMult = min(1 + 0.5 * (pow($turns, 0.5) - 1), self::ATK_TURNS_MAX_MULT);
             $noiseA = mt_rand((int)(self::RANDOM_NOISE_MIN * 1000), (int)(self::RANDOM_NOISE_MAX * 1000)) / 1000.0;
             $noiseD = mt_rand((int)(self::RANDOM_NOISE_MIN * 1000), (int)(self::RANDOM_NOISE_MAX * 1000)) / 1000.0;
 
-            $ea = $atkRatings['raw_attack'] * $turnsMult * $noiseA;
-            $ed = $defRatings['raw_defense'] * $noiseD;
+            $ea = $atkRatings['offense'] * $turnsMult * $noiseA;
+            $ed = $defRatings['defense'] * $noiseD;
             
             $ratio = $ea / max(1.0, $ed);
             $attackerWins = ($ratio >= self::UNDERDOG_MIN_RATIO);
 
             // 3. Casualties
             $guardsLost = 0;
-            if ($defRatings['guards'] > self::GUARD_FLOOR) {
+            if ($defGuards > self::GUARD_FLOOR) {
                 $killFrac = (0.08 + 0.07 * max(0.0, min(1.0, $ratio - 1.0))) * (1 + 0.2 * ($turnsMult - 1.0));
                 if (!$attackerWins) $killFrac *= 0.5;
-                $guardsLost = min((int)floor($defRatings['guards'] * $killFrac), $defRatings['guards'] - self::GUARD_FLOOR);
+                $guardsLost = min((int)floor($defGuards * $killFrac), $defGuards - self::GUARD_FLOOR);
             }
 
             // 4. Plunder
@@ -99,7 +105,7 @@ class BattlefieldService
 
             // 5. XP
             $lvlDiff = $defDom->getPlayerLevel() - $atkDom->getPlayerLevel();
-            $xpGained = (int)(($attackerWins ? rand(150, 200) : rand(40, 60)) * $turns * max(0.1, 1 + ($lvlDiff * 0.07)));
+            $xpGained = (int)(($attackerWins ? mt_rand(150, 200) : mt_rand(40, 60)) * $turns * max(0.1, 1 + ($lvlDiff * 0.07)));
 
             // 6. Persistence
             $atkDom->credits += $stolen;
@@ -126,7 +132,8 @@ class BattlefieldService
                 'attacker_xp_gained' => $xpGained,
                 'guards_lost' => $guardsLost,
                 'attacker_soldiers_lost' => $fatigueLoss,
-                'loot_factor' => $lootFactor
+                'loot_factor' => $lootFactor,
+                'battle_time' => (new DateTime())->format('Y-m-d H:i:s')
             ]);
 
             // Comprehensive Logging
@@ -157,10 +164,13 @@ class BattlefieldService
     private function deductUnits(int $domId, string $slug, int $qty): void
     {
         if ($qty <= 0) return;
+        
+        $unit = Capsule::table('units')->where('slug', $slug)->first();
+        if (!$unit) return;
+
         Capsule::table('dominion_manpower')
-            ->join('units', 'dominion_manpower.unit_id', '=', 'units.id')
-            ->where('dominion_manpower.dominion_id', $domId)
-            ->where('units.slug', $slug)
+            ->where('dominion_id', $domId)
+            ->where('unit_id', $unit->id)
             ->decrement('total_quantity', $qty);
     }
 

@@ -1,225 +1,197 @@
 <?php
+declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use PDO;
 use PHPUnit\Framework\TestCase;
 use sdo\Services\BattlefieldService;
+use sdo\Services\TacticalService;
+use sdo\Services\LogService;
+use sdo\Models\Dominion;
+use sdo\Models\User;
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Mockery;
+use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 
 class BattlefieldServiceTest extends TestCase
 {
-    private PDO $db;
-    private BattlefieldService $service;
+    use MockeryPHPUnitIntegration;
+
+    private BattlefieldService $battlefieldService;
+    private $tacticalService;
+    private $logService;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->db = new PDO('sqlite::memory:');
-        $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        // 1. Boot Eloquent with SQLite In-Memory
+        $capsule = new Capsule;
+        $capsule->addConnection([
+            'driver'   => 'sqlite',
+            'database' => ':memory:',
+            'prefix'   => '',
+        ]);
+        $capsule->setAsGlobal();
+        $capsule->bootEloquent();
 
-        $this->db->exec("CREATE TABLE kingdoms (
-            id INTEGER PRIMARY KEY,
-            unit_guards INTEGER DEFAULT 0,
-            unit_soldiers INTEGER DEFAULT 0,
-            unit_spies INTEGER DEFAULT 0,
-            unit_sentries INTEGER DEFAULT 0
-        )");
+        // 2. Build Schema
+        $schema = Capsule::schema();
+        
+        $schema->create('users', function($table) {
+            $table->increments('id');
+            $table->string('username');
+            $table->timestamps();
+        });
 
-        $this->service = new BattlefieldService($this->db);
+        $schema->create('dominions', function($table) {
+            $table->increments('id');
+            $table->integer('user_id');
+            $table->string('name');
+            $table->integer('credits')->default(0);
+            $table->integer('turns')->default(100);
+            $table->integer('xp')->default(0);
+            $table->timestamps();
+        });
+
+        $schema->create('units', function($table) {
+            $table->increments('id');
+            $table->string('slug');
+        });
+
+        $schema->create('dominion_manpower', function($table) {
+            $table->integer('dominion_id');
+            $table->integer('unit_id');
+            $table->integer('total_quantity');
+        });
+
+        $schema->create('battle_logs', function($table) {
+            $table->increments('id');
+            $table->integer('attacker_id');
+            $table->integer('defender_id');
+            $table->string('attacker_name');
+            $table->string('defender_name');
+            $table->string('outcome');
+            $table->bigInteger('credits_stolen');
+            $table->integer('turns_used');
+            $table->bigInteger('attacker_damage');
+            $table->bigInteger('defender_damage');
+            $table->integer('attacker_xp_gained');
+            $table->integer('guards_lost');
+            $table->integer('attacker_soldiers_lost');
+            $table->decimal('loot_factor', 3, 2);
+            $table->timestamp('battle_time');
+        });
+
+        $this->tacticalService = Mockery::mock(TacticalService::class);
+        $this->logService = Mockery::mock(LogService::class);
+        $this->battlefieldService = new BattlefieldService($this->tacticalService, $this->logService);
     }
 
-    public function testCalculateArmyPowerEmpty(): void
+    public function testExecuteAttackSuccess(): void
     {
-        $result = $this->service->calculateArmyPower([
-            'guards' => 0,
-            'soldiers' => 0,
-            'spies' => 0,
-            'sentries' => 0,
+        // Setup Attacker
+        $attackerUser = new User(['username' => 'Attacker']);
+        $attackerUser->save();
+        $attacker = new Dominion([
+            'user_id' => $attackerUser->id,
+            'name' => 'Attacker Kingdom',
+            'credits' => 1000,
+            'turns' => 10,
+            'xp' => 100
+        ]);
+        $attacker->save();
+
+        // Setup Defender
+        $defenderUser = new User(['username' => 'Defender']);
+        $defenderUser->save();
+        $defender = new Dominion([
+            'user_id' => $defenderUser->id,
+            'name' => 'Defender Kingdom',
+            'credits' => 5000,
+            'turns' => 100,
+            'xp' => 500
+        ]);
+        $defender->save();
+
+        // Setup Units
+        $soldierUnit = Capsule::table('units')->insertGetId(['slug' => 'soldiers']);
+        $guardUnit = Capsule::table('units')->insertGetId(['slug' => 'guards']);
+
+        Capsule::table('dominion_manpower')->insert([
+            'dominion_id' => $attacker->id,
+            'unit_id' => $soldierUnit,
+            'total_quantity' => 100
         ]);
 
-        $this->assertEquals(0, $result['total_offense']);
-        $this->assertEquals(0, $result['total_defense']);
-        $this->assertEquals(0, $result['weighted_power']);
-    }
-
-    public function testCalculateArmyPowerSingleGuard(): void
-    {
-        $result = $this->service->calculateArmyPower([
-            'guards' => 1,
-            'soldiers' => 0,
-            'spies' => 0,
-            'sentries' => 0,
+        Capsule::table('dominion_manpower')->insert([
+            'dominion_id' => $defender->id,
+            'unit_id' => $guardUnit,
+            'total_quantity' => 50000 // Above GUARD_FLOOR
         ]);
 
-        $this->assertEquals(5, $result['total_offense']);
-        $this->assertEquals(15, $result['total_defense']);
-        $this->assertGreaterThan(0, $result['weighted_power']);
+        // Mock Tactical Ratings
+        $this->tacticalService->shouldReceive('calculateTacticalRatings')
+            ->with($attacker->id)
+            ->andReturn([
+                'offense' => 100000,
+                'defense' => 1000,
+                'army' => ['soldiers' => 100]
+            ]);
+
+        $this->tacticalService->shouldReceive('calculateTacticalRatings')
+            ->with($defender->id)
+            ->andReturn([
+                'offense' => 100,
+                'defense' => 1000,
+                'army' => ['guards' => 50000]
+            ]);
+
+        $this->logService->shouldReceive('log')->twice();
+
+        $result = $this->battlefieldService->executeAttack($attacker->id, $defender->id, 5);
+
+        $this->assertTrue($result['success']);
+        $this->assertArrayHasKey('battle_id', $result);
+        $this->assertEquals('Dominion Victorious.', $result['message']);
+
+        // Verify state changes
+        $attacker->refresh();
+        $defender->refresh();
+
+        $this->assertEquals(5, $attacker->turns);
+        $this->assertGreaterThan(1000, $attacker->credits); // Stole credits
+        $this->assertLessThan(5000, $defender->credits);
+        $this->assertGreaterThan(100, $attacker->xp);
+
+        // Verify log exists
+        $log = Capsule::table('battle_logs')->find($result['battle_id']);
+        $this->assertNotNull($log);
+        $this->assertEquals('victory', $log->outcome);
+        $this->assertGreaterThan(0, $log->credits_stolen);
     }
 
-    public function testCalculateArmyPowerMixedUnits(): void
+    public function testExecuteAttackInsufficientTurns(): void
     {
-        $result = $this->service->calculateArmyPower([
-            'guards' => 10,
-            'soldiers' => 5,
-            'spies' => 2,
-            'sentries' => 3,
-        ]);
+        $attacker = new Dominion(['user_id' => 1, 'name' => 'A', 'turns' => 1]);
+        $attacker->save();
+        $defender = new Dominion(['user_id' => 2, 'name' => 'B']);
+        $defender->save();
 
-        $expectedOffense = (10 * 5) + (5 * 10) + (2 * 1) + (3 * 2);
-        $expectedDefense = (10 * 15) + (5 * 10) + (2 * 1) + (3 * 25);
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage("Insufficient strike capacity.");
 
-        $this->assertEquals($expectedOffense, $result['total_offense']);
-        $this->assertEquals($expectedDefense, $result['total_defense']);
+        $this->battlefieldService->executeAttack($attacker->id, $defender->id, 5);
     }
 
-    public function testCalculateArmyPowerWeightedFormula(): void
+    public function testExecuteAttackSelfHarmProhibited(): void
     {
-        $result = $this->service->calculateArmyPower([
-            'guards' => 100,
-            'soldiers' => 0,
-            'spies' => 0,
-            'sentries' => 0,
-        ]);
+        $attacker = new Dominion(['user_id' => 1, 'name' => 'A', 'turns' => 10]);
+        $attacker->save();
 
-        $offense = 100 * 5;
-        $defense = 100 * 15;
-        $expectedWeighted = max(0, pow($offense * 1.1, 0.3) * pow($defense * 0.9, 0.3));
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage("Self-harm protocol prohibited.");
 
-        $this->assertEqualsWithDelta($expectedWeighted, $result['weighted_power'], 0.01);
-    }
-
-    public function testSimulateBattleAttackerWins(): void
-    {
-        $result = $this->service->simulateBattle(
-            ['guards' => 100, 'soldiers' => 50, 'spies' => 0, 'sentries' => 0],
-            ['guards' => 10, 'soldiers' => 5, 'spies' => 0, 'sentries' => 0]
-        );
-
-        $this->assertEquals('attacker', $result['victor']);
-        $this->assertGreaterThan(0, $result['attacker_loss_percent']);
-        $this->assertGreaterThan(0, $result['defender_loss_percent']);
-    }
-
-    public function testSimulateBattleDefenderWins(): void
-    {
-        $result = $this->service->simulateBattle(
-            ['guards' => 10, 'soldiers' => 5, 'spies' => 0, 'sentries' => 0],
-            ['guards' => 100, 'soldiers' => 50, 'spies' => 0, 'sentries' => 0]
-        );
-
-        $this->assertEquals('defender', $result['victor']);
-    }
-
-    public function testSimulateBattleStalemate(): void
-    {
-        $units = ['guards' => 10, 'soldiers' => 10, 'spies' => 0, 'sentries' => 0];
-
-        $result = $this->service->simulateBattle($units, $units);
-
-        $this->assertEquals('defender', $result['victor']);
-    }
-
-    public function testSimulateBattleNoDefender(): void
-    {
-        $result = $this->service->simulateBattle(
-            ['guards' => 10, 'soldiers' => 10, 'spies' => 0, 'sentries' => 0],
-            ['guards' => 0, 'soldiers' => 0, 'spies' => 0, 'sentries' => 0]
-        );
-
-        $this->assertEquals('attacker', $result['victor']);
-        $this->assertEquals(2.0, $result['attacker_loss_percent']);
-        $this->assertEquals(90.0, $result['defender_loss_percent']);
-    }
-
-    public function testSimulateBattleNoAttacker(): void
-    {
-        $result = $this->service->simulateBattle(
-            ['guards' => 0, 'soldiers' => 0, 'spies' => 0, 'sentries' => 0],
-            ['guards' => 10, 'soldiers' => 10, 'spies' => 0, 'sentries' => 0]
-        );
-
-        $this->assertEquals('defender', $result['victor']);
-        $this->assertEquals(80.0, $result['attacker_loss_percent']);
-        $this->assertEquals(2.0, $result['defender_loss_percent']);
-    }
-
-    public function testSimulateBattleBothEmpty(): void
-    {
-        $result = $this->service->simulateBattle(
-            ['guards' => 0, 'soldiers' => 0, 'spies' => 0, 'sentries' => 0],
-            ['guards' => 0, 'soldiers' => 0, 'spies' => 0, 'sentries' => 0]
-        );
-
-        $this->assertEquals('neutral', $result['victor']);
-        $this->assertEquals(0.0, $result['attacker_loss_percent']);
-        $this->assertEquals(0.0, $result['defender_loss_percent']);
-    }
-
-    public function testGetStabilizedUnits(): void
-    {
-        $this->db->exec("INSERT INTO kingdoms VALUES (1, 10, 20, 5, 3)");
-
-        $result = $this->service->getStabilizedUnits(1);
-
-        $this->assertEquals(10, $result['guards']);
-        $this->assertEquals(20, $result['soldiers']);
-        $this->assertEquals(5, $result['spies']);
-        $this->assertEquals(3, $result['sentries']);
-    }
-
-    public function testGetStabilizedUnitsNotFound(): void
-    {
-        $result = $this->service->getStabilizedUnits(999);
-
-        $this->assertEquals(0, $result['guards']);
-        $this->assertEquals(0, $result['soldiers']);
-    }
-
-    public function testGetStabilizedUnitsForMultipleKingdoms(): void
-    {
-        $this->db->exec("INSERT INTO kingdoms VALUES (1, 10, 20, 5, 3)");
-        $this->db->exec("INSERT INTO kingdoms VALUES (2, 30, 40, 10, 5)");
-
-        $result = $this->service->getStabilizedUnitsForMultipleKingdoms([1, 2]);
-
-        $this->assertArrayHasKey(1, $result);
-        $this->assertArrayHasKey(2, $result);
-        $this->assertEquals(10, $result[1]['guards']);
-        $this->assertEquals(30, $result[2]['guards']);
-    }
-
-    public function testGetStabilizedUnitsForMultipleKingdomsEmpty(): void
-    {
-        $result = $this->service->getStabilizedUnitsForMultipleKingdoms([]);
-
-        $this->assertEmpty($result);
-    }
-
-    public function testGetPowerComparison(): void
-    {
-        $result = $this->service->getPowerComparison(
-            ['guards' => 50, 'soldiers' => 30, 'spies' => 0, 'sentries' => 10],
-            'Army A',
-            ['guards' => 20, 'soldiers' => 10, 'spies' => 0, 'sentries' => 5],
-            'Army B'
-        );
-
-        $this->assertArrayHasKey('comparison', $result);
-        $this->assertArrayHasKey('ratio_1', $result);
-        $this->assertArrayHasKey('ratio_2', $result);
-    }
-
-    public function testGetPowerComparisonBothEmpty(): void
-    {
-        $result = $this->service->getPowerComparison(
-            ['guards' => 0, 'soldiers' => 0, 'spies' => 0, 'sentries' => 0],
-            'Army A',
-            ['guards' => 0, 'soldiers' => 0, 'spies' => 0, 'sentries' => 0],
-            'Army B'
-        );
-
-        $this->assertEquals('none', $result['army_1']);
-        $this->assertEquals('none', $result['army_2']);
+        $this->battlefieldService->executeAttack($attacker->id, $attacker->id, 5);
     }
 }
