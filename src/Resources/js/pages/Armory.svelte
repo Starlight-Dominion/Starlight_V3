@@ -7,10 +7,30 @@
     let activeTab = $state('soldiers');
     let message = $state(null);
     let loading = $state(false);
+    
+    // Track quantities for each item locally
+    let quantities = $state({});
 
     const currentLoadout = $derived(loadouts[activeTab] || { categories: {}, unit_count: 0 });
 
+    function getQty(itemId) {
+        return quantities[itemId] || 1;
+    }
+
+    function setQty(itemId, val) {
+        quantities[itemId] = Math.max(1, parseInt(val) || 1);
+    }
+
+    function buyMax(item) {
+        const affordable = Math.floor(resources.credits / item.cost);
+        const needed = Math.max(0, currentLoadout.unit_count - item.owned_quantity);
+        // We can buy more than we need, but usually 'max' means 'what I can afford' or 'what I need'
+        // Let's go with 'what I can afford' but cap it at a reasonable large number if needed.
+        setQty(item.id, affordable);
+    }
+
     async function handleAction(action, itemId = null, qty = 1) {
+        if (loading) return;
         loading = true;
         message = null;
         
@@ -28,8 +48,6 @@
             const data = await res.json();
             message = data;
             if (data.success) {
-                // Svelte logic: We could manually update stores, but for data consistency
-                // after a bulk purchase, we refresh the session state.
                 window.location.reload();
             }
         } catch (e) {
@@ -113,17 +131,32 @@
                             </div>
 
                             {#if item.unlocked}
-                                <div class="grid grid-cols-2 gap-2">
-                                    <button 
-                                        onclick={() => handleAction('buy', item.id, 1)}
-                                        class="bg-cyan-950/40 border border-cyan-500/20 text-cyan-400 py-2 rounded text-[9px] font-black uppercase tracking-widest hover:bg-cyan-500 hover:text-black transition-all"
-                                        disabled={loading || resources.credits < item.cost}
-                                    >Buy x1</button>
-                                    <button 
-                                        onclick={() => handleAction('buy', item.id, 10)}
-                                        class="bg-cyan-950/40 border border-cyan-500/20 text-cyan-400 py-2 rounded text-[9px] font-black uppercase tracking-widest hover:bg-cyan-500 hover:text-black transition-all"
-                                        disabled={loading || resources.credits < (item.cost * 10)}
-                                    >Buy x10</button>
+                                <div class="space-y-4">
+                                    <div class="flex items-center gap-2">
+                                        <input 
+                                            type="number" 
+                                            value={getQty(item.id)} 
+                                            oninput={(e) => setQty(item.id, e.target.value)}
+                                            class="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-xs font-mono text-cyan-400 focus:border-cyan-500 outline-none"
+                                            placeholder="Qty"
+                                        />
+                                        <button 
+                                            onclick={() => buyMax(item)}
+                                            class="bg-white/5 hover:bg-white/10 text-gray-400 px-3 py-2 rounded text-[8px] font-black uppercase tracking-widest transition-all"
+                                        >Max</button>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <button 
+                                            onclick={() => handleAction('buy', item.id, getQty(item.id))}
+                                            class="bg-cyan-950/40 border border-cyan-500/20 text-cyan-400 py-3 rounded text-[9px] font-black uppercase tracking-widest hover:bg-cyan-500 hover:text-black transition-all"
+                                            disabled={loading || resources.credits < (item.cost * getQty(item.id))}
+                                        >Purchase</button>
+                                        <button 
+                                            onclick={() => handleAction('sell', item.id, getQty(item.id))}
+                                            class="bg-red-950/20 border border-red-900/30 text-red-900 py-3 rounded text-[9px] font-black uppercase tracking-widest hover:bg-red-900 hover:text-white transition-all"
+                                            disabled={loading || item.owned_quantity < getQty(item.id)}
+                                        >Salvage</button>
+                                    </div>
                                 </div>
                             {:else}
                                 <div class="absolute inset-0 flex items-center justify-center bg-black/60 rounded-2xl z-10">

@@ -39,9 +39,23 @@ class ArmoryController extends BaseController
     public function buy(): string
     {
         header('Content-Type: application/json');
+        
+        $validator = \sdo\Infrastructure\Validator::make($_POST, [
+            'item_id' => 'required|numeric',
+            'quantity' => 'required|numeric'
+        ]);
+
+        if ($validator->fails()) {
+            return json_encode(['success' => false, 'message' => 'Invalid tactical parameters.']);
+        }
+
         $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-        $itemId = (int)($_POST['item_id'] ?? 0);
-        $qty = (int)($_POST['quantity'] ?? 1);
+        $itemId = (int)$_POST['item_id'];
+        $qty = (int)$_POST['quantity'];
+
+        if ($qty <= 0) {
+            return json_encode(['success' => false, 'message' => 'Quantity must be positive.']);
+        }
 
         try {
             return json_encode($this->armoryService->buyItem($dominion->id, $itemId, $qty));
@@ -53,9 +67,23 @@ class ArmoryController extends BaseController
     public function sell(): string
     {
         header('Content-Type: application/json');
+        
+        $validator = \sdo\Infrastructure\Validator::make($_POST, [
+            'item_id' => 'required|numeric',
+            'quantity' => 'required|numeric'
+        ]);
+
+        if ($validator->fails()) {
+            return json_encode(['success' => false, 'message' => 'Invalid tactical parameters.']);
+        }
+
         $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-        $itemId = (int)($_POST['item_id'] ?? 0);
-        $qty = (int)($_POST['quantity'] ?? 1);
+        $itemId = (int)$_POST['item_id'];
+        $qty = (int)$_POST['quantity'];
+
+        if ($qty <= 0) {
+            return json_encode(['success' => false, 'message' => 'Quantity must be positive.']);
+        }
 
         try {
             return json_encode($this->armoryService->sellItem($dominion->id, $itemId, $qty));
