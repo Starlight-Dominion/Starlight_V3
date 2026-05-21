@@ -15,7 +15,7 @@ class GameStore {
         max_deposits: 6
     });
 
-    nextTickSeconds = $state(600);
+    nextTickSeconds = $state(900);
 
     get formattedTick() {
         const m = Math.floor(this.nextTickSeconds / 60);
@@ -54,7 +54,7 @@ class GameStore {
             if (this.nextTickSeconds > 0) {
                 this.nextTickSeconds--;
             } else {
-                this.nextTickSeconds = 600;
+                this.nextTickSeconds = 900;
                 this.refreshState();
             }
         }, 1000);

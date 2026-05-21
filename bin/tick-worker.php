@@ -6,8 +6,8 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Dotenv\Dotenv;
-use Shadowreign\Infrastructure\Eloquent;
-use Shadowreign\Services\TickService;
+use sdo\Infrastructure\Eloquent;
+use sdo\Services\TickService;
 
 // Load environment variables
 $dotenv = Dotenv::createImmutable(__DIR__ . '/../');

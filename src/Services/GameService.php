@@ -10,7 +10,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 
 class GameService
 {
-    public const TICK_INTERVAL_SECONDS = 600; 
+    public const TICK_INTERVAL_SECONDS = 900; 
     public const TIMEZONE = 'America/New_York';
     public const BASE_INCOME = 100;
 
