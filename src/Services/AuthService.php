@@ -14,19 +14,34 @@ class AuthService
     public function register(string $username, string $email, string $password, string $dominionName, string $raceName): array
     {
         try {
-            if (User::where('username', $username)->exists()) return ['success' => false, 'message' => "Handle taken."];
-            if (User::where('email', $email)->exists()) return ['success' => false, 'message' => "Email in use."];
-            if (Dominion::where('name', $dominionName)->exists()) return ['success' => false, 'message' => "Designation claimed."];
+            // 1. Identity Verification
+            if (User::where('username', $username)->exists()) {
+                return ['success' => false, 'message' => "Identity handle is already claimed."];
+            }
+            if (User::where('email', $email)->exists()) {
+                return ['success' => false, 'message' => "Comms frequency (Email) is in use."];
+            }
+            if (Dominion::where('name', $dominionName)->exists()) {
+                return ['success' => false, 'message' => "Dominion designation is already claimed."];
+            }
 
-            $race = Race::where('name', $raceName)->firstOrFail();
+            // 2. Resolve Race Definition
+            $race = Race::where('name', $raceName)->first();
+            if (!$race) {
+                return ['success' => false, 'message' => "Invalid evolutionary strain selected."];
+            }
 
+            // 3. Execute Transaction
             Capsule::transaction(function () use ($username, $email, $password, $dominionName, $race) {
+                
+                // Create Commander
                 $user = User::create([
                     'username' => $username,
                     'email'    => $email,
-                    'password' => $password,
+                    'password' => $password, // Automatically hashed by the User Model mutator
                 ]);
 
+                // Create Dominion
                 $dominion = $user->dominion()->create([
                     'name'    => $dominionName,
                     'race_id' => $race->id,
@@ -37,7 +52,17 @@ class AuthService
                     'foundation_max_hp' => 1000
                 ]);
 
-                // Initialize empty Manpower for all unit types
+                // Initialize Structural Blueprints
+                $structures = Capsule::table('structures')->get();
+                foreach ($structures as $s) {
+                    Capsule::table('dominion_structures')->insert([
+                        'dominion_id' => $dominion->id,
+                        'structure_id' => $s->id,
+                        'level' => 0
+                    ]);
+                }
+
+                // Initialize Manpower Roster
                 $units = Capsule::table('units')->get();
                 foreach ($units as $u) {
                     Capsule::table('dominion_manpower')->insert([
@@ -47,19 +72,9 @@ class AuthService
                         'stabled_quantity' => 0
                     ]);
                 }
-
-                // Initialize level 0 for all structures
-                $structures = Capsule::table('structures')->get();
-                foreach ($structures as $s) {
-                    Capsule::table('dominion_structures')->insert([
-                        'dominion_id' => $dominion->id,
-                        'structure_id' => $s->id,
-                        'level' => 0
-                    ]);
-                }
             });
 
-            return ['success' => true, 'message' => 'Sector initialized.'];
+            return ['success' => true, 'message' => 'Sector initialized successfully.'];
         } catch (Exception $e) {
             return ['success' => false, 'message' => "System failure: " . $e->getMessage()];
         }
@@ -69,11 +84,29 @@ class AuthService
     {
         $user = User::with('dominion')->where('username', $username)->first();
         if ($user && password_verify($password, $user->password)) {
-            if (session_status() === PHP_SESSION_ACTIVE) session_regenerate_id(true);
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_regenerate_id(true);
+            }
             return $user;
         }
         return null;
     }
 
-    public function logout(): void { session_destroy(); }
+    public function logout(): void 
+    { 
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_destroy(); 
+        }
+    }
+
+    public function isLoggedIn(array $session): bool
+    {
+        return isset($session['user_id']);
+    }
+
+    public function getCurrentUser(): ?User
+    {
+        if (!isset($_SESSION['user_id'])) return null;
+        return User::find((int)$_SESSION['user_id']);
+    }
 }

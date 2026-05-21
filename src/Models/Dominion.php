@@ -8,7 +8,8 @@ class Dominion extends Model
     protected $table = 'dominions';
 
     /**
-     * Explicitly enable timestamps to match the StarlightDominionCore migration.
+     * Standard timestamps are enabled.
+     * Eloquent expects 'created_at' and 'updated_at' columns.
      */
     public $timestamps = true;
 

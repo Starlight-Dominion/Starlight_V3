@@ -6,16 +6,13 @@ namespace sdo\Services;
 use DateTime;
 use DateTimeZone;
 use sdo\Models\Dominion;
-use sdo\Repositories\Interfaces\KingdomRepositoryInterface;
+use Illuminate\Database\Capsule\Manager as Capsule;
 
 class GameService
 {
     public const TICK_INTERVAL_SECONDS = 600; 
     public const TIMEZONE = 'America/New_York';
-
-    public function __construct(
-        private KingdomRepositoryInterface $kingdomRepository
-    ) {}
+    public const BASE_INCOME = 100;
 
     public function getRealmTime(): DateTime
     {
@@ -31,9 +28,6 @@ class GameService
         return self::TICK_INTERVAL_SECONDS - $secondsIntoCurrentTick;
     }
 
-    /**
-     * Maps to User -> Dominion relation
-     */
     public function getKingdomByUserId(int $userId): ?Dominion
     {
         return Dominion::with(['user', 'race'])->where('user_id', $userId)->first();
@@ -49,5 +43,21 @@ class GameService
 
         $progress = (($xp - $currentThreshold) / ($nextThreshold - $currentThreshold)) * 100;
         return (int)max(0, min(100, $progress));
+    }
+
+    /**
+     * Calculates the total economic multiplier from all structures.
+     */
+    public function getEconomyMultiplier(int $dominionId): float
+    {
+        $totalBuff = (float)Capsule::table('dominion_structures')
+            ->join('structure_levels', function($join) {
+                $join->on('dominion_structures.structure_id', '=', 'structure_levels.structure_id')
+                     ->on('dominion_structures.level', '=', 'structure_levels.level');
+            })
+            ->where('dominion_structures.dominion_id', $dominionId)
+            ->sum('structure_levels.buff_economy');
+
+        return 1 + ($totalBuff / 100);
     }
 }

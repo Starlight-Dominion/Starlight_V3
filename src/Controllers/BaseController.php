@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 namespace sdo\Controllers;
@@ -22,26 +21,22 @@ abstract class BaseController
         $this->advisorService = $advisorService;
     }
 
-    /**
-     * Renders the Svelte Shell with refined hydration logic.
-     */
     protected function render(string $component, array $pageData = []): string
     {
         $userData = null;
 
         if (isset($_SESSION['user_id'])) {
-            $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-            if ($kingdom) {
-                $advice = $this->advisorService->getContextualAdviceFromKingdom($kingdom->toArray());
+            $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+            if ($dominion) {
+                $advice = $this->advisorService->getContextualAdviceFromKingdom($dominion->toArray());
                 $vm = new GameStateViewModel(
-                    $kingdom,
+                    $dominion,
                     $this->gameService,
                     $advice,
                     $_SESSION['username'] ?? 'Unknown Lord',
                     $_SESSION['advisor_history'] ?? []
                 );
 
-                // Map to a clean associative array for JS Proxy stability
                 $userData = [
                     'username' => $vm->username,
                     'kingdomName' => $vm->kingdomName,
@@ -51,8 +46,8 @@ abstract class BaseController
                     'advice' => $vm->advice,
                     'realmTime' => $vm->realmTime,
                     'secondsToNextTick' => $vm->secondsToNextTick,
-                    'kingdom' => $kingdom->toArray(),
-                    'avatar_path' => $kingdom->user->avatar_path, // CRITICAL FIX: Explicitly pass the path
+                    'kingdom' => $dominion->toArray(),
+                    'avatar_path' => $dominion->user->avatar_path,
                     'advisorHistory' => $vm->advisorHistory
                 ];
             }
@@ -85,14 +80,6 @@ abstract class BaseController
     protected function redirect(string $url): void
     {
         header('Location: ' . $url);
-        exit;
-    }
-
-    protected function redirectBack(array $errors = [], array $input = []): void
-    {
-        $_SESSION['errors'] = $errors;
-        $_SESSION['old'] = $input;
-        header('Location: ' . ($_SERVER['HTTP_REFERER'] ?? '/'));
         exit;
     }
 }

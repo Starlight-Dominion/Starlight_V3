@@ -18,9 +18,6 @@ class AuthController extends BaseController
         parent::__construct($gameService, $advisorService);
     }
 
-    /**
-     * Standardized JSON API Response
-     */
     private function jsonResponse(bool $success, array $errors = [], int $status = 200): void
     {
         header('Content-Type: application/json');
@@ -55,7 +52,7 @@ class AuthController extends BaseController
         if ($user) {
             $_SESSION['user_id'] = $user->id;
             $_SESSION['username'] = $user->username;
-            $this->jsonResponse(true, ['Link established.']);
+            $this->jsonResponse(true, []);
         }
 
         $this->jsonResponse(false, ['Invalid identity handle or cipher.'], 401);
@@ -63,9 +60,8 @@ class AuthController extends BaseController
 
     public function register(): void
     {
-        // 1. Initial Validation
         $validator = Validator::make($_POST, [
-            'username' => 'required|min:3|alpha_num',
+            'username' => 'required|min:3',
             'email' => 'required|email',
             'password' => 'required|min:6|confirmed',
             'kingdom_name' => 'required|min:3',
@@ -80,7 +76,6 @@ class AuthController extends BaseController
             $this->jsonResponse(false, $errorMsgs, 400);
         }
 
-        // 2. Process Registration with Explicit Error Handling
         $result = $this->authService->register(
             $_POST['username'],
             $_POST['email'],
@@ -90,9 +85,9 @@ class AuthController extends BaseController
         );
 
         if ($result['success']) {
-            $this->jsonResponse(true, ['Sector initialized successfully.']);
+            $this->jsonResponse(true, []);
         } else {
-            // Returns the exact error (e.g. "Handle is already registered")
+            // Pass the specific AuthService error string back directly
             $this->jsonResponse(false, [$result['message']], 400);
         }
     }

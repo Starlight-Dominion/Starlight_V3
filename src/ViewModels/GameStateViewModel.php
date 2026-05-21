@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace sdo\ViewModels;
 
-use sdo\Models\Kingdom;
+use sdo\Models\Dominion;
 use sdo\Services\GameService;
 
 readonly class GameStateViewModel
@@ -16,7 +16,7 @@ readonly class GameStateViewModel
     public string $raceName;
 
     public function __construct(
-        public Kingdom $kingdom,
+        public Dominion $dominion,
         GameService $gameService,
         public string $advice,
         public string $username,
@@ -25,13 +25,13 @@ readonly class GameStateViewModel
         $this->realmTime = $gameService->getRealmTime()->format('H:i T');
         $this->secondsToNextTick = $gameService->getSecondsToNextTick();
         
-        // Calculate based on normalized Dominion (Kingdom) data
-        $this->level = (int)floor(sqrt($kingdom->xp / 100)) + 1;
-        $this->xpProgress = $gameService->calculateXpProgress((int)$kingdom->xp);
+        // Calculate based on normalized Dominion data
+        $this->level = (int)floor(sqrt($dominion->xp / 100)) + 1;
+        $this->xpProgress = $gameService->calculateXpProgress((int)$dominion->xp);
         
-        $this->kingdomName = (string)$kingdom->kingdom_name;
+        $this->kingdomName = (string)$dominion->name;
         
         // Eager-loaded race name
-        $this->raceName = $kingdom->race ? $kingdom->race->name : 'Unknown';
+        $this->raceName = $dominion->race ? $dominion->race->name : 'Unknown';
     }
 }
