@@ -34,6 +34,10 @@
                 <span class="text-cyan-600 font-bold group-hover:text-cyan-400 transition-colors">{resources.bank.toLocaleString()}</span>
             </div>
             <div class="flex justify-between items-center group">
+                <span class="text-gray-600 uppercase">Citizens</span>
+                <span class="text-white font-bold group-hover:text-cyan-400 transition-colors">{resources.citizens.toLocaleString()}</span>
+            </div>
+            <div class="flex justify-between items-center group">
                 <span class="text-gray-600 uppercase">Growth Rate</span>
                 <span class="text-white font-bold group-hover:text-cyan-400 transition-colors">+{resources.citizens_per_tick.toLocaleString()} <span class="text-[8px] text-gray-700">CIT/CYC</span></span>
             </div>
