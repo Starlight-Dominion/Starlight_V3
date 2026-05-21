@@ -49,6 +49,11 @@ return function (RouteCollector $r) {
     $r->addRoute('GET', '/combat/training', [\sdo\Controllers\TrainingController::class, 'index']);
     $r->addRoute('POST', '/combat/train', [\sdo\Controllers\TrainingController::class, 'train']);
 
+    // Recruitment Routes
+    $r->addRoute('GET', '/combat/recruit', [\sdo\Controllers\RecruitmentController::class, 'index']);
+    $r->addRoute('POST', '/combat/recruit/start', [\sdo\Controllers\RecruitmentController::class, 'start']);
+    $r->addRoute('POST', '/combat/recruit/click', [\sdo\Controllers\RecruitmentController::class, 'click']);
+
     // Admin Command Center
     $r->addRoute('GET', '/admin', [\sdo\Controllers\AdminController::class, 'index']);
     $r->addRoute('GET', '/admin/search', [\sdo\Controllers\AdminController::class, 'searchKingdoms']);
