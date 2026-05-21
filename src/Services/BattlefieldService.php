@@ -3,102 +3,148 @@ declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Repositories\Interfaces\CombatRepositoryInterface;
-use sdo\Repositories\Interfaces\KingdomRepositoryInterface;
+use sdo\Models\Dominion;
+use sdo\Models\User;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class BattlefieldService
 {
-    public function __construct(
-        private CombatRepositoryInterface $combatRepository,
-        private KingdomRepositoryInterface $kingdomRepository,
-        private TacticalService $tacticalService
-    ) {}
+    // Balance Constants from Legacy
+    private const ATK_TURNS_SOFT_EXP = 0.50;
+    private const ATK_TURNS_MAX_MULT = 1.35;
+    private const UNDERDOG_MIN_RATIO = 0.985;
+    private const RANDOM_NOISE_MIN = 0.98;
+    private const RANDOM_NOISE_MAX = 1.02;
+    private const GUARD_FLOOR = 20000;
+    private const HOURLY_FULL_LOOT_CAP = 5;
+    private const HOURLY_REDUCED_LOOT_MAX = 10;
+
+    public function __construct(private TacticalService $tacticalService) {}
 
     public function getBattlefieldList(): array
     {
-        // Map kingdoms with their total manpower
-        return Capsule::table('dominions')
-            ->join('users', 'dominions.user_id', '=', 'users.id')
-            ->select('dominions.id', 'dominions.name', 'users.username', 'dominions.credits', 'dominions.xp')
+        return Dominion::with('user')
+            ->orderBy('credits', 'desc')
             ->get()
             ->map(fn($d) => [
                 'kingdom_id' => $d->id,
                 'name' => $d->name,
-                'username' => $d->username,
+                'username' => $d->user->username,
                 'gold' => $d->credits,
-                'level' => floor(sqrt($d->xp / 100)) + 1
+                'level' => $d->getPlayerLevel()
             ])->toArray();
     }
 
     public function executeAttack(int $attackerId, int $targetId, int $turns): array
     {
         return Capsule::transaction(function() use ($attackerId, $targetId, $turns) {
-            $attacker = Capsule::table('dominions')->where('id', $attackerId)->lockForUpdate()->first();
-            $target = Capsule::table('dominions')->where('id', $targetId)->lockForUpdate()->first();
+            $atkDom = Dominion::lockForUpdate()->find($attackerId);
+            $defDom = Dominion::lockForUpdate()->find($targetId);
 
-            if ($attacker->turns < $turns) throw new Exception("Insufficient turns.");
+            if ($atkDom->turns < $turns) throw new Exception("Insufficient turns.");
+            if ($attackerId === $targetId) throw new Exception("Self-harm protocol prohibited.");
 
-            $attackerRatings = $this->tacticalService->calculateTacticalRatings($attackerId);
-            $targetRatings = $this->tacticalService->calculateTacticalRatings($targetId);
+            // 1. Anti-Farm & Fatigue Checks
+            $hourlyCount = Capsule::table('battle_logs')
+                ->where('attacker_id', $attackerId)
+                ->where('defender_id', $targetId)
+                ->where('battle_time', '>', Capsule::raw('NOW() - INTERVAL 1 HOUR'))
+                ->count();
 
-            if ($attackerRatings['total_units'] <= 0) throw new Exception("You have no army to lead.");
+            $lootFactor = 1.0;
+            if ($hourlyCount >= self::HOURLY_FULL_LOOT_CAP) $lootFactor = 0.25;
+            if ($hourlyCount >= self::HOURLY_REDUCED_LOOT_MAX) $lootFactor = 0.0;
 
-            $result = $this->simulateBattle($attackerRatings, $targetRatings);
-
-            // Deduct Turns
-            Capsule::table('dominions')->where('id', $attackerId)->decrement('turns', $turns);
-
-            // Apply Casualties
-            $this->applyLosses($attackerId, (float)$result['attacker_loss_percent']);
-            $this->applyLosses($targetId, (float)$result['defender_loss_percent']);
-
-            $goldLooted = 0;
-            if ($result['victor'] === 'attacker') {
-                $lootMult = min(0.1 * $turns, 0.5);
-                $goldLooted = (int)($target->credits * $lootMult);
-                
-                Capsule::table('dominions')->where('id', $targetId)->decrement('credits', $goldLooted);
-                Capsule::table('dominions')->where('id', $attackerId)->increment('credits', $goldLooted);
-                Capsule::table('dominions')->where('id', $attackerId)->increment('xp', 5 * $turns);
+            $fatigueLoss = 0;
+            if ($hourlyCount >= 10) {
+                $fatigueLoss = (int)floor($atkDom->user->soldiers * 0.01 * ($hourlyCount - 9));
             }
+
+            // 2. Power Calculation
+            $atkRatings = $this->tacticalService->calculateTacticalRatings($attackerId);
+            $defRatings = $this->tacticalService->calculateTacticalRatings($targetId);
+
+            if ($atkRatings['soldiers'] <= 0) throw new Exception("No expeditionary force available.");
+
+            // Turns Multiplier: 1 + 0.5 * (pow(turns, 0.5) - 1)
+            $turnsMult = min(1 + 0.5 * (pow($turns, 0.5) - 1), self::ATK_TURNS_MAX_MULT);
+            $noiseA = mt_rand((int)(self::RANDOM_NOISE_MIN * 1000), (int)(self::RANDOM_NOISE_MAX * 1000)) / 1000.0;
+            $noiseD = mt_rand((int)(self::RANDOM_NOISE_MIN * 1000), (int)(self::RANDOM_NOISE_MAX * 1000)) / 1000.0;
+
+            $ea = $atkRatings['raw_attack'] * $turnsMult * $noiseA;
+            $ed = $defRatings['raw_defense'] * $noiseD;
+            
+            $ratio = $ea / max(1.0, $ed);
+            $attackerWins = ($ratio >= self::UNDERDOG_MIN_RATIO);
+
+            // 3. Casualties
+            $guardsLost = 0;
+            if ($defRatings['guards'] > self::GUARD_FLOOR) {
+                $killFrac = (0.08 + 0.07 * max(0.0, min(1.0, $ratio - 1.0))) * (1 + 0.2 * ($turnsMult - 1.0));
+                if (!$attackerWins) $killFrac *= 0.5;
+                $guardsLost = min((int)floor($defRatings['guards'] * $killFrac), $defRatings['guards'] - self::GUARD_FLOOR);
+            }
+
+            // 4. Plunder
+            $stolen = 0;
+            if ($attackerWins) {
+                $stealPct = (0.08 + 0.1 * max(0.0, min(1.0, $ratio - 1.0)));
+                $stolen = (int)floor($defDom->credits * min($stealPct, 0.2) * $lootFactor);
+            }
+
+            // 5. XP
+            $lvlDiff = $defDom->getPlayerLevel() - $atkDom->getPlayerLevel();
+            $xpGained = (int)(($attackerWins ? rand(150, 200) : rand(40, 60)) * $turns * max(0.1, 1 + ($lvlDiff * 0.07)));
+
+            // 6. Persistence
+            $atkDom->credits += $stolen;
+            $atkDom->turns -= $turns;
+            $atkDom->xp += $xpGained;
+            $atkDom->save();
+
+            $defDom->credits -= $stolen;
+            $defDom->save();
+
+            $this->deductUnits($attackerId, 'soldiers', $fatigueLoss);
+            $this->deductUnits($targetId, 'guards', $guardsLost);
+
+            $logId = Capsule::table('battle_logs')->insertGetId([
+                'attacker_id' => $attackerId,
+                'defender_id' => $targetId,
+                'attacker_name' => $atkDom->name,
+                'defender_name' => $defDom->name,
+                'outcome' => $attackerWins ? 'victory' : 'defeat',
+                'credits_stolen' => $stolen,
+                'turns_used' => $turns,
+                'attacker_damage' => (int)$ea,
+                'defender_damage' => (int)$ed,
+                'attacker_xp_gained' => $xpGained,
+                'guards_lost' => $guardsLost,
+                'attacker_soldiers_lost' => $fatigueLoss,
+                'loot_factor' => $lootFactor
+            ]);
 
             return [
                 'success' => true,
-                'victor' => $result['victor'],
-                'loot' => $goldLooted,
-                'message' => $result['victor'] === 'attacker' ? "Victory! Looted {$goldLooted} CP." : "Defeat! Forces repelled."
+                'battle_id' => $logId,
+                'message' => $attackerWins ? "Dominion Victorious." : "Assault Repelled."
             ];
         });
     }
 
-    private function applyLosses(int $dominionId, float $percent): void
+    private function deductUnits(int $domId, string $slug, int $qty): void
     {
-        if ($percent <= 0) return;
-        $factor = $percent / 100;
-
-        $manpower = Capsule::table('dominion_manpower')->where('dominion_id', $dominionId)->get();
-        foreach ($manpower as $m) {
-            $loss = (int)ceil($m->total_quantity * $factor);
-            if ($loss > 0) {
-                Capsule::table('dominion_manpower')
-                    ->where('dominion_id', $dominionId)
-                    ->where('unit_id', $m->unit_id)
-                    ->decrement('total_quantity', $loss);
-            }
-        }
+        if ($qty <= 0) return;
+        Capsule::table('dominion_manpower')
+            ->join('units', 'dominion_manpower.unit_id', '=', 'units.id')
+            ->where('dominion_manpower.dominion_id', $domId)
+            ->where('units.slug', $slug)
+            ->decrement('total_quantity', $qty);
     }
 
-    private function simulateBattle(array $atk, array $def): array
+    public function getBattleLog(int $id): ?object
     {
-        $aP = $atk['weighted_power'];
-        $dP = $def['weighted_power'];
-        if ($aP <= 0) return ['victor' => 'defender', 'attacker_loss_percent' => 100, 'defender_loss_percent' => 0];
-        if ($dP <= 0) return ['victor' => 'attacker', 'attacker_loss_percent' => 2, 'defender_loss_percent' => 100];
-
-        $ratio = $aP / $dP;
-        if ($ratio > 1.2) return ['victor' => 'attacker', 'attacker_loss_percent' => 5, 'defender_loss_percent' => 40];
-        return ['victor' => 'defender', 'attacker_loss_percent' => 30, 'defender_loss_percent' => 10];
+        return Capsule::table('battle_logs')->find($id);
     }
 }

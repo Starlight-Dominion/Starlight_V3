@@ -8,64 +8,82 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 
 class TacticalService
 {
+    private const AVG_UNIT_POWER = 10;
+
     public function calculateTacticalRatings(int $dominionId): array
     {
-        $dominion = Dominion::findOrFail($dominionId);
+        $dom = Dominion::findOrFail($dominionId);
         
-        $ratings = [
-            'offense' => 0.0,
-            'defense' => 0.0,
-            'espionage' => 0.0,
-            'sentry' => 0.0,
-            'total_units' => 0,
-            'foundation_hp' => (int)$dominion->foundation_hp
-        ];
-
-        // Join manpower directly with unit definitions
         $manpower = Capsule::table('dominion_manpower')
-            ->join('units', 'dominion_manpower.unit_id', '=', 'units.id')
-            ->where('dominion_manpower.dominion_id', $dominionId)
-            ->get();
-
-        foreach ($manpower as $m) {
-            $qty = (int)$m->total_quantity;
-            if ($qty <= 0) continue;
-
-            $ratings['offense'] += $qty * (float)$m->power_offense;
-            $ratings['defense'] += $qty * (float)$m->power_defense;
-            $ratings['total_units'] += $qty;
-
-            if ($m->slug === 'spies') $ratings['espionage'] += $qty * (float)$m->power_offense;
-            if ($m->slug === 'sentries') $ratings['sentry'] += $qty * (float)$m->power_defense;
-        }
-
-        // Apply Battle Weighting
-        $ratings['weighted_power'] = pow($ratings['offense'] * 1.1, 0.3) * pow($ratings['defense'] * 0.9, 0.3);
-
-        return $ratings;
-    }
-
-    public function getTacticalOverview(int $dominionId): array
-    {
-        $ratings = $this->calculateTacticalRatings($dominionId);
-        $dominion = Dominion::find($dominionId);
-
-        // Fetch detailed roster for UI
-        $roster = Capsule::table('dominion_manpower')
             ->join('units', 'dominion_manpower.unit_id', '=', 'units.id')
             ->where('dominion_manpower.dominion_id', $dominionId)
             ->select('units.slug', 'dominion_manpower.total_quantity')
             ->get()
-            ->pluck('total_quantity', 'slug')
-            ->toArray();
+            ->pluck('total_quantity', 'slug');
+
+        $soldiers = (int)($manpower['soldiers'] ?? 0);
+        $guards = (int)($manpower['guards'] ?? 0);
+
+        // Attribute Multipliers (1% per point)
+        $strengthMult = 1 + ($dom->strength_points * 0.01);
+        $constitutionMult = 1 + ($dom->constitution_points * 0.01);
+
+        // 1:1 Equipping Logic
+        $atkArmoryBonus = $this->getArmoryBonus($dominionId, 'soldiers', $soldiers, 'attack_bonus');
+        $defArmoryBonus = $this->getArmoryBonus($dominionId, 'guards', $guards, 'defense_bonus');
+
+        // Structural Multipliers (From dominion_structures table)
+        $structs = Capsule::table('dominion_structures')
+            ->join('structure_levels', function($j) {
+                $j->on('dominion_structures.structure_id', '=', 'structure_levels.structure_id')
+                  ->on('dominion_structures.level', '=', 'structure_levels.level');
+            })
+            ->where('dominion_structures.dominion_id', $dominionId)
+            ->selectRaw('SUM(buff_offense) as off, SUM(buff_defense) as def')
+            ->first();
+
+        $offenseUpgradeMult = 1 + (($structs->off ?? 0) / 100.0);
+        $defenseUpgradeMult = 1 + (($structs->def ?? 0) / 100.0);
+
+        // Legacy Formula
+        $rawAttack = (($soldiers * self::AVG_UNIT_POWER * $strengthMult) + $atkArmoryBonus) * $offenseUpgradeMult;
+        $rawDefense = (($guards * self::AVG_UNIT_POWER * $constitutionMult) + $defArmoryBonus) * $defenseUpgradeMult;
 
         return [
-            'ratings' => $ratings,
-            'foundation' => [
-                'hp' => $dominion->foundation_hp,
-                'max_hp' => $dominion->foundation_max_hp
-            ],
-            'army' => $roster
+            'offense' => (int)$rawAttack,
+            'defense' => (int)$rawDefense,
+            'army' => $manpower->toArray()
+        ];
+    }
+
+    private function getArmoryBonus(int $domId, string $type, int $unitCount, string $field): float
+    {
+        if ($unitCount <= 0) return 0.0;
+
+        $items = Capsule::table('kingdom_armory_items')
+            ->join('armory_items', 'kingdom_armory_items.item_id', '=', 'armory_items.id')
+            ->where('kingdom_armory_items.kingdom_id', $domId)
+            ->where('armory_items.unit_type', $type)
+            ->select('armory_items.' . $field, 'kingdom_armory_items.quantity')
+            ->get();
+
+        $bonus = 0.0;
+        foreach ($items as $item) {
+            // Only as many items as we have units can provide a bonus
+            $effectiveQty = min($unitCount, $item->quantity);
+            $bonus += ($effectiveQty * (float)$item->$field);
+        }
+        return $bonus;
+    }
+
+    public function getTacticalOverview(int $dominionId): array
+    {
+        $res = $this->calculateTacticalRatings($dominionId);
+        $dom = Dominion::find($dominionId);
+        return [
+            'ratings' => ['offense' => $res['offense'], 'defense' => $res['defense']],
+            'army' => $res['army'],
+            'foundation' => ['hp' => $dom->foundation_hp, 'max_hp' => $dom->foundation_max_hp]
         ];
     }
 }

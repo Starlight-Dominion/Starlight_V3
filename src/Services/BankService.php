@@ -1,116 +1,95 @@
 <?php
-
 declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Repositories\Interfaces\BankRepositoryInterface;
-use sdo\Repositories\Interfaces\KingdomRepositoryInterface;
+use sdo\Models\Dominion;
 use Illuminate\Database\Capsule\Manager as Capsule;
-use DateTime;
-use DateTimeZone;
 use Exception;
+use DateTime;
 
 class BankService
 {
-    public function __construct(
-        private BankRepositoryInterface $bankRepository,
-        private KingdomRepositoryInterface $kingdomRepository
-    ) {}
+    private const MAX_DEPOSITS = 4;
+    private const RECHARGE_SECONDS = 21600; // 6 Hours
 
-    public function getTransactions(int $kingdomId, int $page, int $limit): array
+    public function getTransactions(int $dominionId, int $page, int $limit): array
     {
-        $paginator = $this->bankRepository->getTransactionsPaginated($kingdomId, $page, $limit);
+        $query = Capsule::table('bank_transactions')
+            ->where('kingdom_id', $dominionId)
+            ->orderBy('created_at', 'desc');
 
-        // Map to existing view requirements for backward compatibility with PaginationService
+        $total = $query->count();
+        $offset = ($page - 1) * $limit;
+        $items = $query->offset($offset)->limit($limit)->get()->toArray();
+
         return [
-            'transactions' => $paginator->items(),
-            'pagination' => new PaginationService(
-                (int)$paginator->total(),
-                (int)$paginator->currentPage(),
-                (int)$paginator->perPage(),
-                '/bank'
-            )
+            'transactions' => $items,
+            'pagination' => ['total' => $total, 'page' => $page, 'limit' => $limit]
         ];
     }
 
-    public function deposit(int $kingdomId, int $amount): array
+    public function deposit(int $domId, int $amount): array
     {
-        try {
-            return Capsule::transaction(function() use ($kingdomId, $amount) {
-                $kingdom = $this->kingdomRepository->lockForUpdate($kingdomId);
+        return Capsule::transaction(function() use ($domId, $amount) {
+            $dom = Dominion::lockForUpdate()->find($domId);
+            
+            // 1. 80% Rule
+            if ($amount > ($dom->credits * 0.8)) {
+                throw new Exception("Security Protocol: Cannot deposit more than 80% of liquid assets.");
+            }
 
-                if (!$kingdom) {
-                    throw new Exception("Kingdom not found.");
-                }
+            // 2. Cooldown Recovery
+            $this->rechargeSlots($dom);
+            if ($dom->deposits_today >= self::MAX_DEPOSITS) {
+                throw new Exception("Bank Vault Locked: Daily deposit frequency exceeded. Cooldown active.");
+            }
 
-                if ($amount > $kingdom->gold * 0.8) {
-                    throw new Exception("You cannot deposit more than 80% of your on-hand gold.");
-                }
+            // 3. Execution
+            $dom->credits -= $amount;
+            $dom->credits_banked += $amount;
+            $dom->deposits_today += 1;
+            $dom->last_deposit_timestamp = new DateTime();
+            $dom->save();
 
-                $this->rechargeDeposits($kingdom);
-                if ($kingdom->deposits_today >= 4) {
-                    throw new Exception("You have no available deposits. They recharge 6 hours after use.");
-                }
+            Capsule::table('bank_transactions')->insert([
+                'kingdom_id' => $domId,
+                'transaction_type' => 'deposit',
+                'amount' => $amount
+            ]);
 
-                $this->kingdomRepository->update($kingdomId, [
-                    'gold' => $kingdom->gold - $amount,
-                    'gold_in_bank' => $kingdom->gold_in_bank + $amount,
-                    'deposits_today' => $kingdom->deposits_today + 1,
-                    'last_deposit_recharge' => (new DateTime('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s')
-                ]);
-
-                $this->bankRepository->logTransaction($kingdomId, 'deposit', $amount);
-
-                return ['success' => true];
-            });
-        } catch (Exception $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
-        }
+            return ['success' => true, 'message' => "Assets secured in deep-space vault."];
+        });
     }
 
-    public function withdraw(int $kingdomId, int $amount): array
+    private function rechargeSlots(Dominion $dom): void
     {
-        try {
-            return Capsule::transaction(function() use ($kingdomId, $amount) {
-                $kingdom = $this->kingdomRepository->lockForUpdate($kingdomId);
-
-                if (!$kingdom || $amount > $kingdom->gold_in_bank) {
-                    throw new Exception("Insufficient funds in bank.");
-                }
-
-                $this->kingdomRepository->update($kingdomId, [
-                    'gold' => $kingdom->gold + $amount,
-                    'gold_in_bank' => $kingdom->gold_in_bank - $amount
-                ]);
-
-                $this->bankRepository->logTransaction($kingdomId, 'withdraw', $amount);
-
-                return ['success' => true];
-            });
-        } catch (Exception $e) {
-            return ['success' => false, 'message' => $e->getMessage()];
-        }
-    }
-
-    private function rechargeDeposits($kingdom): void
-    {
-        if ($kingdom->deposits_today > 0 && $kingdom->last_deposit_recharge) {
-            $rechargeTime = new DateTime($kingdom->last_deposit_recharge);
-            $rechargeTime->modify('+6 hours');
-            $now = new DateTime();
-
-            if ($now >= $rechargeTime) {
-                $diff = $now->getTimestamp() - (new DateTime($kingdom->last_deposit_recharge))->getTimestamp();
-                $rechargeCount = (int)min($kingdom->deposits_today, floor($diff / 21600));
-
-                $this->kingdomRepository->update($kingdom->id, [
-                    'deposits_today' => $kingdom->deposits_today - $rechargeCount
-                ]);
-                
-                // Refresh local object for the caller
-                $kingdom->deposits_today -= $rechargeCount;
+        if ($dom->deposits_today > 0 && $dom->last_deposit_timestamp) {
+            $seconds = time() - $dom->last_deposit_timestamp->getTimestamp();
+            $reclaimed = (int)floor($seconds / self::RECHARGE_SECONDS);
+            if ($reclaimed > 0) {
+                $dom->deposits_today = max(0, $dom->deposits_today - $reclaimed);
             }
         }
+    }
+
+    public function withdraw(int $domId, int $amount): array
+    {
+        return Capsule::transaction(function() use ($domId, $amount) {
+            $dom = Dominion::lockForUpdate()->find($domId);
+            if ($dom->credits_banked < $amount) throw new Exception("Insufficient vault reserves.");
+
+            $dom->credits_banked -= $amount;
+            $dom->credits += $amount;
+            $dom->save();
+
+            Capsule::table('bank_transactions')->insert([
+                'kingdom_id' => $domId,
+                'transaction_type' => 'withdraw',
+                'amount' => $amount
+            ]);
+
+            return ['success' => true, 'message' => "Credits liquidated for immediate use."];
+        });
     }
 }

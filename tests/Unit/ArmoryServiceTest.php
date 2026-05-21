@@ -1,163 +1,230 @@
 <?php
+declare(strict_types=1);
 
 namespace Tests\Unit;
 
-use PDO;
 use PHPUnit\Framework\TestCase;
 use sdo\Services\ArmoryService;
+use sdo\Models\Dominion;
+use sdo\Models\User;
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Exception;
 
 class ArmoryServiceTest extends TestCase
 {
-    private PDO $db;
-    private ArmoryService $service;
+    private ArmoryService $armoryService;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->db = new PDO('sqlite::memory:');
-        $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        // 1. Boot Eloquent with SQLite In-Memory
+        $capsule = new Capsule;
+        $capsule->addConnection([
+            'driver'   => 'sqlite',
+            'database' => ':memory:',
+            'prefix'   => '',
+        ]);
+        $capsule->setAsGlobal();
+        $capsule->bootEloquent();
 
-        $this->db->exec("CREATE TABLE kingdoms (
-            id INTEGER PRIMARY KEY,
-            foundation_level INTEGER DEFAULT 1,
-            gold INTEGER DEFAULT 0
-        )");
+        // 2. Build Schema
+        $schema = Capsule::schema();
+        
+        $schema->create('users', function($table) {
+            $table->increments('id');
+            $table->string('username');
+            $table->string('avatar_path')->nullable();
+        });
 
-        $this->db->exec("CREATE TABLE armory_items (
-            id INTEGER PRIMARY KEY,
-            name TEXT,
-            type TEXT,
-            unit_type TEXT,
-            tier INTEGER,
-            cost INTEGER,
-            attack_bonus INTEGER DEFAULT 0,
-            defense_bonus INTEGER DEFAULT 0
-        )");
+        $schema->create('dominions', function($table) {
+            $table->increments('id');
+            $table->integer('user_id');
+            $table->string('name');
+            $table->integer('credits')->default(0);
+            $table->integer('armory_level')->default(0);
+            $table->integer('xp')->default(0);
+            $table->timestamps();
+        });
 
-        $this->db->exec("CREATE TABLE kingdom_armory_items (
-            id INTEGER PRIMARY KEY,
-            kingdom_id INTEGER,
-            item_id INTEGER,
-            quantity INTEGER DEFAULT 0,
-            UNIQUE(kingdom_id, item_id)
-        )");
+        $schema->create('armory_unit_types', function($table) {
+            $table->increments('id');
+            $table->string('slug');
+            $table->string('name');
+            $table->string('title');
+        });
 
-        // Insert test armory items
-        $items = [
-            "(1, 'Iron Helmet', 'head', 'guards', 1, 100, 5, 0)",
-            "(2, 'Iron Sword', 'primary', 'guards', 1, 150, 10, 0)",
-            "(3, 'Steel Armor', 'body', 'soldiers', 2, 300, 0, 15)",
-            "(4, 'Mithril Dagger', 'secondary', 'spies', 3, 500, 20, 0)",
-        ];
+        $schema->create('armory_categories', function($table) {
+            $table->increments('id');
+            $table->integer('unit_type_id');
+            $table->string('slug');
+            $table->string('name');
+            $table->integer('slots')->default(1);
+        });
 
-        foreach ($items as $item) {
-            $this->db->exec("INSERT INTO armory_items VALUES {$item}");
-        }
+        $schema->create('armory_items', function($table) {
+            $table->increments('id');
+            $table->integer('category_id');
+            $table->string('slug');
+            $table->string('name');
+            $table->string('unit_type');
+            $table->integer('attack_bonus')->default(0);
+            $table->integer('defense_bonus')->default(0);
+            $table->integer('cost');
+            $table->integer('armory_level_req')->default(0);
+        });
 
-        $this->service = new ArmoryService($this->db);
+        $schema->create('kingdom_armory_items', function($table) {
+            $table->integer('kingdom_id');
+            $table->integer('item_id');
+            $table->integer('quantity')->default(0);
+            $table->primary(['kingdom_id', 'item_id']);
+        });
+
+        $schema->create('units', function($table) {
+            $table->increments('id');
+            $table->string('slug');
+        });
+
+        $schema->create('dominion_manpower', function($table) {
+            $table->integer('dominion_id');
+            $table->integer('unit_id');
+            $table->integer('total_quantity');
+        });
+
+        $schema->create('structures', function($table) {
+            $table->increments('id');
+            $table->string('slug');
+        });
+
+        $schema->create('structure_levels', function($table) {
+            $table->integer('structure_id');
+            $table->integer('level');
+            $table->integer('cost');
+        });
+
+        // 3. Populate Seed Data
+        Capsule::table('users')->insert(['id' => 1, 'username' => 'TestLord']);
+        Capsule::table('dominions')->insert([
+            'id' => 1, 
+            'user_id' => 1, 
+            'name' => 'Test Dominion', 
+            'credits' => 1000000, 
+            'armory_level' => 1
+        ]);
+
+        Capsule::table('units')->insert(['id' => 1, 'slug' => 'soldiers']);
+        Capsule::table('dominion_manpower')->insert(['dominion_id' => 1, 'unit_id' => 1, 'total_quantity' => 1000]);
+
+        Capsule::table('armory_unit_types')->insert(['id' => 1, 'slug' => 'soldiers', 'name' => 'Soldiers', 'title' => 'Soldier Offensive Loadout']);
+        Capsule::table('armory_categories')->insert(['id' => 1, 'unit_type_id' => 1, 'slug' => 'main_weapon', 'name' => 'Heavy Main Weapons', 'slots' => 1]);
+        
+        Capsule::table('armory_items')->insert([
+            ['id' => 1, 'category_id' => 1, 'slug' => 'pulse_rifle', 'name' => 'Pulse Rifle', 'unit_type' => 'soldiers', 'cost' => 80000, 'armory_level_req' => 0],
+            ['id' => 2, 'category_id' => 1, 'slug' => 'railgun', 'name' => 'Railgun', 'unit_type' => 'soldiers', 'cost' => 120000, 'armory_level_req' => 2],
+        ]);
+
+        Capsule::table('structures')->insert(['id' => 3, 'slug' => 'armory']);
+        Capsule::table('structure_levels')->insert(['structure_id' => 3, 'level' => 2, 'cost' => 210000]);
+
+        $this->armoryService = new ArmoryService();
     }
 
-    public function testGetArmoryData(): void
+    public function test_get_armory_data_retrieves_complete_structure(): void
     {
-        $this->db->exec("INSERT INTO kingdoms (id, foundation_level) VALUES (1, 1)");
+        $data = $this->armoryService->getArmoryData(1);
 
-        $result = $this->service->getArmoryData(1);
-
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('items', $result);
-        $this->assertArrayHasKey('unlocked_tiers', $result);
-        $this->assertArrayHasKey('foundation_level', $result);
+        $this->assertArrayHasKey('loadouts', $data);
+        $this->assertArrayHasKey('soldiers', $data['loadouts']);
+        $this->assertEquals(1000, $data['loadouts']['soldiers']['unit_count']);
+        
+        $categories = $data['loadouts']['soldiers']['categories'];
+        $this->assertArrayHasKey('main_weapon', $categories);
+        
+        $items = $categories['main_weapon']['items'];
+        $this->assertTrue($items['pulse_rifle']->unlocked);
+        $this->assertFalse($items['railgun']->unlocked); // Level 1 < Req 2
     }
 
-    public function testGetArmoryDataFiltersByFoundation(): void
+    public function test_buy_item_success_decrements_credits_and_increments_inventory(): void
     {
-        $this->db->exec("INSERT INTO kingdoms (id, foundation_level) VALUES (1, 1)"); // Only tier 1 unlocked
-
-        $result = $this->service->getArmoryData(1);
-
-        // Should only have tier 1 items
-        foreach ($result['items'] as $unitType => $types) {
-            foreach ($types as $type => $items) {
-                foreach ($items as $item) {
-                    $this->assertEquals(1, $item['tier']);
-                }
-            }
-        }
-    }
-
-    public function testGetArmoryDataHigherFoundation(): void
-    {
-        $this->db->exec("INSERT INTO kingdoms (id, foundation_level) VALUES (1, 2)"); // Tier 2 unlocked
-
-        $result = $this->service->getArmoryData(1);
-
-        $this->assertArrayHasKey('unlocked_tiers', $result);
-        $this->assertArrayHasKey(1, $result['unlocked_tiers']);
-        $this->assertArrayHasKey(2, $result['unlocked_tiers']);
-    }
-
-    public function testBuyItem(): void
-    {
-        // Insert kingdom with gold and armory item (use id 10 to avoid conflict with setUp items)
-        $this->db->exec("INSERT INTO kingdoms (id, foundation_level, gold) VALUES (1, 1, 1000)");
-        $this->db->exec("INSERT INTO armory_items (id, name, type, unit_type, tier, cost) VALUES (10, 'Iron Sword', 'primary', 'guards', 1, 100)");
-
-        $result = $this->service->buyItem(1, 10, 1);
+        $result = $this->armoryService->buyItem(1, 1, 10);
 
         $this->assertTrue($result['success']);
-        $this->assertStringContainsString('Successfully purchased', $result['message']);
+        
+        $dom = Dominion::find(1);
+        $this->assertEquals(1000000 - (80000 * 10), $dom->credits);
+
+        $inv = Capsule::table('kingdom_armory_items')->where('kingdom_id', 1)->where('item_id', 1)->first();
+        $this->assertEquals(10, $inv->quantity);
     }
 
-    public function testBuyItemInsufficientGold(): void
+    public function test_buy_item_fails_on_insufficient_credits(): void
     {
-        $this->db->exec("INSERT INTO kingdoms (id, foundation_level, gold) VALUES (1, 1, 50)");
-        $this->db->exec("INSERT INTO armory_items (id, name, type, unit_type, tier, cost) VALUES (10, 'Iron Sword', 'primary', 'guards', 1, 100)");
+        $dom = Dominion::find(1);
+        $dom->credits = 50000;
+        $dom->save();
 
-        $result = $this->service->buyItem(1, 10, 1);
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Insufficient gold', $result['message']);
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Insufficient credits.");
+        
+        $this->armoryService->buyItem(1, 1, 1);
     }
 
-    public function testSellItem(): void
+    public function test_buy_item_fails_on_unmet_tech_rank(): void
     {
-        // Insert kingdom, armory item, and kingdom_armory_item
-        $this->db->exec("INSERT INTO kingdoms (id, foundation_level, gold) VALUES (1, 1, 1000)");
-        $this->db->exec("INSERT INTO armory_items (id, name, type, unit_type, tier, cost) VALUES (10, 'Iron Sword', 'primary', 'guards', 1, 100)");
-        $this->db->exec("INSERT INTO kingdom_armory_items (kingdom_id, item_id, quantity) VALUES (1, 10, 3)");
+        // Item ID 2 (Railgun) requires Level 2. Dominion is Level 1.
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Tech requirement not met.");
+        
+        $this->armoryService->buyItem(1, 2, 1);
+    }
 
-        $result = $this->service->sellItem(1, 10, 1);
+    public function test_sell_item_success_refunds_credits_and_decrements_inventory(): void
+    {
+        // Setup initial inventory
+        Capsule::table('kingdom_armory_items')->insert(['kingdom_id' => 1, 'item_id' => 1, 'quantity' => 20]);
+        
+        $result = $this->armoryService->sellItem(1, 1, 10);
 
         $this->assertTrue($result['success']);
-        $this->assertStringContainsString('Successfully sold', $result['message']);
+        
+        $dom = Dominion::find(1);
+        // Refund is 50% of 80000 = 40000 * 10 = 400000
+        $this->assertEquals(1000000 + 400000, $dom->credits);
+
+        $inv = Capsule::table('kingdom_armory_items')->where('kingdom_id', 1)->where('item_id', 1)->first();
+        $this->assertEquals(10, $inv->quantity);
     }
 
-    public function testSellItemNotFound(): void
+    public function test_sell_item_fails_on_insufficient_stock(): void
     {
-        $this->db->exec("INSERT INTO kingdoms (id, foundation_level) VALUES (1, 1)");
-
-        $result = $this->service->sellItem(1, 999, 1);
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('not found', $result['message']);
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Insufficient stock.");
+        
+        $this->armoryService->sellItem(1, 1, 1);
     }
 
-    public function testGetArmoryDataNoItems(): void
+    public function test_upgrade_armory_success_increases_level(): void
     {
-        $this->db->exec("DELETE FROM armory_items");
-        $this->db->exec("INSERT INTO kingdoms (id, foundation_level) VALUES (1, 1)");
+        $result = $this->armoryService->upgradeArmory(1);
 
-        $result = $this->service->getArmoryData(1);
-
-        $this->assertEmpty($result['items']);
+        $this->assertTrue($result['success']);
+        
+        $dom = Dominion::find(1);
+        $this->assertEquals(2, $dom->armory_level);
+        $this->assertEquals(1000000 - 210000, $dom->credits);
     }
 
-    public function testGetArmoryDataKingdomNotFound(): void
+    public function test_upgrade_armory_fails_at_max_level(): void
     {
-        $result = $this->service->getArmoryData(999);
+        $dom = Dominion::find(1);
+        $dom->armory_level = 2; // Level 3 doesn't exist in our seed
+        $dom->save();
 
-        // The method returns false for non-existent kingdom
-        $this->assertFalse($result['foundation_level'] ?? false);
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Maximum tech level reached.");
+        
+        $this->armoryService->upgradeArmory(1);
     }
 }

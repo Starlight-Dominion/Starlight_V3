@@ -2,10 +2,14 @@
     import { game, resources } from '../stores/gameStore.svelte.js';
     import { fade, slide } from 'svelte/transition';
 
-    let { tactical = {} } = $props();
+    let { 
+        tactical = {}, 
+        production_total = 0, 
+        production_base = 0, 
+        production_mines = 0 
+    } = $props();
 
     const user = $derived(game.user);
-    const kingdom = $derived(user?.kingdom || {});
     
     let activeModules = $state({
         eco: true,
@@ -22,7 +26,6 @@
     );
 
     const totalPopulation = $derived(totalMilitary + (resources.citizens || 0));
-    const goldPerTick = $derived(tactical.production_total || 100);
 </script>
 
 <div in:fade class="space-y-6">
@@ -75,11 +78,15 @@
                 <div in:slide class="p-8 space-y-4 font-mono">
                     <div class="flex justify-between items-end border-b border-white/5 pb-2">
                         <span class="text-[10px] text-gray-500 uppercase tracking-widest">Liquid Credits</span>
-                        <span class="text-xl font-black text-white">{resources.gold.toLocaleString()}</span>
+                        <span class="text-xl font-black text-white">{resources.credits.toLocaleString()}</span>
                     </div>
                     <div class="flex justify-between items-center text-xs">
                         <span class="text-gray-600 uppercase font-bold">Cycle Growth</span>
-                        <span class="text-cyan-400 font-bold">+{tactical.production_total?.toLocaleString() || 100} CP</span>
+                        <span class="text-cyan-400 font-bold">+{production_total.toLocaleString()} CP</span>
+                    </div>
+                    <div class="flex justify-between items-center text-[9px] text-gray-700">
+                        <span class="uppercase">Base: {production_base}</span>
+                        <span class="uppercase">Bonus: {production_mines}</span>
                     </div>
                 </div>
             {/if}
@@ -98,12 +105,16 @@
             {#if activeModules.mil}
                 <div in:slide class="p-8 space-y-4 font-mono">
                     <div class="flex justify-between items-end border-b border-white/5 pb-2">
-                        <span class="text-[10px] text-gray-500 uppercase tracking-widest">Active Sorties</span>
+                        <span class="text-[10px] text-gray-500 uppercase tracking-widest">Active Sorties (Turns)</span>
                         <span class="text-xl font-black text-cyan-400">{resources.turns}</span>
                     </div>
                     <div class="flex justify-between items-center text-xs">
                         <span class="text-gray-600 uppercase font-bold">Offense Power</span>
                         <span class="text-white font-bold">{tactical.ratings?.offense?.toLocaleString() || 0}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-gray-600 uppercase font-bold">Defense Power</span>
+                        <span class="text-white font-bold">{tactical.ratings?.defense?.toLocaleString() || 0}</span>
                     </div>
                 </div>
             {/if}

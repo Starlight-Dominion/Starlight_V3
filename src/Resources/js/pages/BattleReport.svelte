@@ -1,128 +1,98 @@
 <script>
-    import { fade } from 'svelte/transition';
+    import { fade, slide } from 'svelte/transition';
     let { log, attacker, defender } = $props();
 
-    function formatNumber(num) {
-        return new Intl.NumberFormat().format(num);
-    }
+    function n(num) { return new Intl.NumberFormat().format(num); }
 </script>
 
 <div in:fade class="space-y-8 pb-20 max-w-4xl mx-auto">
-    <header class="flex justify-between items-end border-b border-[#2a231e] pb-6">
+    <header class="flex justify-between items-end border-b border-cyan-500/20 pb-6">
         <div>
-            <h1 class="text-4xl font-black text-white uppercase tracking-tighter">Battle Report</h1>
-            <p class="text-gray-500 font-bold uppercase tracking-[3px] text-[10px] mt-2">Historical Record of Engagement #{log.id}</p>
+            <h1 class="text-4xl font-title font-black text-white uppercase tracking-tighter text-shadow-glow">
+                Engagement Log #{log.id}
+            </h1>
+            <p class="text-cyan-500/60 text-[9px] font-bold uppercase tracking-[4px] mt-2">
+                Telemetry Synchronized
+            </p>
         </div>
-        <a href="/combat/battlefield" class="text-[9px] font-black text-[#c5a059] uppercase tracking-widest hover:text-white transition-colors">
-            &larr; Back to Battlefield
+        <a href="/combat/battlefield" class="text-[10px] font-black text-cyan-400 uppercase tracking-widest hover:text-white transition-all">
+            &larr; Return to War Room
         </a>
     </header>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <!-- Attacker -->
-        <div class="bg-[#0f0f0f] border border-[#2a231e] rounded-3xl p-8 relative overflow-hidden">
-            <div class="absolute top-0 right-0 p-4">
-                <span class="text-[10px] font-black text-gray-700 uppercase tracking-widest">Attacker</span>
+        <!-- Attacker Card -->
+        <div class="bg-dark-translucent border border-cyan-500/20 rounded-3xl p-8 relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-4 opacity-10">
+                <span class="text-4xl font-title font-black text-white italic">OFFENSE</span>
             </div>
-            <h2 class="text-2xl font-black text-white mb-1">{attacker.kingdom_name}</h2>
-            <p class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-6">Commander: {attacker.user.username}</p>
+            <h2 class="text-2xl font-title font-black text-white uppercase">{attacker.name}</h2>
             
-            <div class="space-y-4">
-                <h3 class="text-[10px] font-black text-gray-600 uppercase tracking-[2px]">Army Deployed</h3>
-                <div class="grid grid-cols-2 gap-4">
-                    {#each Object.entries(log.attacker_units) as [type, count]}
-                        <div class="bg-[#1a1a1a] p-3 rounded-xl border border-[#2a231e]">
-                            <span class="text-[8px] text-gray-600 uppercase block font-bold mb-1">{type}</span>
-                            <span class="text-white font-mono font-bold">{formatNumber(count)}</span>
-                        </div>
-                    {/each}
+            <div class="mt-8 space-y-6">
+                <div>
+                    <span class="text-[9px] text-gray-500 uppercase font-black tracking-widest block mb-1">Effective Firepower</span>
+                    <span class="text-3xl font-mono font-bold text-white">{n(log.attacker_damage)}</span>
                 </div>
-                <div class="mt-6 pt-6 border-t border-[#2a231e]">
-                    <div class="flex justify-between items-end">
-                        <div>
-                            <span class="text-[8px] text-gray-600 uppercase block font-bold">Casualties</span>
-                            <span class="text-red-500 font-black text-xl">{log.attacker_loss_percent}%</span>
-                        </div>
-                        {#if log.result === 'attacker'}
-                            <div class="text-right">
-                                <span class="text-[8px] text-gray-600 uppercase block font-bold">Looted</span>
-                                <span class="text-[#c5a059] font-black text-xl">+{formatNumber(log.gold_looted)} Gold</span>
-                            </div>
-                        {/if}
+
+                <div class="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                    <div>
+                        <span class="text-[8px] text-gray-600 uppercase font-bold">Fatigue Casualties</span>
+                        <span class="block text-red-500 font-mono font-bold">{n(log.attacker_soldiers_lost)}</span>
+                    </div>
+                    <div>
+                        <span class="text-[8px] text-gray-600 uppercase font-bold">XP Harvested</span>
+                        <span class="block text-cyan-400 font-mono font-bold">+{n(log.attacker_xp_gained)}</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Defender -->
-        <div class="bg-[#0f0f0f] border border-[#2a231e] rounded-3xl p-8 relative overflow-hidden">
-            <div class="absolute top-0 right-0 p-4">
-                <span class="text-[10px] font-black text-gray-700 uppercase tracking-widest">Defender</span>
+        <!-- Defender Card -->
+        <div class="bg-dark-translucent border border-cyan-500/20 rounded-3xl p-8 relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-4 opacity-10">
+                <span class="text-4xl font-title font-black text-white italic">DEFENSE</span>
             </div>
-            <h2 class="text-2xl font-black text-white mb-1">{defender.kingdom_name}</h2>
-            <p class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-6">Commander: {defender.user.username}</p>
-            
-            <div class="space-y-4">
-                <h3 class="text-[10px] font-black text-gray-600 uppercase tracking-[2px]">Garrison</h3>
-                <div class="grid grid-cols-2 gap-4">
-                    {#each Object.entries(log.defender_units) as [type, count]}
-                        <div class="bg-[#1a1a1a] p-3 rounded-xl border border-[#2a231e]">
-                            <span class="text-[8px] text-gray-600 uppercase block font-bold mb-1">{type}</span>
-                            <span class="text-white font-mono font-bold">{formatNumber(count)}</span>
-                        </div>
-                    {/each}
+            <h2 class="text-2xl font-title font-black text-white uppercase">{defender.name}</h2>
+
+            <div class="mt-8 space-y-6">
+                <div>
+                    <span class="text-[9px] text-gray-500 uppercase font-black tracking-widest block mb-1">Barrier Efficiency</span>
+                    <span class="text-3xl font-mono font-bold text-white">{n(log.defender_damage)}</span>
                 </div>
-                <div class="mt-6 pt-6 border-t border-[#2a231e]">
-                    <div class="flex justify-between items-end">
-                        <div>
-                            <span class="text-[8px] text-gray-600 uppercase block font-bold">Casualties</span>
-                            <span class="text-red-500 font-black text-xl">{log.defender_loss_percent}%</span>
-                        </div>
-                        {#if log.result === 'attacker'}
-                            <div class="text-right">
-                                <span class="text-[8px] text-gray-600 uppercase block font-bold">Lost</span>
-                                <span class="text-red-900 font-black text-xl">-{formatNumber(log.gold_looted)} Gold</span>
-                            </div>
-                        {/if}
+
+                <div class="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                    <div>
+                        <span class="text-[8px] text-gray-600 uppercase font-bold">Garrison Losses</span>
+                        <span class="block text-red-500 font-mono font-bold">-{n(log.guards_lost)}</span>
+                    </div>
+                    <div>
+                        <span class="text-[8px] text-gray-600 uppercase font-bold">Loot Siphon</span>
+                        <span class="block text-red-900 font-mono font-bold">-{n(log.credits_stolen)} CP</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Conclusion -->
-    <div class="bg-[#1a1a1a] border border-[#2a231e] rounded-3xl p-12 text-center relative overflow-hidden">
-        <div class="absolute inset-0 opacity-10 pointer-events-none">
-            <div class="absolute inset-0 bg-gradient-to-b from-transparent to-black"></div>
-        </div>
+    <!-- Final Outcome -->
+    <div class="bg-black/60 border border-cyan-500/30 rounded-3xl p-12 text-center relative overflow-hidden">
+        <div class="absolute inset-0 opacity-5 pointer-events-none bg-[url('/images/grid.png')]"></div>
         
-        <span class="text-[10px] font-black text-gray-600 uppercase tracking-[5px] mb-4 block">Engagement Outcome</span>
-        
-        {#if log.result === 'attacker'}
-            <h2 class="text-6xl font-black text-[#3f6b2f] uppercase tracking-tighter mb-4 italic">Victory</h2>
+        {#if log.outcome === 'victory'}
+            <h2 class="text-7xl font-title font-black text-cyan-400 uppercase tracking-tighter italic mb-4">Strategic Victory</h2>
             <p class="text-gray-400 max-w-md mx-auto text-sm leading-relaxed">
-                The assault was successful. Your forces overwhelmed the garrison of {defender.kingdom_name} and secured {formatNumber(log.gold_looted)} gold in spoils.
+                Primary objectives achieved. Secured <span class="text-white font-bold">{n(log.credits_stolen)} Credits</span> from the target sector.
             </p>
+            {#if log.loot_factor < 1.0}
+                <div in:slide class="mt-6 inline-block px-4 py-1 bg-red-900/20 border border-red-500/50 rounded-full">
+                    <span class="text-[10px] font-black text-red-400 uppercase tracking-widest">Anti-Farm Siphon Active: {log.loot_factor * 100}% Yield</span>
+                </div>
+            {/if}
         {:else}
-            <h2 class="text-6xl font-black text-red-900 uppercase tracking-tighter mb-4 italic">Defeat</h2>
+            <h2 class="text-7xl font-title font-black text-red-900 uppercase tracking-tighter italic mb-4">Assault Failed</h2>
             <p class="text-gray-400 max-w-md mx-auto text-sm leading-relaxed">
-                Your forces were repelled by the defenders of {defender.kingdom_name}. The retreat was costly, and no spoils were recovered.
+                The target's barriers held. Expeditionary forces forced into emergency warp-out.
             </p>
         {/if}
-        
-        <div class="mt-12 flex justify-center gap-8">
-            <div class="text-center">
-                <span class="text-[8px] text-gray-600 uppercase block font-bold mb-1">Turns Spent</span>
-                <span class="text-white font-mono text-lg">{log.turns_spent}</span>
-            </div>
-            <div class="text-center">
-                <span class="text-[8px] text-gray-600 uppercase block font-bold mb-1">XP Gained</span>
-                <span class="text-white font-mono text-lg">{log.result === 'attacker' ? log.turns_spent * 5 : 0}</span>
-            </div>
-            <div class="text-center">
-                <span class="text-[8px] text-gray-600 uppercase block font-bold mb-1">Date</span>
-                <span class="text-white font-mono text-lg">{new Date(log.created_at).toLocaleDateString()}</span>
-            </div>
-        </div>
     </div>
 </div>

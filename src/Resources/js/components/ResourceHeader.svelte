@@ -1,5 +1,5 @@
 <script>
-    import { game, resources, formattedTick } from '../stores/gameStore.svelte.js';
+    import { game, resources } from '../stores/gameStore.svelte.js';
     import { fade } from 'svelte/transition';
     
     let activeMenu = $state(null);
@@ -10,7 +10,6 @@
     };
 
     const closeAll = () => activeMenu = null;
-    const goldPerTick = $derived(game.user?.kingdom?.base_gold_per_tick || 100);
 </script>
 
 <svelte:window onclick={closeAll} />
@@ -69,7 +68,7 @@
                 <div class="flex flex-col items-end">
                     <span class="text-[7px] font-black text-cyan-900 uppercase tracking-widest">Operational Credits</span>
                     <div class="flex items-center gap-2">
-                        <span class="text-white font-mono font-bold text-sm">{resources.gold.toLocaleString()}</span>
+                        <span class="text-white font-mono font-bold text-sm">{resources.credits.toLocaleString()}</span>
                     </div>
                 </div>
             </div>
@@ -77,7 +76,8 @@
             <div class="flex items-center gap-4">
                 <div class="bg-black/40 px-4 py-2 rounded border border-cyan-500/20 flex flex-col items-center min-w-[90px]">
                     <span class="text-[7px] font-black text-cyan-800 uppercase tracking-widest">Cycle Sync</span>
-                    <span class="text-cyan-400 font-mono font-bold text-sm leading-none mt-1">{formattedTick.value}</span>
+                    <!-- FIX: Referencing game.formattedTick directly -->
+                    <span class="text-cyan-400 font-mono font-bold text-sm leading-none mt-1">{game.formattedTick}</span>
                 </div>
                 <a href="/logout" class="text-[8px] font-black text-red-900 uppercase hover:text-red-500 transition-all tracking-tighter">Terminate Link</a>
             </div>

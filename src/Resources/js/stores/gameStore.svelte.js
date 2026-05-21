@@ -1,54 +1,87 @@
-// src/Resources/js/stores/gameStore.svelte.js
+class GameStore {
+    component = $state('home');
+    props = $state({});
+    user = $state(null);
+    csrf = $state('');
+    heartbeatInterval = null;
 
-// Using $state.raw for the user object can sometimes help with heavy models, 
-// but for an RPG, we want deep reactivity.
-export const game = $state({
-    component: 'home',
-    props: {},
-    user: null,
-    csrf: '',
-    secondsToNextTick: 600
-});
+    resources = $state({
+        credits: 0,
+        bank: 0,
+        citizens: 0,
+        turns: 0,
+        xp: 0
+    });
 
-export function updateGame(data) {
-    if (!data) return;
-    
-    // Batch updates to ensure the component re-renders once
-    game.component = data.component;
-    game.props = data.props;
-    game.user = data.user; 
-    game.csrf = data.csrf;
-    
-    if (data.user?.secondsToNextTick) {
-        game.secondsToNextTick = data.user.secondsToNextTick;
+    nextTickSeconds = $state(600);
+
+    get formattedTick() {
+        const m = Math.floor(this.nextTickSeconds / 60);
+        const s = this.nextTickSeconds % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    init(initialState) {
+        this.component = initialState.component || 'home';
+        this.props = initialState.props || {};
+        this.user = initialState.user || null;
+        this.csrf = initialState.csrf || '';
+
+        if (this.user?.kingdom) {
+            this.syncResources(this.user.kingdom);
+        }
+        
+        if (initialState.user?.secondsToNextTick) {
+            this.nextTickSeconds = initialState.user.secondsToNextTick;
+        }
+    }
+
+    syncResources(kingdom) {
+        this.resources.credits = kingdom.credits ?? 0;
+        this.resources.bank = kingdom.credits_banked ?? 0;
+        this.resources.citizens = kingdom.citizens ?? 0;
+        this.resources.turns = kingdom.turns ?? 0;
+        this.resources.xp = kingdom.xp ?? 0;
+    }
+
+    startHeartbeat() {
+        if (this.heartbeatInterval) return;
+
+        this.heartbeatInterval = setInterval(() => {
+            if (this.nextTickSeconds > 0) {
+                this.nextTickSeconds--;
+            } else {
+                this.nextTickSeconds = 600;
+                this.refreshState();
+            }
+        }, 1000);
+    }
+
+    async refreshState() {
+        try {
+            const res = await fetch(window.location.pathname, {
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.user?.kingdom) {
+                this.syncResources(data.user.kingdom);
+            }
+        } catch (e) {
+            console.error("Telemetry link lost.");
+        }
     }
 }
 
-export function startHeartbeat() {
-    // Prevent multiple intervals
-    if (window.gameInterval) clearInterval(window.gameInterval);
-    
-    window.gameInterval = setInterval(() => {
-        if (game.secondsToNextTick > 0) {
-            game.secondsToNextTick--;
-        } else {
-            clearInterval(window.gameInterval);
-            window.location.reload();
-        }
-    }, 1000);
-}
+export const game = new GameStore();
+export const resources = game.resources;
 
-export const resources = {
-    get gold() { return game.user?.kingdom?.gold || 0 },
-    get bank() { return game.user?.kingdom?.gold_in_bank || 0 },
-    get citizens() { return game.user?.kingdom?.citizens || 0 },
-    get turns() { return game.user?.kingdom?.turns || 0 }
+/**
+ * Functional exports for app.js integration
+ */
+export const updateGame = (state) => {
+    game.init(state);
 };
 
-export const formattedTick = {
-    get value() {
-        const mins = Math.floor(game.secondsToNextTick / 60);
-        const secs = game.secondsToNextTick % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
+export const startHeartbeat = () => {
+    game.startHeartbeat();
 };
