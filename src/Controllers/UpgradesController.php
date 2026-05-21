@@ -8,17 +8,19 @@ use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
 use sdo\Services\UpgradesService;
 use sdo\Services\AuthService;
+use sdo\Services\ConfigService;
 
 class UpgradesController extends BaseController
 {
-public function __construct(
-GameService $gameService,
-AdvisorService $advisorService,
-private UpgradesService $upgradesService,
-private AuthService $authService
-) {
-parent::__construct($gameService, $advisorService);
-}
+    public function __construct(
+        GameService $gameService,
+        AdvisorService $advisorService,
+        ConfigService $configService,
+        private UpgradesService $upgradesService,
+        private AuthService $authService
+    ) {
+        parent::__construct($gameService, $advisorService, $configService);
+    }
 
 public function index(): string
 {

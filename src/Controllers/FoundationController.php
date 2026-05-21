@@ -7,16 +7,18 @@ use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
 use sdo\Services\FoundationService;
 use sdo\Services\AuthService;
+use sdo\Services\ConfigService;
 
 class FoundationController extends BaseController
 {
     public function __construct(
         GameService $gameService,
         AdvisorService $advisorService,
+        ConfigService $configService,
         private FoundationService $foundationService,
         private AuthService $authService
     ) {
-        parent::__construct($gameService, $advisorService);
+        parent::__construct($gameService, $advisorService, $configService);
     }
 
     /**

@@ -6,14 +6,16 @@ namespace sdo\Controllers;
 
 use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
+use sdo\Services\ConfigService;
 
 class HomeController extends BaseController
 {
     public function __construct(
         GameService $gameService,
-        AdvisorService $advisorService
+        AdvisorService $advisorService,
+        ConfigService $configService
     ) {
-        parent::__construct($gameService, $advisorService);
+        parent::__construct($gameService, $advisorService, $configService);
     }
 
     /**

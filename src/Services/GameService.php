@@ -6,17 +6,17 @@ namespace sdo\Services;
 use DateTime;
 use DateTimeZone;
 use sdo\Models\Dominion;
+use sdo\Services\ConfigService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class GameService
 {
-    public const TICK_INTERVAL_SECONDS = 900; 
     public const TIMEZONE = 'America/New_York';
     public const BASE_INCOME = 100;
 
-    public const BASE_CREDITS_PER_TICK = 100;
-    public const BASE_CITIZENS_PER_TICK = 50;
     public const BASE_TURNS_PER_TICK = 10;
+
+    public function __construct(private ConfigService $configService) {}
 
     public function getRealmTime(): DateTime
     {
@@ -25,11 +25,14 @@ class GameService
 
     public function getSecondsToNextTick(): int
     {
+        $interval = (int)$this->configService->get('tick_interval_seconds', 900);
         $now = $this->getRealmTime();
+        
+        // Use a 3600 second hour base for consistency
         $secondsSinceHour = ($now->getTimestamp() % 3600);
-        $secondsIntoCurrentTick = $secondsSinceHour % self::TICK_INTERVAL_SECONDS;
+        $secondsIntoCurrentTick = $secondsSinceHour % $interval;
 
-        return self::TICK_INTERVAL_SECONDS - $secondsIntoCurrentTick;
+        return $interval - $secondsIntoCurrentTick;
     }
 
     public function getKingdomByUserId(int $userId): ?Dominion

@@ -6,11 +6,14 @@ namespace sdo\Services;
 use sdo\Models\User;
 use sdo\Models\Dominion;
 use sdo\Models\Race;
+use sdo\Services\ConfigService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class AuthService
 {
+    public function __construct(private ConfigService $configService) {}
+
     public function register(string $username, string $email, string $password, string $dominionName, string $raceName): array
     {
         try {
@@ -31,8 +34,11 @@ class AuthService
                 return ['success' => false, 'message' => "Invalid evolutionary strain selected."];
             }
 
+            $startingCredits = (int)$this->configService->get('starting_credits', 10000);
+            $startingCitizens = (int)$this->configService->get('starting_citizens', 500);
+
             // 3. Execute Transaction
-            Capsule::transaction(function () use ($username, $email, $password, $dominionName, $race) {
+            Capsule::transaction(function () use ($username, $email, $password, $dominionName, $race, $startingCredits, $startingCitizens) {
                 
                 // Create Commander
                 $user = User::create([
@@ -45,8 +51,8 @@ class AuthService
                 $dominion = $user->dominion()->create([
                     'name'    => $dominionName,
                     'race_id' => $race->id,
-                    'credits' => 10000,
-                    'citizens' => 500,
+                    'credits' => $startingCredits,
+                    'citizens' => $startingCitizens,
                     'turns'    => 100,
                     'foundation_hp' => 1000,
                     'foundation_max_hp' => 1000

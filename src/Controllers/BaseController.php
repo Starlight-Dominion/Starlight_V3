@@ -6,19 +6,23 @@ namespace sdo\Controllers;
 use sdo\Infrastructure\Csrf;
 use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
+use sdo\Services\ConfigService;
 use sdo\ViewModels\GameStateViewModel;
 
 abstract class BaseController
 {
     protected GameService $gameService;
     protected AdvisorService $advisorService;
+    protected ConfigService $configService;
 
     public function __construct(
         GameService $gameService,
-        AdvisorService $advisorService
+        AdvisorService $advisorService,
+        ConfigService $configService
     ) {
         $this->gameService = $gameService;
         $this->advisorService = $advisorService;
+        $this->configService = $configService;
     }
 
     protected function render(string $component, array $pageData = []): string
@@ -46,7 +50,7 @@ abstract class BaseController
                     'advice' => $vm->advice,
                     'realmTime' => $vm->realmTime,
                     'secondsToNextTick' => $vm->secondsToNextTick,
-                    'citizen_growth_rate' => \sdo\Services\GameService::BASE_CITIZENS_PER_TICK,
+                    'citizen_growth_rate' => (int)$this->configService->get('baseline_citizens_per_tick', 50),
                     'kingdom' => $dominion->toArray(),
                     'avatar_path' => $dominion->user->avatar_path,
                     'advisorHistory' => $vm->advisorHistory

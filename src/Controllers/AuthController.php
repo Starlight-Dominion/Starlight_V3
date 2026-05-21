@@ -7,15 +7,17 @@ use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
 use sdo\Services\AuthService;
 use sdo\Infrastructure\Validator;
+use sdo\Services\ConfigService;
 
 class AuthController extends BaseController
 {
     public function __construct(
         GameService $gameService,
         AdvisorService $advisorService,
+        ConfigService $configService,
         private AuthService $authService
     ) {
-        parent::__construct($gameService, $advisorService);
+        parent::__construct($gameService, $advisorService, $configService);
     }
 
     private function jsonResponse(bool $success, array $errors = [], int $status = 200): void

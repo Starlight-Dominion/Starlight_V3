@@ -8,17 +8,19 @@ use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
 use sdo\Services\SpyService;
 use sdo\Services\AuthService;
+use sdo\Services\ConfigService;
 
 class SpyController extends BaseController
 {
-public function __construct(
-GameService $gameService,
-AdvisorService $advisorService,
-private SpyService $spyService,
-private AuthService $authService
-) {
-parent::__construct($gameService, $advisorService);
-}
+    public function __construct(
+        GameService $gameService,
+        AdvisorService $advisorService,
+        ConfigService $configService,
+        private SpyService $spyService,
+        private AuthService $authService
+    ) {
+        parent::__construct($gameService, $advisorService, $configService);
+    }
 
 public function index(): string
 {

@@ -8,16 +8,18 @@ use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
 use sdo\Services\AuthService;
 use sdo\Services\AdminService;
+use sdo\Services\ConfigService;
 
 class AdminController extends BaseController
 {
     public function __construct(
         GameService $gameService,
         AdvisorService $advisorService,
+        ConfigService $configService,
         private AuthService $authService,
         private AdminService $adminService
     ) {
-        parent::__construct($gameService, $advisorService);
+        parent::__construct($gameService, $advisorService, $configService);
     }
 
     private function checkAdmin(): void
@@ -325,5 +327,29 @@ class AdminController extends BaseController
         $this->checkAdmin();
 
         return json_encode(['success' => true, 'logs' => $this->adminService->getRecentBattleLogs()]);
+    }
+
+    public function getSettings(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        return json_encode(['success' => true, 'settings' => $this->configService->getAll()]);
+    }
+
+    public function updateSetting(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        $key = (string)($_POST['key'] ?? '');
+        $value = $_POST['value'] ?? '';
+
+        try {
+            $this->configService->set($key, $value);
+            return json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
     }
 }

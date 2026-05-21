@@ -9,18 +9,20 @@ use sdo\Services\AdvisorService;
 use sdo\Services\MinesService;
 use sdo\Services\AuthService;
 use sdo\Services\UntrainingService;
+use sdo\Services\ConfigService;
 
 class MinesController extends BaseController
 {
-public function __construct(
-GameService $gameService,
-AdvisorService $advisorService,
-private MinesService $minesService,
-private UntrainingService $untrainingService,
-private AuthService $authService
-) {
-parent::__construct($gameService, $advisorService);
-}
+    public function __construct(
+        GameService $gameService,
+        AdvisorService $advisorService,
+        ConfigService $configService,
+        private MinesService $minesService,
+        private UntrainingService $untrainingService,
+        private AuthService $authService
+    ) {
+        parent::__construct($gameService, $advisorService, $configService);
+    }
 
 public function index(): string
 {

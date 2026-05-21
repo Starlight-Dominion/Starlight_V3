@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\User;
-use sdo\Models\Kingdom;
+use sdo\Models\Dominion;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
@@ -19,7 +19,7 @@ class AdminService
     public function getSystemStats(): array
     {
         $playerCount = User::count();
-        $kingdomCount = Kingdom::count();
+        $kingdomCount = Dominion::count();
         
         return [
             'total_users' => $playerCount,
@@ -30,8 +30,8 @@ class AdminService
 
     public function searchKingdoms(string $query): array
     {
-        return Kingdom::with('user')
-            ->where('kingdom_name', 'LIKE', "%{$query}%")
+        return Dominion::with('user')
+            ->where('name', 'LIKE', "%{$query}%")
             ->orWhereHas('user', function($q) use ($query) {
                 $q->where('username', 'LIKE', "%{$query}%");
             })
@@ -42,18 +42,18 @@ class AdminService
 
     public function updateKingdomStats(int $kingdomId, array $stats): bool
     {
-        $kingdom = Kingdom::findOrFail($kingdomId);
+        $dominion = Dominion::findOrFail($kingdomId);
         
         // Basic protection: only allow specific fields
-        $allowed = ['gold', 'xp', 'turns', 'citizens', 'unit_guards', 'unit_soldiers', 'unit_spies', 'unit_sentries'];
+        $allowed = ['credits', 'xp', 'turns', 'citizens'];
         
         foreach ($stats as $field => $value) {
             if (in_array($field, $allowed)) {
-                $kingdom->$field = $value;
+                $dominion->$field = $value;
             }
         }
 
-        return $kingdom->save();
+        return $dominion->save();
     }
 
     // --- Units Management ---
@@ -121,16 +121,6 @@ class AdminService
         return Capsule::table('structure_levels')->insert($data);
     }
 
-    public function addStructureUpgradeOption(array $data): int
-    {
-        return Capsule::table('structure_upgrade_options')->insertGetId($data);
-    }
-
-    public function updateStructureUpgradeOption(int $id, array $data): bool
-    {
-        return Capsule::table('structure_upgrade_options')->where('id', $id)->update($data) > 0;
-    }
-
     // --- Armory Items Management ---
     public function getAllArmoryItems(): array
     {
@@ -162,24 +152,11 @@ class AdminService
         return Capsule::table('armory_categories')->get()->toArray();
     }
 
-    public function updateArmoryUnitType(int $id, array $data): bool
-    {
-        return Capsule::table('armory_unit_types')->where('id', $id)->update($data) > 0;
-    }
-
-    public function updateArmoryCategory(int $id, array $data): bool
-    {
-        return Capsule::table('armory_categories')->where('id', $id)->update($data) > 0;
-    }
-
     // --- Logs Oversight ---
     public function getRecentBattleLogs(int $limit = 50): array
     {
         return Capsule::table('battle_logs')
-            ->join('kingdoms as atk', 'battle_logs.attacker_id', '=', 'atk.id')
-            ->join('kingdoms as def', 'battle_logs.defender_id', '=', 'def.id')
-            ->select('battle_logs.*', 'atk.kingdom_name as attacker_name', 'def.kingdom_name as defender_name')
-            ->orderBy('battle_logs.created_at', 'desc')
+            ->orderBy('created_at', 'desc')
             ->limit($limit)
             ->get()
             ->toArray();

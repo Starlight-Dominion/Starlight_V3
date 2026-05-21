@@ -7,16 +7,18 @@ use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
 use sdo\Services\BankService;
 use sdo\Services\AuthService;
+use sdo\Services\ConfigService;
 
 class BankController extends BaseController
 {
     public function __construct(
         GameService $gameService,
         AdvisorService $advisorService,
+        ConfigService $configService,
         private BankService $bankService,
         private AuthService $authService
     ) {
-        parent::__construct($gameService, $advisorService);
+        parent::__construct($gameService, $advisorService, $configService);
     }
 
     public function index(): string

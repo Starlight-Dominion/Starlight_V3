@@ -6,18 +6,26 @@ namespace sdo\Services;
 use PDO;
 use DateTime;
 use sdo\Services\GameService;
+use sdo\Services\ConfigService;
 
 class TickService
 {
     public const BATCH_SIZE = 100;
 
-    public function __construct(private PDO $db) {}
+    public function __construct(
+        private PDO $db,
+        private ConfigService $configService
+    ) {}
 
     public function processGlobalTick(): void
     {
         $offset = 0;
         $now = (new DateTime())->format('Y-m-d H:i:s');
         echo "Starting Global Tick at {$now}...\n";
+
+        $baseCitizens = (int)$this->configService->get('baseline_citizens_per_tick', 50);
+        $baseCredits = (int)$this->configService->get('baseline_credits_per_tick', 100);
+        $baseTurns = GameService::BASE_TURNS_PER_TICK;
 
         while (true) {
             $stmt = $this->db->prepare(
@@ -50,12 +58,12 @@ class TickService
 
             foreach ($dominions as $dom) {
                 $multiplier = 1 + ((float)($dom['total_economy_buff'] ?? 0) / 100);
-                $creditsGained = (int)floor(GameService::BASE_CREDITS_PER_TICK * $multiplier);
+                $creditsGained = (int)floor($baseCredits * $multiplier);
 
                 $updateStmt->execute([
                     ':credits_gained' => $creditsGained,
-                    ':citizens_gained' => GameService::BASE_CITIZENS_PER_TICK,
-                    ':turns_gained'   => GameService::BASE_TURNS_PER_TICK,
+                    ':citizens_gained' => $baseCitizens,
+                    ':turns_gained'   => $baseTurns,
                     ':now'            => $now,
                     ':id'             => $dom['id'],
                 ]);

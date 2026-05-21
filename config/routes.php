@@ -68,6 +68,8 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/admin/add-armory-item', [\sdo\Controllers\AdminController::class, 'addArmoryItem']);
     $r->addRoute('POST', '/admin/delete-armory-item', [\sdo\Controllers\AdminController::class, 'deleteArmoryItem']);
     $r->addRoute('GET', '/admin/battle-logs', [\sdo\Controllers\AdminController::class, 'getBattleLogs']);
+    $r->addRoute('GET', '/admin/settings', [\sdo\Controllers\AdminController::class, 'getSettings']);
+    $r->addRoute('POST', '/admin/update-setting', [\sdo\Controllers\AdminController::class, 'updateSetting']);
 
     // Mines Routes (Miner Assignment/Untraining & Upgrades)
     $r->addRoute('GET', '/structures/mines', [\sdo\Controllers\MinesController::class, 'index']);

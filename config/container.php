@@ -50,6 +50,7 @@ $containerBuilder->addDefinitions([
     KingdomRepositoryInterface::class => DI\create(EloquentKingdomRepository::class),
     BankRepositoryInterface::class => DI\create(EloquentBankRepository::class),
     CombatRepositoryInterface::class => DI\create(EloquentCombatRepository::class),
+    \sdo\Services\ConfigService::class => DI\create(),
 ]);
 
 return $containerBuilder->build();
