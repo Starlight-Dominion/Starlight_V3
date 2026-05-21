@@ -11,15 +11,17 @@
 
     const maxDeposit = $derived(Math.floor(resources.credits * 0.8));
     const maxWithdraw = $derived(resources.bank);
+    const isOverLimit = $derived(depositAmount > maxDeposit);
     const depositsLeft = $derived(resources.max_deposits - resources.deposits_today);
 
     async function handleAction(action, amount) {
-        if (loading || amount <= 0) return;
+        const numericAmount = Number(amount);
+        if (loading || numericAmount <= 0) return;
         loading = true;
         message = null;
 
         const fd = new FormData();
-        fd.append('amount', amount);
+        fd.append('amount', numericAmount);
         fd.append('_csrf', game.csrf);
 
         try {
@@ -73,7 +75,7 @@
                     <input type="number" bind:value={depositAmount} class="input-terminal text-2xl font-mono text-cyan-400" placeholder="0" />
                     <div class="flex justify-between px-2 pt-1">
                         <span class="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Safe Limit (80%): {maxDeposit.toLocaleString()} CP</span>
-                        {#if depositAmount > maxDeposit}
+                        {#if isOverLimit}
                             <span class="text-[8px] font-black text-red-500 uppercase animate-pulse">Exceeding Security Protocol</span>
                         {/if}
                     </div>
@@ -82,7 +84,7 @@
                 <button 
                     onclick={() => handleAction('deposit', depositAmount)}
                     class="w-full bg-cyan-700/50 hover:bg-cyan-600 border border-cyan-500/50 text-white font-title font-black py-4 rounded-xl uppercase tracking-[3px] transition-all disabled:opacity-30"
-                    disabled={loading || depositAmount <= 0 || depositAmount > maxDeposit || depositsLeft <= 0}
+                    disabled={loading || depositAmount <= 0 || isOverLimit || depositsLeft <= 0}
                 >Secure Assets</button>
             </div>
 
@@ -93,8 +95,8 @@
                 </div>
 
                 <div class="space-y-2">
-                    <label class="text-[9px] font-black text-gray-600 uppercase tracking-[2px] ml-2">Liquidate Assets (Credits)</label>
-                    <input type="number" bind:value={withdrawAmount} class="input-terminal text-2xl font-mono text-gray-400 border-white/10" placeholder="0" />
+                    <label class="text-[9px] font-black text-gray-400 uppercase tracking-[2px] ml-2">Liquidate Assets (Credits)</label>
+                    <input type="number" bind:value={withdrawAmount} class="input-terminal text-2xl font-mono text-cyan-400 border-white/10" placeholder="0" />
                     <div class="px-2 pt-1">
                         <span class="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Withdraw Max: {maxWithdraw.toLocaleString()} CP</span>
                     </div>

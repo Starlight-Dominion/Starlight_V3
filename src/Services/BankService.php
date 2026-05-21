@@ -59,7 +59,7 @@ class BankService
                 'kingdom_id' => $domId,
                 'transaction_type' => 'deposit',
                 'amount' => $amount,
-                'created_at' => new DateTime()
+                'created_at' => (new DateTime())->format('Y-m-d H:i:s')
             ]);
 
             // Comprehensive Logging
@@ -100,7 +100,7 @@ class BankService
                 'kingdom_id' => $domId,
                 'transaction_type' => 'withdraw',
                 'amount' => $amount,
-                'created_at' => new DateTime()
+                'created_at' => (new DateTime())->format('Y-m-d H:i:s')
             ]);
 
             // Comprehensive Logging

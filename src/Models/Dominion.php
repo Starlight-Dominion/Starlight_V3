@@ -21,6 +21,8 @@ class Dominion extends Model
         'xp' => 'integer',
         'foundation_hp' => 'integer',
         'foundation_max_hp' => 'integer',
+        'deposits_today' => 'integer',
+        'last_deposit_timestamp' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'last_tick' => 'datetime'
