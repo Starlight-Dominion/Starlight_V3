@@ -58,18 +58,19 @@ class BattlefieldController extends BaseController
         }
     }
 
-    public function report(int $id): string
+    public function report(array $vars): string
     {
         if (!$this->authService->isLoggedIn($_SESSION)) {
             $this->redirect('/login');
         }
 
+        $id = (int)($vars['id'] ?? 0);
         $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
         $log = $this->battlefieldService->getBattleLog($id);
 
         // Security check: Must be attacker or defender
         if (!$log || ((int)$log->attacker_id !== $kingdom->id && (int)$log->defender_id !== $kingdom->id)) {
-            $this->redirect('/battlefield');
+            $this->redirect('/combat/battlefield');
         }
 
         return $this->render('battlefield/report', [
