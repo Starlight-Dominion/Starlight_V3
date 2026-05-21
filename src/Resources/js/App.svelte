@@ -24,6 +24,7 @@
     import Settings from './pages/Settings.svelte';
     import Spy from './pages/Spy.svelte';
     import Training from './pages/Training.svelte';
+    import Recruit from './pages/Recruit.svelte';
     import BattleReport from './pages/BattleReport.svelte';
 
     const components = {
@@ -36,7 +37,7 @@
         'dashboard/index': Dashboard,
         'admin/index': Admin,
         'structures/index': Structures,
-        'mines/index': Mines,
+        'mines': Mines,
         'battlefield/index': Battlefield,
         'battlefield/report': BattleReport,
         'armory/index': Armory,
@@ -45,7 +46,8 @@
         'upgrades/index': Upgrades,
         'settings/index': Settings,
         'spy/index': Spy,
-        'training/index': Training
+        'training/index': Training,
+        'combat/recruit': Recruit
     };
 
     const ActiveComponent = $derived.by(() => {
