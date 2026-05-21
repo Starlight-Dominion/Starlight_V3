@@ -4,14 +4,17 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
+use sdo\Services\LogService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 use DateTime;
 
 class BankService
 {
-    private const MAX_DEPOSITS = 4;
-    private const RECHARGE_SECONDS = 21600; // 6 Hours
+    private const MAX_DEPOSITS = 6;
+    private const RECHARGE_SECONDS = 14400; // 4 Hours (6 slots in 24h)
+
+    public function __construct(private LogService $logService) {}
 
     public function getTransactions(int $dominionId, int $page, int $limit): array
     {
@@ -55,8 +58,18 @@ class BankService
             Capsule::table('bank_transactions')->insert([
                 'kingdom_id' => $domId,
                 'transaction_type' => 'deposit',
-                'amount' => $amount
+                'amount' => $amount,
+                'created_at' => new DateTime()
             ]);
+
+            // Comprehensive Logging
+            $this->logService->log(
+                $domId,
+                'bank_deposit',
+                "Commander secured " . number_format($amount) . " credits in the deep-space vault.",
+                $amount,
+                ['credits_remaining' => $dom->credits, 'banked_total' => $dom->credits_banked]
+            );
 
             return ['success' => true, 'message' => "Assets secured in deep-space vault."];
         });
@@ -86,8 +99,18 @@ class BankService
             Capsule::table('bank_transactions')->insert([
                 'kingdom_id' => $domId,
                 'transaction_type' => 'withdraw',
-                'amount' => $amount
+                'amount' => $amount,
+                'created_at' => new DateTime()
             ]);
+
+            // Comprehensive Logging
+            $this->logService->log(
+                $domId,
+                'bank_withdraw',
+                "Commander liquidated " . number_format($amount) . " credits from the vault.",
+                $amount,
+                ['credits_total' => $dom->credits, 'banked_remaining' => $dom->credits_banked]
+            );
 
             return ['success' => true, 'message' => "Credits liquidated for immediate use."];
         });

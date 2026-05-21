@@ -5,6 +5,7 @@ namespace sdo\Services;
 
 use sdo\Models\Dominion;
 use sdo\Models\User;
+use sdo\Services\LogService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
@@ -20,7 +21,10 @@ class BattlefieldService
     private const HOURLY_FULL_LOOT_CAP = 5;
     private const HOURLY_REDUCED_LOOT_MAX = 10;
 
-    public function __construct(private TacticalService $tacticalService) {}
+    public function __construct(
+        private TacticalService $tacticalService,
+        private LogService $logService
+    ) {}
 
     public function getBattlefieldList(): array
     {
@@ -124,6 +128,23 @@ class BattlefieldService
                 'attacker_soldiers_lost' => $fatigueLoss,
                 'loot_factor' => $lootFactor
             ]);
+
+            // Comprehensive Logging
+            $this->logService->log(
+                $attackerId,
+                'battle_attack',
+                "Commander launched an assault against {$defDom->name}. Outcome: " . strtoupper($attackerWins ? 'victory' : 'defeat'),
+                $stolen,
+                ['defender_id' => $targetId, 'battle_log_id' => $logId, 'turns_used' => $turns]
+            );
+
+            $this->logService->log(
+                $targetId,
+                'battle_defend',
+                "Commander's sector was attacked by {$atkDom->name}. Outcome: " . strtoupper($attackerWins ? 'defeat' : 'victory'),
+                $stolen,
+                ['attacker_id' => $attackerId, 'battle_log_id' => $logId]
+            );
 
             return [
                 'success' => true,

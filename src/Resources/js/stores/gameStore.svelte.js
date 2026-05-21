@@ -10,7 +10,9 @@ class GameStore {
         bank: 0,
         citizens: 0,
         turns: 0,
-        xp: 0
+        xp: 0,
+        deposits_today: 0,
+        max_deposits: 6
     });
 
     nextTickSeconds = $state(600);
@@ -42,6 +44,7 @@ class GameStore {
         this.resources.citizens = kingdom.citizens ?? 0;
         this.resources.turns = kingdom.turns ?? 0;
         this.resources.xp = kingdom.xp ?? 0;
+        this.resources.deposits_today = kingdom.deposits_today ?? 0;
     }
 
     startHeartbeat() {

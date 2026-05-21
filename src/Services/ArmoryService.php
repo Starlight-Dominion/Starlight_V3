@@ -4,11 +4,14 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
+use sdo\Services\LogService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class ArmoryService
 {
+    public function __construct(private LogService $logService) {}
+
     public function getArmoryData(int $domId): array
     {
         $dom = Dominion::findOrFail($domId);
@@ -101,6 +104,14 @@ class ArmoryService
                 ]);
             }
 
+            $this->logService->log(
+                $domId,
+                'armory_buy',
+                "Commander purchased $qty x {$item->name} from the armory.",
+                $totalCost,
+                ['item' => $item->slug, 'quantity' => $qty]
+            );
+
             return ['success' => true, 'message' => "Acquired $qty x {$item->name}."];
         });
     }
@@ -127,6 +138,14 @@ class ArmoryService
                 ->where('item_id', $itemId)
                 ->decrement('quantity', $qty);
 
+            $this->logService->log(
+                $domId,
+                'armory_sell',
+                "Commander decommissioned $qty x {$item->name} for salvage.",
+                $refund,
+                ['item' => $item->slug, 'quantity' => $qty]
+            );
+
             return ['success' => true, 'message' => "Decommissioned for $refund Credits."];
         });
     }
@@ -148,6 +167,14 @@ class ArmoryService
             $dom->credits -= $levelData->cost;
             $dom->armory_level = $next;
             $dom->save();
+
+            $this->logService->log(
+                $domId,
+                'armory_upgrade',
+                "Commander upgraded the Armory to Rank $next.",
+                (int)$levelData->cost,
+                ['new_level' => $next]
+            );
 
             return ['success' => true, 'message' => "Armory upgraded to Rank $next."];
         });

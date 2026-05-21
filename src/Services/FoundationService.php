@@ -5,11 +5,14 @@ namespace sdo\Services;
 
 use sdo\Models\Dominion;
 use sdo\Models\User;
+use sdo\Services\LogService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class FoundationService
 {
+    public function __construct(private LogService $logService) {}
+
     public function getFoundationState(int $dominionId): array
     {
         $dominion = Dominion::with(['user', 'race'])->findOrFail($dominionId);
@@ -57,11 +60,19 @@ class FoundationService
             if ($needed <= 0) throw new Exception("Integrity is already at 100%.");
 
             $cost = $needed * 10;
-            if ($dominion->gold < $cost) throw new Exception("Insufficient credits for nano-repair.");
+            if ($dominion->credits < $cost) throw new Exception("Insufficient credits for nano-repair.");
 
-            $dominion->gold -= $cost;
+            $dominion->credits -= $cost;
             $dominion->foundation_hp = $dominion->foundation_max_hp;
             $dominion->save();
+
+            $this->logService->log(
+                $dominionId,
+                'foundation_repair',
+                "Commander repaired foundation integrity.",
+                $cost,
+                ['hp_restored' => $needed]
+            );
 
             return ['success' => true, 'message' => 'Integrity restored to nominal parameters.'];
         });
@@ -91,10 +102,10 @@ class FoundationService
                 ->first();
 
             if (!$levelData) throw new Exception("Maximum tier reached for this structure.");
-            if ($dominion->gold < $levelData->cost) throw new Exception("Insufficient credits.");
+            if ($dominion->credits < $levelData->cost) throw new Exception("Insufficient credits.");
 
             // 3. Apply Upgrade
-            $dominion->gold -= $levelData->cost;
+            $dominion->credits -= $levelData->cost;
             
             Capsule::table('dominion_structures')->updateOrInsert(
                 ['dominion_id' => $dominionId, 'structure_id' => $structureId],
@@ -108,6 +119,15 @@ class FoundationService
             }
 
             $dominion->save();
+
+            $this->logService->log(
+                $dominionId,
+                'foundation_upgrade',
+                "Commander upgraded structure #{$structureId} to Tier {$nextLevel}.",
+                (int)$levelData->cost,
+                ['structure_id' => $structureId, 'new_level' => $nextLevel]
+            );
+
             return ['success' => true, 'message' => "Upgrade to Tier {$nextLevel} initialized."];
         });
     }

@@ -9,7 +9,9 @@
     let message = $state(null);
 
     const maxDeposit = $derived(Math.floor(resources.credits * 0.8));
+    const maxWithdraw = $derived(resources.bank);
     const isOverLimit = $derived(amount > maxDeposit);
+    const depositsLeft = $derived(resources.max_deposits - resources.deposits_today);
 
     async function handleAction(action) {
         if (loading || amount <= 0) return;
@@ -29,6 +31,8 @@
             const data = await res.json();
             message = data;
             if (data.success) {
+                // Instead of reload, we could just refresh state, 
+                // but reload is safer for transactions history
                 window.location.reload();
             }
         } catch (e) {
@@ -40,9 +44,15 @@
 </script>
 
 <div in:fade class="space-y-8 pb-20">
-    <header class="border-b border-cyan-500/20 pb-6">
-        <h1 class="text-4xl font-title font-black text-white uppercase tracking-tighter text-shadow-glow">The Iron Bank</h1>
-        <p class="text-cyan-500/60 text-[9px] font-bold uppercase tracking-[4px] mt-2 italic">Securing the liquidity of the Dominion.</p>
+    <header class="border-b border-cyan-500/20 pb-6 flex justify-between items-end">
+        <div>
+            <h1 class="text-4xl font-title font-black text-white uppercase tracking-tighter text-shadow-glow">The Iron Bank</h1>
+            <p class="text-cyan-500/60 text-[9px] font-bold uppercase tracking-[4px] mt-2 italic">Securing the liquidity of the Dominion.</p>
+        </div>
+        <div class="text-right">
+            <p class="text-[10px] font-black text-gray-500 uppercase tracking-widest">Daily Authorization</p>
+            <p class="text-2xl font-title font-black {depositsLeft > 0 ? 'text-cyan-400' : 'text-red-600'}">{depositsLeft} / {resources.max_deposits}</p>
+        </div>
     </header>
 
     {#if message}
@@ -62,7 +72,10 @@
                 <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Transaction Magnitude (Credits)</label>
                 <input type="number" bind:value={amount} class="input-terminal text-2xl font-mono text-cyan-400" placeholder="0" />
                 <div class="flex justify-between px-2 pt-1">
-                    <span class="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Safe Limit (80%): {maxDeposit.toLocaleString()} CP</span>
+                    <div class="flex flex-col">
+                        <span class="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Deposit Limit (80%): {maxDeposit.toLocaleString()} CP</span>
+                        <span class="text-[8px] font-bold text-gray-600 uppercase tracking-widest">Withdraw Max: {maxWithdraw.toLocaleString()} CP</span>
+                    </div>
                     {#if isOverLimit}
                         <span class="text-[8px] font-black text-red-500 uppercase animate-pulse">Exceeding Security Protocol</span>
                     {/if}
@@ -73,12 +86,12 @@
                 <button 
                     onclick={() => handleAction('deposit')}
                     class="bg-cyan-700/50 hover:bg-cyan-600 border border-cyan-500/50 text-white font-title font-black py-5 rounded-xl uppercase tracking-[3px] transition-all disabled:opacity-30"
-                    disabled={loading || isOverLimit || amount <= 0}
+                    disabled={loading || isOverLimit || amount <= 0 || depositsLeft <= 0}
                 >Secure Assets</button>
                 <button 
                     onclick={() => handleAction('withdraw')}
                     class="bg-black/40 hover:bg-black/60 border border-white/5 text-gray-400 py-5 rounded-xl uppercase font-title font-black tracking-[3px] transition-all disabled:opacity-30"
-                    disabled={loading || amount <= 0}
+                    disabled={loading || amount <= 0 || amount > maxWithdraw}
                 >Liquidate</button>
             </div>
         </div>
