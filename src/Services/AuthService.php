@@ -68,8 +68,7 @@ class AuthService
                     Capsule::table('dominion_manpower')->insert([
                         'dominion_id' => $dominion->id,
                         'unit_id' => $u->id,
-                        'total_quantity' => 0,
-                        'stabled_quantity' => 0
+                        'total_quantity' => 0
                     ]);
                 }
             });
