@@ -24,7 +24,6 @@
     import Settings from './pages/Settings.svelte';
     import Spy from './pages/Spy.svelte';
     import Training from './pages/Training.svelte';
-    import Stable from './pages/Stable.svelte';
     import BattleReport from './pages/BattleReport.svelte';
 
     const components = {
@@ -46,8 +45,7 @@
         'upgrades/index': Upgrades,
         'settings/index': Settings,
         'spy/index': Spy,
-        'training/index': Training,
-        'stable/index': Stable
+        'training/index': Training
     };
 
     const ActiveComponent = $derived.by(() => {
@@ -60,20 +58,15 @@
     const bgUrl = "/images/backgroundMain.avif";
 </script>
 
-<!-- The root wrapper handles the starry background and ensures NO clipping -->
 <div 
     class="min-h-screen flex flex-col bg-[#030712] text-gray-300 font-sans selection:bg-cyan-500/30 bg-cover bg-center bg-fixed relative"
     style="background-image: url('{bgUrl}');"
 >
-    <!-- Deep Space Overlay -->
     <div class="absolute inset-0 bg-gradient-to-b from-[#030712]/60 via-[#030712]/50 to-[#030712]/90 z-0 pointer-events-none"></div>
 
-    <!-- UI Layer: We use z-10 here, but the Header inside uses z-50 -->
     <div class="flex flex-col flex-grow z-10">
         {#if game.user}
-            <!-- ResourceHeader is now at the top of the stack -->
             <ResourceHeader />
-            
             <main class="flex-grow w-full max-w-7xl mx-auto px-6 py-8">
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                     <TacticalSidebar />

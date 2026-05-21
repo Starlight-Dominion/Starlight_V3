@@ -15,7 +15,6 @@
 
 <svelte:window onclick={closeAll} />
 
-<!-- Higher Z-Index and clear overflow context -->
 <header class="sticky top-0 z-[100] bg-dark-translucent border-b border-cyan-500/20 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
     <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center relative">
         
@@ -55,11 +54,13 @@
                             <a href="/structures" class="block px-4 py-3 text-[9px] font-black uppercase tracking-widest text-cyan-400 border-b border-white/5 mb-1">Structural Overview</a>
                             <a href="/structures/foundation" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">Foundation</a>
                             <a href="/structures/armory" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">Sector Armory</a>
-                            <a href="/structures/stable" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">Unit Stable</a>
                             <a href="/bank" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">The Iron Bank</a>
                         </div>
                     {/if}
                 </div>
+
+                <a href="/combat/training" class="text-[9px] font-title font-bold tracking-[2px] uppercase text-gray-500 hover:text-cyan-400 transition-colors">Training</a>
+                <a href="/combat/battlefield" class="text-[9px] font-title font-bold tracking-[2px] uppercase text-gray-500 hover:text-cyan-400 transition-colors">War Room</a>
             </nav>
         </div>
 
@@ -69,7 +70,6 @@
                     <span class="text-[7px] font-black text-cyan-900 uppercase tracking-widest">Operational Credits</span>
                     <div class="flex items-center gap-2">
                         <span class="text-white font-mono font-bold text-sm">{resources.gold.toLocaleString()}</span>
-                        <span class="text-cyan-600 text-[8px] font-bold">+{goldPerTick}</span>
                     </div>
                 </div>
             </div>

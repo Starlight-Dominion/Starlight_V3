@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 namespace sdo\Services;
@@ -9,16 +8,6 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 
 class TacticalService
 {
-    private array $unitsConfig;
-
-    public function __construct()
-    {
-        $this->unitsConfig = require __DIR__ . '/../../config/units.php';
-    }
-
-    /**
-     * Calculates tactical ratings using the new Dominion architecture.
-     */
     public function calculateTacticalRatings(int $dominionId): array
     {
         $dominion = Dominion::findOrFail($dominionId);
@@ -28,26 +17,29 @@ class TacticalService
             'defense' => 0.0,
             'espionage' => 0.0,
             'sentry' => 0.0,
+            'total_units' => 0,
             'foundation_hp' => (int)$dominion->foundation_hp
         ];
 
-        // 1. Calculate Stabled Unit Power
-        foreach ($this->unitsConfig as $slug => $config) {
-            // We check 'stabled_unit_' columns added in previous migrations
-            $count = (int)($dominion->{"stabled_unit_{$slug}"} ?? 0);
-            if ($count <= 0) continue;
+        // Join manpower directly with unit definitions
+        $manpower = Capsule::table('dominion_manpower')
+            ->join('units', 'dominion_manpower.unit_id', '=', 'units.id')
+            ->where('dominion_manpower.dominion_id', $dominionId)
+            ->get();
 
-            $unitOffense = (float)$config['power_offense'];
-            $unitDefense = (float)$config['power_defense'];
+        foreach ($manpower as $m) {
+            $qty = (int)$m->total_quantity;
+            if ($qty <= 0) continue;
 
-            $ratings['offense'] += $count * $unitOffense;
-            $ratings['defense'] += $count * $unitDefense;
-            
-            if ($slug === 'spies') $ratings['espionage'] += $count * $unitOffense;
-            if ($slug === 'sentries') $ratings['sentry'] += $count * $unitDefense;
+            $ratings['offense'] += $qty * (float)$m->power_offense;
+            $ratings['defense'] += $qty * (float)$m->power_defense;
+            $ratings['total_units'] += $qty;
+
+            if ($m->slug === 'spies') $ratings['espionage'] += $qty * (float)$m->power_offense;
+            if ($m->slug === 'sentries') $ratings['sentry'] += $qty * (float)$m->power_defense;
         }
 
-        // 2. Battle Weighting Formula
+        // Apply Battle Weighting
         $ratings['weighted_power'] = pow($ratings['offense'] * 1.1, 0.3) * pow($ratings['defense'] * 0.9, 0.3);
 
         return $ratings;
@@ -58,18 +50,22 @@ class TacticalService
         $ratings = $this->calculateTacticalRatings($dominionId);
         $dominion = Dominion::find($dominionId);
 
+        // Fetch detailed roster for UI
+        $roster = Capsule::table('dominion_manpower')
+            ->join('units', 'dominion_manpower.unit_id', '=', 'units.id')
+            ->where('dominion_manpower.dominion_id', $dominionId)
+            ->select('units.slug', 'dominion_manpower.total_quantity')
+            ->get()
+            ->pluck('total_quantity', 'slug')
+            ->toArray();
+
         return [
             'ratings' => $ratings,
             'foundation' => [
                 'hp' => $dominion->foundation_hp,
                 'max_hp' => $dominion->foundation_max_hp
             ],
-            'army' => [
-                'guards' => (int)($dominion->stabled_unit_guards ?? 0),
-                'soldiers' => (int)($dominion->stabled_unit_soldiers ?? 0),
-                'spies' => (int)($dominion->stabled_unit_spies ?? 0),
-                'sentries' => (int)($dominion->stabled_unit_sentries ?? 0),
-            ]
+            'army' => $roster
         ];
     }
 }

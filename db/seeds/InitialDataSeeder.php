@@ -31,11 +31,10 @@ class InitialDataSeeder extends AbstractSeed {
         $this->table('structures')->insert([
             ['slug' => 'foundation', 'name' => 'Planetary Foundation', 'description' => 'Core integrity.', 'max_level' => 20],
             ['slug' => 'economy', 'name' => 'Economic Hub', 'description' => 'Credit generation and trade networks.', 'max_level' => 20],
-            ['slug' => 'armory', 'name' => 'Sector Armory', 'description' => 'Advanced tactical gear unlocking.', 'max_level' => 20],
-            ['slug' => 'stable', 'name' => 'Unit Stable', 'description' => 'Active unit capacity management.', 'max_level' => 30]
+            ['slug' => 'armory', 'name' => 'Sector Armory', 'description' => 'Advanced tactical gear unlocking.', 'max_level' => 20]
         ])->saveData();
 
-        // 1. Generate Foundation Levels (Standard scaling)
+        // 1. Foundation Levels
         $foundation = $this->fetchRow("SELECT id FROM structures WHERE slug = 'foundation'");
         $fLevels = [];
         for ($i = 1; $i <= 20; $i++) {
@@ -50,7 +49,7 @@ class InitialDataSeeder extends AbstractSeed {
         }
         $this->table('structure_levels')->insert($fLevels)->saveData();
 
-        // 2. Generate Economy Levels (Based on User Spec)
+        // 2. Economy Levels
         $economy = $this->fetchRow("SELECT id FROM structures WHERE slug = 'economy'");
         $eLevels = [
             1 => ['name' => 'Orbital Trade Post', 'cost' => 200, 'bonus' => 5],

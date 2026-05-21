@@ -52,5 +52,4 @@ $containerBuilder->addDefinitions([
     CombatRepositoryInterface::class => DI\create(EloquentCombatRepository::class),
 ]);
 
-// Automatically autowire all services and controllers based on constructor hints
 return $containerBuilder->build();
