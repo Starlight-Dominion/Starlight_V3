@@ -15,9 +15,9 @@ class AuthController extends BaseController
         GameService $gameService,
         AdvisorService $advisorService,
         ConfigService $configService,
-        private AuthService $authService
+        AuthService $authService
     ) {
-        parent::__construct($gameService, $advisorService, $configService);
+        parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
     private function jsonResponse(bool $success, array $errors = [], int $status = 200): void

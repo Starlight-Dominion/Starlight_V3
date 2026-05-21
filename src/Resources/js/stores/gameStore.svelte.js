@@ -1,7 +1,10 @@
 class GameStore {
     component = $state('home');
     props = $state({});
-    user = $state(null);
+    user = $state({
+        username: 'Unknown Lord',
+        is_admin: false
+    });
     csrf = $state('');
     heartbeatInterval = null;
 
@@ -27,7 +30,7 @@ class GameStore {
     init(initialState) {
         this.component = initialState.component || 'home';
         this.props = initialState.props || {};
-        this.user = initialState.user || null;
+        this.user = initialState.user || { username: 'Unknown Lord', is_admin: false };
         this.csrf = initialState.csrf || '';
 
         if (this.user?.kingdom) {

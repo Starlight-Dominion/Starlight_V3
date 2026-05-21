@@ -16,10 +16,10 @@ class AdminController extends BaseController
         GameService $gameService,
         AdvisorService $advisorService,
         ConfigService $configService,
-        private AuthService $authService,
+        AuthService $authService,
         private AdminService $adminService
     ) {
-        parent::__construct($gameService, $advisorService, $configService);
+        parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
     private function checkAdmin(): void
@@ -29,7 +29,7 @@ class AdminController extends BaseController
         }
 
         $user = $this->authService->getCurrentUser();
-        if (!$user || !$user->is_admin) {
+        if (!$this->authService->isAdmin($user)) {
             $_SESSION['message'] = ['success' => false, 'message' => 'Access Denied: High Command Only.'];
             $this->redirect('/dashboard');
         }

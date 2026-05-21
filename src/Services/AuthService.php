@@ -109,6 +109,18 @@ class AuthService
         return isset($session['user_id']);
     }
 
+    public function isAdmin(?User $user): bool
+    {
+        if (!$user) return false;
+        
+        $hardcodedAdmin = $_ENV['ADMIN_USERNAME'] ?? null;
+        if ($hardcodedAdmin && $user->username === $hardcodedAdmin) {
+            return true;
+        }
+
+        return (bool)$user->is_admin;
+    }
+
     public function getCurrentUser(): ?User
     {
         if (!isset($_SESSION['user_id'])) return null;

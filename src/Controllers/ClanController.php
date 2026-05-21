@@ -7,15 +7,17 @@ namespace sdo\Controllers;
 use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
 use sdo\Services\ConfigService;
+use sdo\Services\AuthService;
 
 class ClanController extends BaseController
 {
     public function __construct(
         GameService $gameService,
         AdvisorService $advisorService,
-        ConfigService $configService
+        ConfigService $configService,
+        AuthService $authService
     ) {
-        parent::__construct($gameService, $advisorService, $configService);
+        parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
     public function home(): string

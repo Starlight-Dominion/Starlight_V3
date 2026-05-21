@@ -15,10 +15,10 @@ class ArmoryController extends BaseController
         GameService $gameService,
         AdvisorService $advisorService,
         ConfigService $configService,
-        private ArmoryService $armoryService,
-        private AuthService $authService
+        AuthService $authService,
+        private ArmoryService $armoryService
     ) {
-        parent::__construct($gameService, $advisorService, $configService);
+        parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
     public function index(): string

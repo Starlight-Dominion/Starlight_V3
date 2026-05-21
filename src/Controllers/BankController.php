@@ -15,10 +15,10 @@ class BankController extends BaseController
         GameService $gameService,
         AdvisorService $advisorService,
         ConfigService $configService,
-        private BankService $bankService,
-        private AuthService $authService
+        AuthService $authService,
+        private BankService $bankService
     ) {
-        parent::__construct($gameService, $advisorService, $configService);
+        parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
     public function index(): string

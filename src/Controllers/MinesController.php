@@ -17,11 +17,11 @@ class MinesController extends BaseController
         GameService $gameService,
         AdvisorService $advisorService,
         ConfigService $configService,
+        AuthService $authService,
         private MinesService $minesService,
-        private UntrainingService $untrainingService,
-        private AuthService $authService
+        private UntrainingService $untrainingService
     ) {
-        parent::__construct($gameService, $advisorService, $configService);
+        parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
 public function index(): string

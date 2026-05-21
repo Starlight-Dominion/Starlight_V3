@@ -7,6 +7,7 @@ use sdo\Infrastructure\Csrf;
 use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
 use sdo\Services\ConfigService;
+use sdo\Services\AuthService;
 use sdo\ViewModels\GameStateViewModel;
 
 abstract class BaseController
@@ -14,15 +15,18 @@ abstract class BaseController
     protected GameService $gameService;
     protected AdvisorService $advisorService;
     protected ConfigService $configService;
+    protected AuthService $authService;
 
     public function __construct(
         GameService $gameService,
         AdvisorService $advisorService,
-        ConfigService $configService
+        ConfigService $configService,
+        AuthService $authService
     ) {
         $this->gameService = $gameService;
         $this->advisorService = $advisorService;
         $this->configService = $configService;
+        $this->authService = $authService;
     }
 
     protected function render(string $component, array $pageData = []): string
@@ -51,6 +55,7 @@ abstract class BaseController
                     'realmTime' => $vm->realmTime,
                     'secondsToNextTick' => $vm->secondsToNextTick,
                     'citizen_growth_rate' => (int)$this->configService->get('baseline_citizens_per_tick', 50),
+                    'is_admin' => $this->authService->isAdmin($dominion->user),
                     'kingdom' => $dominion->toArray(),
                     'avatar_path' => $dominion->user->avatar_path,
                     'advisorHistory' => $vm->advisorHistory

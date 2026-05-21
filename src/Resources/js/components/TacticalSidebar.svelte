@@ -44,4 +44,18 @@
             </div>
         </div>
     </div>
+
+    {#if user?.is_admin}
+        <div in:fade class="bg-red-950/10 border border-red-900/30 rounded-xl overflow-hidden shadow-2xl">
+            <header class="bg-red-900/10 px-4 py-3 border-b border-red-900/20 flex justify-between items-center">
+                <h2 class="text-red-500 font-title text-[10px] font-black uppercase tracking-[3px]">High Command</h2>
+                <span class="w-1.5 h-1.5 bg-red-600 rounded-full animate-pulse shadow-[0_0_8px_#ff0000]"></span>
+            </header>
+            <div class="p-4">
+                <a href="/admin" class="block w-full bg-red-900/20 hover:bg-red-900/40 border border-red-900/30 text-red-500 text-center py-2 rounded-lg font-title font-black text-[9px] uppercase tracking-[3px] transition-all">
+                    Access Command Center
+                </a>
+            </div>
+        </div>
+    {/if}
 </aside>

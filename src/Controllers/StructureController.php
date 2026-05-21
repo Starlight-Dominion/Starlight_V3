@@ -15,10 +15,10 @@ class StructureController extends BaseController
         GameService $gameService,
         AdvisorService $advisorService,
         ConfigService $configService,
-        private AuthService $authService,
+        AuthService $authService,
         private FoundationService $foundationService
     ) {
-        parent::__construct($gameService, $advisorService, $configService);
+        parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
     public function index(): string

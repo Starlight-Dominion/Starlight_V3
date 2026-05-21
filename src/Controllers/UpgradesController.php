@@ -16,38 +16,40 @@ class UpgradesController extends BaseController
         GameService $gameService,
         AdvisorService $advisorService,
         ConfigService $configService,
-        private UpgradesService $upgradesService,
-        private AuthService $authService
+        AuthService $authService,
+        private UpgradesService $upgradesService
     ) {
-        parent::__construct($gameService, $advisorService, $configService);
+        parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
-public function index(): string
-{
-if (!$this->authService->isLoggedIn($_SESSION)) $this->redirect('/login');
+    public function index(): string
+    {
+        if (!$this->authService->isLoggedIn($_SESSION)) {
+            $this->redirect('/login');
+        }
 
-$kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-$upgradeData = $this->upgradesService->getUpgradeData($kingdom->id);
+        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $upgradeData = $this->upgradesService->getUpgradeData($kingdom->id);
 
-return $this->render('upgrades/index', [
-'title' => 'Empire Upgrades',
-'housingConfig' => $upgradeData['housing_config'],
-'mercenaryMarketConfig' => $upgradeData['mercenary_market_config'],
-'message' => $_SESSION['message'] ?? null,
-]);
-}
+        return $this->render('upgrades/index', [
+            'title' => 'Empire Upgrades',
+            'housingConfig' => $upgradeData['housing_config'],
+            'mercenaryMarketConfig' => $upgradeData['mercenary_market_config'],
+            'message' => $_SESSION['message'] ?? null,
+        ]);
+    }
 
-public function upgradeHousing(): void
-{
-$kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-$_SESSION['message'] = $this->upgradesService->upgradeHousing($kingdom->id);
-$this->redirect('/structures/upgrades');
-}
+    public function upgradeHousing(): void
+    {
+        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $_SESSION['message'] = $this->upgradesService->upgradeHousing($kingdom->id);
+        $this->redirect('/structures/upgrades');
+    }
 
-public function upgradeMercenaryMarket(): void
-{
-$kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-$_SESSION['message'] = $this->upgradesService->upgradeMercenaryMarket($kingdom->id);
-$this->redirect('/structures/upgrades');
-}
+    public function upgradeMercenaryMarket(): void
+    {
+        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $_SESSION['message'] = $this->upgradesService->upgradeMercenaryMarket($kingdom->id);
+        $this->redirect('/structures/upgrades');
+    }
 }

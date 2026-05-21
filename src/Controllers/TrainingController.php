@@ -16,10 +16,10 @@ class TrainingController extends BaseController
         GameService $gameService,
         AdvisorService $advisorService,
         ConfigService $configService,
-        private TrainingService $trainingService,
-        private AuthService $authService
+        AuthService $authService,
+        private TrainingService $trainingService
     ) {
-        parent::__construct($gameService, $advisorService, $configService);
+        parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
     public function index(): string
