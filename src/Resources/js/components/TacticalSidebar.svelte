@@ -41,6 +41,10 @@
                 <span class="text-gray-600 uppercase">Growth Rate</span>
                 <span class="text-white font-bold group-hover:text-cyan-400 transition-colors">+{resources.citizens_per_tick.toLocaleString()} <span class="text-[8px] text-gray-700">CIT/CYC</span></span>
             </div>
+            <div class="flex justify-between items-center group">
+                <span class="text-gray-600 uppercase">Tactical Turns</span>
+                <span class="text-cyan-400 font-bold group-hover:text-white transition-colors">{resources.turns.toLocaleString()}</span>
+            </div>
             <div class="flex justify-between items-center pt-2">
                 <span class="text-gray-600 uppercase text-[9px]">Cycle Refresh</span>
                 <!-- FIX: Referencing game.formattedTick directly -->
