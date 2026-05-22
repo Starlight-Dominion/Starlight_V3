@@ -75,8 +75,19 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/admin/add-armory-item', [\sdo\Controllers\AdminController::class, 'addArmoryItem']);
     $r->addRoute('POST', '/admin/delete-armory-item', [\sdo\Controllers\AdminController::class, 'deleteArmoryItem']);
     $r->addRoute('GET', '/admin/battle-logs', [\sdo\Controllers\AdminController::class, 'getBattleLogs']);
+    
+    // API Management
+    $r->addRoute('GET', '/admin/api/keys', [\sdo\Controllers\AdminController::class, 'getApiKeys']);
+    $r->addRoute('POST', '/admin/api/issue', [\sdo\Controllers\AdminController::class, 'issueApiKey']);
+    $r->addRoute('POST', '/admin/api/update', [\sdo\Controllers\AdminController::class, 'updateApiKey']);
+    $r->addRoute('POST', '/admin/api/delete', [\sdo\Controllers\AdminController::class, 'deleteApiKey']);
+    $r->addRoute('GET', '/admin/api/logs', [\sdo\Controllers\AdminController::class, 'getApiLogs']);
+
     $r->addRoute('GET', '/admin/settings', [\sdo\Controllers\AdminController::class, 'getSettings']);
     $r->addRoute('POST', '/admin/update-setting', [\sdo\Controllers\AdminController::class, 'updateSetting']);
+
+    // Open API v1
+    $r->addRoute('GET', '/api/v1/ping', [\sdo\Controllers\ApiController::class, 'ping']);
 
     // Mines Routes (Miner Assignment/Untraining & Upgrades)
     $r->addRoute('GET', '/structures/mines', [\sdo\Controllers\MinesController::class, 'index']);

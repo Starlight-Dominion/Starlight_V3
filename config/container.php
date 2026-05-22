@@ -51,6 +51,9 @@ $containerBuilder->addDefinitions([
     BankRepositoryInterface::class => DI\create(EloquentBankRepository::class),
     CombatRepositoryInterface::class => DI\create(EloquentCombatRepository::class),
     \sdo\Services\ConfigService::class => DI\create(),
+    \sdo\Services\ApiService::class => DI\create(),
+    \sdo\Services\RateLimitService::class => DI\autowire(),
+    \sdo\Infrastructure\ApiAuthMiddleware::class => DI\autowire(),
 ]);
 
 return $containerBuilder->build();

@@ -17,7 +17,8 @@ class AdminController extends BaseController
         AdvisorService $advisorService,
         ConfigService $configService,
         AuthService $authService,
-        private AdminService $adminService
+        private AdminService $adminService,
+        private \sdo\Services\ApiService $apiService
     ) {
         parent::__construct($gameService, $advisorService, $configService, $authService);
     }
@@ -334,6 +335,71 @@ class AdminController extends BaseController
         $this->checkAdmin();
 
         return json_encode(['success' => true, 'logs' => $this->adminService->getRecentBattleLogs()]);
+    }
+
+    public function getApiKeys(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        return json_encode(['success' => true, 'keys' => $this->apiService->getAllKeys()]);
+    }
+
+    public function issueApiKey(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $limit = (int)($_POST['rate_limit'] ?? 60);
+
+        try {
+            $key = $this->apiService->issueKey($userId, $limit);
+            return json_encode(['success' => true, 'key' => $key]);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function updateApiKey(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        $id = (int)($_POST['id'] ?? 0);
+        $data = [];
+        if (isset($_POST['rate_limit'])) $data['rate_limit_per_minute'] = (int)$_POST['rate_limit'];
+        if (isset($_POST['is_active'])) $data['is_active'] = ($_POST['is_active'] === 'true' || $_POST['is_active'] === '1');
+
+        try {
+            $this->apiService->updateKey($id, $data);
+            return json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function deleteApiKey(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        $id = (int)($_POST['id'] ?? 0);
+
+        try {
+            $this->apiService->deleteKey($id);
+            return json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function getApiLogs(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        return json_encode(['success' => true, 'logs' => $this->apiService->getRecentLogs()]);
     }
 
     public function getSettings(): string
