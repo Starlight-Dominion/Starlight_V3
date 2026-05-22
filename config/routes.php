@@ -6,6 +6,7 @@ return function (RouteCollector $r) {
     // Public Routes
     $r->addRoute('GET', '/', [\sdo\Controllers\HomeController::class, 'index']);
     $r->addRoute('GET', '/about', [\sdo\Controllers\PageController::class, 'about']);
+    $r->addRoute('GET', '/rules', [\sdo\Controllers\PageController::class, 'rules']);
     $r->addRoute('GET', '/terms', [\sdo\Controllers\PageController::class, 'terms']);
     $r->addRoute('GET', '/contact', [\sdo\Controllers\PageController::class, 'contact']);
 

@@ -78,6 +78,17 @@ Search and manage individual player sectors.
 
 ---
 
+## 📝 Sector Documentation
+
+The **Documentation** module allows for real-time management of public-facing content.
+
+*   **Official Rules:** A large-scale Markdown editor for the **Protocols** page (`/rules`). 
+*   **Markdown Support:** Supports standard headers (`#`, `##`), bullet points, and emphasis.
+
+**Commit Protocol:** Click **"COMMIT CHANGES"** to synchronize the documentation with the public sector protocols immediately.
+
+---
+
 ## 🏛️ Structural Engineering
 
 Manage the archetypes of all dominion buildings and their evolution paths.
