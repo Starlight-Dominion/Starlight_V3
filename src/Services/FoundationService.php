@@ -112,11 +112,16 @@ class FoundationService
                 ['level' => $nextLevel]
             );
 
-            // 4. If Foundation upgraded, increase max HP
-            if ($structureId == 1) { // Foundation ID
+            // 4. Process Structural Buffs
+            
+            // Foundation logic
+            if ($structureId == 1) { 
                 $dominion->foundation_max_hp = $levelData->buff_hp;
                 $dominion->foundation_hp = $levelData->buff_hp;
             }
+
+            // Unit Rewards (e.g., Mercenary Market)
+            $this->grantUnitBuffs($dominionId, $levelData);
 
             $dominion->save();
 
@@ -130,5 +135,25 @@ class FoundationService
 
             return ['success' => true, 'message' => "Upgrade to Tier {$nextLevel} initialized."];
         });
+    }
+
+    private function grantUnitBuffs(int $domId, object $levelData): void
+    {
+        $mapping = [
+            'guards' => $levelData->buff_unit_guards ?? 0,
+            'soldiers' => $levelData->buff_unit_soldiers ?? 0,
+            'spies' => $levelData->buff_unit_spies ?? 0,
+            'sentries' => $levelData->buff_unit_sentries ?? 0
+        ];
+
+        foreach ($mapping as $slug => $qty) {
+            if ($qty > 0) {
+                Capsule::table('dominion_manpower')
+                    ->join('units', 'dominion_manpower.unit_id', '=', 'units.id')
+                    ->where('dominion_manpower.dominion_id', $domId)
+                    ->where('units.slug', $slug)
+                    ->increment('total_quantity', $qty);
+            }
+        }
     }
 }

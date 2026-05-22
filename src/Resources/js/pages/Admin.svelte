@@ -641,6 +641,8 @@
                                                 <th class="px-6 py-5">Integrity (HP)</th>
                                                 <th class="px-6 py-5">ATK / DEF Buff</th>
                                                 <th class="px-6 py-5">Economy Buff (%)</th>
+                                                <th class="px-6 py-5">Citizens / Tick</th>
+                                                <th class="px-6 py-5">Military Reinforcements</th>
                                                 <th class="px-6 py-5">Capacity</th>
                                                 <th class="px-6 py-5">Req. Lvl</th>
                                                 <th class="px-6 py-5"></th>
@@ -660,6 +662,15 @@
                                                         </div>
                                                     </td>
                                                     <td class="px-6 py-5"><input type="number" bind:value={row.buff_economy} class="bg-transparent border-none p-0 text-green-500 text-xs font-mono focus:ring-0 w-16" /></td>
+                                                    <td class="px-6 py-5"><input type="number" bind:value={row.buff_citizens_per_tick} class="bg-transparent border-none p-0 text-blue-300 text-xs font-mono focus:ring-0 w-16" /></td>
+                                                    <td class="px-6 py-5">
+                                                        <div class="flex flex-wrap gap-1 max-w-[200px]">
+                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">G</span><input type="number" bind:value={row.buff_unit_guards} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
+                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">S</span><input type="number" bind:value={row.buff_unit_soldiers} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
+                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">SP</span><input type="number" bind:value={row.buff_unit_spies} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
+                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">SE</span><input type="number" bind:value={row.buff_unit_sentries} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
+                                                        </div>
+                                                    </td>
                                                     <td class="px-6 py-5"><input type="number" bind:value={row.capacity} class="bg-transparent border-none p-0 text-blue-400 text-xs font-mono focus:ring-0 w-20" /></td>
                                                     <td class="px-6 py-5"><input type="number" bind:value={row.player_level_req} class="bg-transparent border-none p-0 text-white text-xs font-mono focus:ring-0 w-12" /></td>
                                                     <td class="px-6 py-5 text-right">

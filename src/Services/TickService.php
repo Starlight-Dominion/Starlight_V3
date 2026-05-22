@@ -33,7 +33,11 @@ class TickService
                 (SELECT SUM(sl.buff_economy) 
                  FROM dominion_structures ds 
                  JOIN structure_levels sl ON ds.structure_id = sl.structure_id AND ds.level = sl.level
-                 WHERE ds.dominion_id = d.id) as total_economy_buff
+                 WHERE ds.dominion_id = d.id) as total_economy_buff,
+                (SELECT SUM(sl.buff_citizens_per_tick) 
+                 FROM dominion_structures ds 
+                 JOIN structure_levels sl ON ds.structure_id = sl.structure_id AND ds.level = sl.level
+                 WHERE ds.dominion_id = d.id) as total_citizen_buff
                 FROM dominions d 
                 LIMIT :limit OFFSET :offset"
             );
@@ -59,10 +63,12 @@ class TickService
             foreach ($dominions as $dom) {
                 $multiplier = 1 + ((float)($dom['total_economy_buff'] ?? 0) / 100);
                 $creditsGained = (int)floor($baseCredits * $multiplier);
+                
+                $citizenGained = $baseCitizens + (int)($dom['total_citizen_buff'] ?? 0);
 
                 $updateStmt->execute([
                     ':credits_gained' => $creditsGained,
-                    ':citizens_gained' => $baseCitizens,
+                    ':citizens_gained' => $citizenGained,
                     ':turns_gained'   => $baseTurns,
                     ':now'            => $now,
                     ':id'             => $dom['id'],
