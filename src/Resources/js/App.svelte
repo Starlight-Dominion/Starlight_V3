@@ -57,6 +57,8 @@
         return Landing;
     });
 
+    const isPublicView = $derived(['home', 'pages/about', 'pages/terms', 'pages/contact', 'auth/login', 'auth/register'].includes(game.component));
+
     const bgUrl = "/images/backgroundMain.avif";
 </script>
 
@@ -67,7 +69,7 @@
     <div class="absolute inset-0 bg-gradient-to-b from-[#030712]/60 via-[#030712]/50 to-[#030712]/90 z-0 pointer-events-none"></div>
 
     <div class="flex flex-col flex-grow z-10">
-        {#if game.user}
+        {#if game.user && !isPublicView}
             <ResourceHeader />
             <main class="flex-grow w-full max-w-7xl mx-auto px-6 py-8">
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
