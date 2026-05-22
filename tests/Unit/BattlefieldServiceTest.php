@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use sdo\Services\BattlefieldService;
 use sdo\Services\TacticalService;
 use sdo\Services\LogService;
+use sdo\Services\ConfigService;
 use sdo\Models\Dominion;
 use sdo\Models\User;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -20,6 +21,7 @@ class BattlefieldServiceTest extends TestCase
     private BattlefieldService $battlefieldService;
     private $tacticalService;
     private $logService;
+    private $configService;
 
     protected function setUp(): void
     {
@@ -85,7 +87,18 @@ class BattlefieldServiceTest extends TestCase
 
         $this->tacticalService = Mockery::mock(TacticalService::class);
         $this->logService = Mockery::mock(LogService::class);
-        $this->battlefieldService = new BattlefieldService($this->tacticalService, $this->logService);
+        $this->configService = Mockery::mock(ConfigService::class);
+        $this->battlefieldService = new BattlefieldService($this->tacticalService, $this->logService, $this->configService);
+
+        // Default Config Mocks
+        $this->configService->shouldReceive('get')->with('battle_atk_turns_soft_exp', 0.50)->andReturn(0.50)->byDefault();
+        $this->configService->shouldReceive('get')->with('battle_atk_turns_max_mult', 1.35)->andReturn(1.35)->byDefault();
+        $this->configService->shouldReceive('get')->with('battle_underdog_min_ratio', 0.985)->andReturn(0.985)->byDefault();
+        $this->configService->shouldReceive('get')->with('battle_random_noise_min', 0.98)->andReturn(0.98)->byDefault();
+        $this->configService->shouldReceive('get')->with('battle_random_noise_max', 1.02)->andReturn(1.02)->byDefault();
+        $this->configService->shouldReceive('get')->with('battle_guard_floor', 20000)->andReturn(20000)->byDefault();
+        $this->configService->shouldReceive('get')->with('battle_hourly_full_loot_cap', 5)->andReturn(5)->byDefault();
+        $this->configService->shouldReceive('get')->with('battle_hourly_reduced_loot_max', 10)->andReturn(10)->byDefault();
     }
 
     public function testExecuteAttackSuccess(): void

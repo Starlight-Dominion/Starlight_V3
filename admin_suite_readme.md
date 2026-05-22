@@ -40,7 +40,20 @@ The **Global Mechanics** module allows for real-time tuning of the game's baseli
 
 ---
 
-## ⚔️ Armory Forge
+## ⚔️ War Doctrine Calibration
+
+The **Battle Doctrine** module provides high-level control over the mathematical foundations of combat.
+
+*   **Atk Turns Soft Exp:** Adjusts the scaling of damage based on turn expenditure.
+*   **Atk Turns Max Mult:** Caps the maximum damage multiplier for massive turn-dumps.
+*   **Underdog Min Ratio:** The threshold at which a significantly weaker attacker can still potentially breach defenses.
+*   **Random Noise (Min/Max):** Controls the "fog of war" variance applied to every strike.
+*   **Guard Floor:** Sets the population threshold that is protected from casualty calculations.
+*   **Loot Caps (Full/Reduced):** Configure the anti-farm thresholds for repeat attacks on the same target.
+
+---
+
+## 🛠️ Armory Forge
 
 The **Armory Forge** provides granular control over all military equipment.
 

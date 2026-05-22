@@ -6,25 +6,17 @@ namespace sdo\Services;
 use sdo\Models\Dominion;
 use sdo\Models\User;
 use sdo\Services\LogService;
+use sdo\Services\ConfigService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 use DateTime;
 
 class BattlefieldService
 {
-    // Balance Constants from Legacy
-    private const ATK_TURNS_SOFT_EXP = 0.50;
-    private const ATK_TURNS_MAX_MULT = 1.35;
-    private const UNDERDOG_MIN_RATIO = 0.985;
-    private const RANDOM_NOISE_MIN = 0.98;
-    private const RANDOM_NOISE_MAX = 1.02;
-    private const GUARD_FLOOR = 20000;
-    private const HOURLY_FULL_LOOT_CAP = 5;
-    private const HOURLY_REDUCED_LOOT_MAX = 10;
-
     public function __construct(
         private TacticalService $tacticalService,
-        private LogService $logService
+        private LogService $logService,
+        private ConfigService $configService
     ) {}
 
     public function getBattlefieldList(): array
@@ -51,6 +43,16 @@ class BattlefieldService
             if ($atkDom->turns < $turns) throw new Exception("Insufficient strike capacity.");
             if ($attackerId === $targetId) throw new Exception("Self-harm protocol prohibited.");
 
+            // 0. Pull Balance Settings
+            $turnsSoftExp = (float)$this->configService->get('battle_atk_turns_soft_exp', 0.50);
+            $turnsMaxMult = (float)$this->configService->get('battle_atk_turns_max_mult', 1.35);
+            $underdogMinRatio = (float)$this->configService->get('battle_underdog_min_ratio', 0.985);
+            $noiseMin = (float)$this->configService->get('battle_random_noise_min', 0.98);
+            $noiseMax = (float)$this->configService->get('battle_random_noise_max', 1.02);
+            $guardFloor = (int)$this->configService->get('battle_guard_floor', 20000);
+            $fullLootCap = (int)$this->configService->get('battle_hourly_full_loot_cap', 5);
+            $reducedLootMax = (int)$this->configService->get('battle_hourly_reduced_loot_max', 10);
+
             // 1. Anti-Farm & Fatigue Checks
             $hourAgo = (new DateTime('-1 hour'))->format('Y-m-d H:i:s');
             $hourlyCount = Capsule::table('battle_logs')
@@ -60,8 +62,8 @@ class BattlefieldService
                 ->count();
 
             $lootFactor = 1.0;
-            if ($hourlyCount >= self::HOURLY_FULL_LOOT_CAP) $lootFactor = 0.25;
-            if ($hourlyCount >= self::HOURLY_REDUCED_LOOT_MAX) $lootFactor = 0.0;
+            if ($hourlyCount >= $fullLootCap) $lootFactor = 0.25;
+            if ($hourlyCount >= $reducedLootMax) $lootFactor = 0.0;
 
             // 2. Power Calculation
             $atkRatings = $this->tacticalService->calculateTacticalRatings($attackerId);
@@ -77,23 +79,23 @@ class BattlefieldService
                 $fatigueLoss = (int)floor($atkSoldiers * 0.01 * ($hourlyCount - 9));
             }
 
-            // Turns Multiplier: 1 + 0.5 * (pow(turns, 0.5) - 1)
-            $turnsMult = min(1 + 0.5 * (pow($turns, 0.5) - 1), self::ATK_TURNS_MAX_MULT);
-            $noiseA = mt_rand((int)(self::RANDOM_NOISE_MIN * 1000), (int)(self::RANDOM_NOISE_MAX * 1000)) / 1000.0;
-            $noiseD = mt_rand((int)(self::RANDOM_NOISE_MIN * 1000), (int)(self::RANDOM_NOISE_MAX * 1000)) / 1000.0;
+            // Turns Multiplier: 1 + soft_exp * (pow(turns, 0.5) - 1)
+            $turnsMult = min(1 + $turnsSoftExp * (pow($turns, 0.5) - 1), $turnsMaxMult);
+            $noiseA = mt_rand((int)($noiseMin * 1000), (int)($noiseMax * 1000)) / 1000.0;
+            $noiseD = mt_rand((int)($noiseMin * 1000), (int)($noiseMax * 1000)) / 1000.0;
 
             $ea = $atkRatings['offense'] * $turnsMult * $noiseA;
             $ed = $defRatings['defense'] * $noiseD;
             
             $ratio = $ea / max(1.0, $ed);
-            $attackerWins = ($ratio >= self::UNDERDOG_MIN_RATIO);
+            $attackerWins = ($ratio >= $underdogMinRatio);
 
             // 3. Casualties
             $guardsLost = 0;
-            if ($defGuards > self::GUARD_FLOOR) {
+            if ($defGuards > $guardFloor) {
                 $killFrac = (0.08 + 0.07 * max(0.0, min(1.0, $ratio - 1.0))) * (1 + 0.2 * ($turnsMult - 1.0));
                 if (!$attackerWins) $killFrac *= 0.5;
-                $guardsLost = min((int)floor($defGuards * $killFrac), $defGuards - self::GUARD_FLOOR);
+                $guardsLost = min((int)floor($defGuards * $killFrac), $defGuards - $guardFloor);
             }
 
             // 4. Plunder
