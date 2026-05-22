@@ -394,6 +394,31 @@ class AdminController extends BaseController
         }
     }
 
+    public function getApiApplications(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+        return json_encode(['success' => true, 'applications' => $this->apiService->getPendingApplications()]);
+    }
+
+    public function processApiApplication(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        $id = (int)($_POST['id'] ?? 0);
+        $action = (string)($_POST['action'] ?? '');
+        $rateLimit = (int)($_POST['rate_limit'] ?? 60);
+        $notes = (string)($_POST['notes'] ?? '');
+
+        try {
+            $res = $this->apiService->processApplication($id, $action, $rateLimit, $notes);
+            return json_encode($res);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     public function getApiLogs(): string
     {
         header('Content-Type: application/json');

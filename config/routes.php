@@ -78,6 +78,8 @@ return function (RouteCollector $r) {
     
     // API Management
     $r->addRoute('GET', '/admin/api/keys', [\sdo\Controllers\AdminController::class, 'getApiKeys']);
+    $r->addRoute('GET', '/admin/api/applications', [\sdo\Controllers\AdminController::class, 'getApiApplications']);
+    $r->addRoute('POST', '/admin/api/process-app', [\sdo\Controllers\AdminController::class, 'processApiApplication']);
     $r->addRoute('POST', '/admin/api/issue', [\sdo\Controllers\AdminController::class, 'issueApiKey']);
     $r->addRoute('POST', '/admin/api/update', [\sdo\Controllers\AdminController::class, 'updateApiKey']);
     $r->addRoute('POST', '/admin/api/delete', [\sdo\Controllers\AdminController::class, 'deleteApiKey']);
