@@ -63,6 +63,7 @@ switch ($routeInfo[0]) {
             try {
                 $middleware = $container->get(ApiAuthMiddleware::class);
                 $apiKey = $middleware->handle();
+                $vars['_api_key'] = $apiKey;
             } catch (\Exception $e) {
                 http_response_code($e->getCode() ?: 401);
                 header('Content-Type: application/json');

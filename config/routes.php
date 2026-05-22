@@ -88,6 +88,10 @@ return function (RouteCollector $r) {
 
     // Open API v1
     $r->addRoute('GET', '/api/v1/ping', [\sdo\Controllers\ApiController::class, 'ping']);
+    $r->addRoute('GET', '/api/v1/sector/status', [\sdo\Controllers\ApiController::class, 'sectorStatus']);
+    $r->addRoute('GET', '/api/v1/sector/manpower', [\sdo\Controllers\ApiController::class, 'sectorManpower']);
+    $r->addRoute('GET', '/api/v1/sector/structures', [\sdo\Controllers\ApiController::class, 'sectorStructures']);
+    $r->addRoute('GET', '/api/v1/battlefield', [\sdo\Controllers\ApiController::class, 'battlefield']);
 
     // Mines Routes (Miner Assignment/Untraining & Upgrades)
     $r->addRoute('GET', '/structures/mines', [\sdo\Controllers\MinesController::class, 'index']);
