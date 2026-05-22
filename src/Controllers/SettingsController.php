@@ -29,14 +29,38 @@ class SettingsController extends BaseController
 
         $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
         
+        // Fetch API Status
+        $apiService = new \sdo\Services\ApiService();
+        $apiApp = $apiService->getUserApplication((int)$_SESSION['user_id']);
+        $apiStatus = null;
+        if ($apiApp) {
+            $apiStatus = [
+                'status' => $apiApp->status,
+                'keys' => $apiApp->status === 'approved' ? $apiService->getUserKeys((int)$_SESSION['user_id']) : []
+            ];
+        }
+
         return $this->render('settings/index', [
             'title' => 'System Settings',
             'user_profile' => [
                 'avatar' => $kingdom->user->avatar_path ?? '',
                 'email' => $kingdom->user->email,
-                'stasis_until' => $kingdom->user->stasis_until?->format('Y-m-d H:i:s')
+                'stasis_until' => $kingdom->user->stasis_until?->format('Y-m-d H:i:s'),
+                'api_status' => $apiStatus
             ]
         ]);
+    }
+
+    public function applyForApi(): string
+    {
+        return $this->jsonResponse(function() {
+            $apiService = new \sdo\Services\ApiService();
+            return $apiService->submitApplication(
+                (int)$_SESSION['user_id'],
+                (string)($_POST['project_name'] ?? ''),
+                (string)($_POST['justification'] ?? '')
+            );
+        });
     }
 
     private function jsonResponse(callable $action): string

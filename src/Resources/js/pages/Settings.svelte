@@ -27,6 +27,14 @@
 
     const isStasisActive = $derived(user_profile.stasis_until && new Date(user_profile.stasis_until) > new Date());
 
+    // API Logic
+    let apiAppForm = $state({
+        project_name: '',
+        justification: ''
+    });
+    let apiStatus = $state(user_profile.api_status || null); // { status: 'pending'|'approved'|'rejected', keys: [] }
+    let showKey = $state(false);
+
     /**
      * Standard JSON submission for text fields
      */
@@ -48,6 +56,9 @@
             message = data;
             if (data.success && body.username) {
                 game.user.username = body.username;
+            }
+            if (data.success && endpoint === '/settings/api/apply') {
+                apiStatus = { status: 'pending', keys: [] };
             }
         } catch (e) {
             message = { success: false, message: "Terminal link lost." };
@@ -107,12 +118,12 @@
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <!-- Tab Navigation -->
         <aside class="flex flex-col gap-2">
-            {#each ['identity', 'security', 'stasis', 'uplink'] as tab}
+            {#each ['identity', 'security', 'stasis', 'uplink', 'api'] as tab}
                 <button 
                     onclick={() => activeTab = tab}
                     class="w-full text-left px-6 py-4 rounded-xl border transition-all font-title text-[10px] uppercase tracking-widest {activeTab === tab ? 'bg-cyan-500/10 border-cyan-500 text-white font-black' : 'bg-black/40 border-white/5 text-gray-600 hover:border-cyan-500/30'}"
                 >
-                    {tab}
+                    {tab === 'api' ? 'Neural API' : tab}
                 </button>
             {/each}
         </aside>
@@ -232,6 +243,67 @@
                                 </button>
                             </div>
                         </div>
+                    </div>
+                {:else if activeTab === 'api'}
+                    <div in:fly={{ x: 20 }} class="space-y-8 relative z-10">
+                        <div class="flex justify-between items-end">
+                            <h2 class="text-white font-title text-xl uppercase tracking-widest">Neural API Gate</h2>
+                            <a href="https://github.com/Starlight-Dominion/Starlight_V3/blob/main/OPEN_API.md" target="_blank" class="text-[9px] font-black text-cyan-500 uppercase tracking-widest hover:text-white transition-colors">View Documentation &raquo;</a>
+                        </div>
+
+                        {#if !apiStatus}
+                            <div class="bg-black/40 border border-white/5 p-8 rounded-2xl space-y-6">
+                                <p class="text-gray-400 text-xs leading-relaxed italic">
+                                    Access to the Dominion's tactical telemetry requires authorization from High Command. Submit your integration proposal below.
+                                </p>
+                                <form onsubmit={(e) => { e.preventDefault(); submitRequest('/settings/api/apply', apiAppForm); }} class="space-y-6">
+                                    <div class="space-y-2">
+                                        <label class="text-[9px] font-black text-cyan-800 uppercase ml-2">Project Designation</label>
+                                        <input type="text" bind:value={apiAppForm.project_name} class="input-terminal" required placeholder="e.g., Sector Analytics Overlay" />
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="text-[9px] font-black text-cyan-800 uppercase ml-2">Operational Justification</label>
+                                        <textarea bind:value={apiAppForm.justification} class="input-terminal min-h-[100px] resize-none" required placeholder="Describe how you intend to utilize the neural link..."></textarea>
+                                    </div>
+                                    <button type="submit" class="btn-launch w-full py-4 text-sm" disabled={loading}>Submit Application</button>
+                                </form>
+                            </div>
+                        {:else if apiStatus.status === 'pending'}
+                            <div class="bg-cyan-950/20 border border-cyan-900/50 p-12 rounded-2xl text-center space-y-4">
+                                <div class="w-16 h-16 rounded-full border-4 border-cyan-500/20 border-t-cyan-500 animate-spin mx-auto mb-6"></div>
+                                <h3 class="text-cyan-400 font-title font-black uppercase tracking-[4px] text-lg">Application Under Review</h3>
+                                <p class="text-gray-500 text-[10px] uppercase tracking-widest">High Command is evaluating your request. Please stand by.</p>
+                            </div>
+                        {:else if apiStatus.status === 'rejected'}
+                            <div class="bg-red-950/20 border border-red-900/50 p-12 rounded-2xl text-center space-y-4">
+                                <div class="text-red-500 font-title font-black text-4xl mb-2">✕</div>
+                                <h3 class="text-red-500 font-title font-black uppercase tracking-[4px] text-lg">Authorization Denied</h3>
+                                <p class="text-gray-500 text-[10px] uppercase tracking-widest">Your request for API access has been rejected by High Command.</p>
+                            </div>
+                        {:else if apiStatus.status === 'approved'}
+                            <div class="space-y-6">
+                                <div class="bg-cyan-900/10 border border-cyan-500/30 p-6 rounded-xl flex items-center justify-between">
+                                    <span class="text-[10px] font-black text-cyan-400 uppercase tracking-widest">Status: Authorized</span>
+                                    <span class="text-[9px] font-black text-gray-500 uppercase tracking-[2px]">Rate Limit: {apiStatus.keys[0]?.rate_limit_per_minute || 60} RPM</span>
+                                </div>
+
+                                <div class="bg-black/60 border border-white/10 p-8 rounded-2xl space-y-4">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-[9px] font-black text-gray-600 uppercase tracking-widest">Bearer Token (Keep Secret)</span>
+                                        <button onclick={() => showKey = !showKey} class="text-[9px] font-black text-cyan-500 uppercase hover:text-white transition-colors">
+                                            {showKey ? 'Hide' : 'Reveal'}
+                                        </button>
+                                    </div>
+                                    <div class="bg-black border border-cyan-500/20 p-4 rounded-lg text-center font-mono text-cyan-400 break-all select-all">
+                                        {#if showKey}
+                                            {apiStatus.keys[0]?.api_token || 'ERROR_RETRIEVING_KEY'}
+                                        {:else}
+                                            ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+                                        {/if}
+                                    </div>
+                                </div>
+                            </div>
+                        {/if}
                     </div>
                 {/if}
             </div>
