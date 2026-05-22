@@ -26,12 +26,14 @@
     import Training from './pages/Training.svelte';
     import Recruit from './pages/Recruit.svelte';
     import BattleReport from './pages/BattleReport.svelte';
+    import Rules from './pages/Rules.svelte';
 
     const components = {
         'home': Landing,
         'auth/login': Login,
         'auth/register': Register,
         'pages/about': About,
+        'pages/rules': Rules,
         'pages/terms': Terms,
         'pages/contact': Contact,
         'dashboard/index': Dashboard,
@@ -57,7 +59,7 @@
         return Landing;
     });
 
-    const isPublicView = $derived(['home', 'pages/about', 'pages/terms', 'pages/contact', 'auth/login', 'auth/register'].includes(game.component));
+    const isPublicView = $derived(['home', 'pages/about', 'pages/rules', 'pages/terms', 'pages/contact', 'auth/login', 'auth/register'].includes(game.component));
 
     const bgUrl = "/images/backgroundMain.avif";
 </script>
@@ -98,6 +100,7 @@
                 </div>
 
                 <nav class="flex gap-10">
+                    <a href="/rules" class="text-[10px] font-bold text-cyan-400 uppercase tracking-widest hover:text-white transition-colors">Protocols</a>
                     <a href="/terms" class="text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Sector Laws</a>
                     <a href="/about" class="text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Command Manual</a>
                     <a href="/contact" class="text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-cyan-400 transition-colors">Signal Uplink</a>
