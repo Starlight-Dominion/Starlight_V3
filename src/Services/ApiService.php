@@ -21,7 +21,7 @@ class ApiService
     }
 
     /**
-     * Log an API request.
+     * Log an API request with high-fidelity telemetry.
      */
     public function logRequest(
         ?int $apiKeyId,
@@ -29,8 +29,16 @@ class ApiService
         string $method,
         string $ip,
         int $statusCode,
-        int $responseTimeMs
+        int $responseTimeMs,
+        ?string $userAgent = null,
+        ?array $payload = null,
+        ?string $errorLog = null
     ): void {
+        // Sanitize payload: remove sensitive data if any
+        if ($payload) {
+            unset($payload['password'], $payload['cipher'], $payload['token']);
+        }
+
         ApiLog::create([
             'api_key_id' => $apiKeyId,
             'endpoint' => $endpoint,
@@ -38,8 +46,100 @@ class ApiService
             'ip_address' => $ip,
             'status_code' => $statusCode,
             'response_time_ms' => $responseTimeMs,
+            'user_agent' => $userAgent,
+            'payload' => $payload ? json_encode($payload) : null,
+            'error_log' => $errorLog,
             'created_at' => date('Y-m-d H:i:s')
         ]);
+    }
+
+    /**
+     * Submit a new API access application.
+     */
+    public function submitApplication(int $userId, string $projectName, string $justification): array
+    {
+        // Check for existing pending application
+        $existing = Capsule::table('api_applications')
+            ->where('user_id', $userId)
+            ->where('status', 'pending')
+            ->exists();
+
+        if ($existing) {
+            throw new Exception("You already have an active request pending review by High Command.");
+        }
+
+        Capsule::table('api_applications')->insert([
+            'user_id' => $userId,
+            'project_name' => $projectName,
+            'justification' => $justification,
+            'status' => 'pending',
+            'created_at' => date('Y-m-d H:i:s')
+        ]);
+
+        return ['success' => true, 'message' => "Request transmitted. Awaiting High Command authorization."];
+    }
+
+    /**
+     * Get the user's latest application status.
+     */
+    public function getUserApplication(int $userId): ?object
+    {
+        return Capsule::table('api_applications')
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->first();
+    }
+
+    /**
+     * Get all API keys for a specific user.
+     */
+    public function getUserKeys(int $userId): array
+    {
+        return ApiKey::where('user_id', $userId)->get()->toArray();
+    }
+
+    /**
+     * Get pending applications for Admin review.
+     */
+    public function getPendingApplications(): array
+    {
+        return Capsule::table('api_applications')
+            ->join('users', 'api_applications.user_id', '=', 'users.id')
+            ->where('status', 'pending')
+            ->select('api_applications.*', 'users.username')
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Process an application (Approve/Reject).
+     */
+    public function processApplication(int $appId, string $action, int $rateLimit = 60, string $notes = ''): array
+    {
+        return Capsule::transaction(function() use ($appId, $action, $rateLimit, $notes) {
+            $app = Capsule::table('api_applications')->where('id', $appId)->first();
+            if (!$app || $app->status !== 'pending') {
+                throw new Exception("Application not found or already processed.");
+            }
+
+            if ($action === 'approve') {
+                $this->issueKey((int)$app->user_id, $rateLimit);
+                $status = 'approved';
+            } else {
+                $status = 'rejected';
+            }
+
+            Capsule::table('api_applications')
+                ->where('id', $appId)
+                ->update([
+                    'status' => $status,
+                    'admin_notes' => $notes,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+
+            return ['success' => true, 'message' => "Application $status."];
+        });
     }
 
     /**

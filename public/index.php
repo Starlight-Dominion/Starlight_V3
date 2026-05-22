@@ -60,6 +60,13 @@ switch ($routeInfo[0]) {
         $apiKey = null;
 
         if ($isApi) {
+            $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            $payload = $_POST;
+            if (empty($payload) && in_array($httpMethod, ['POST', 'PUT', 'PATCH'])) {
+                $raw = file_get_contents('php://input');
+                if ($raw) $payload = json_decode($raw, true) ?? [];
+            }
+
             try {
                 $middleware = $container->get(ApiAuthMiddleware::class);
                 $apiKey = $middleware->handle();
@@ -69,14 +76,17 @@ switch ($routeInfo[0]) {
                 header('Content-Type: application/json');
                 echo json_encode(['success' => false, 'message' => $e->getMessage()]);
                 
-                // Log failed API attempt
+                // Log failed API attempt with enhanced telemetry
                 $container->get(ApiService::class)->logRequest(
                     null,
                     $uri,
                     $httpMethod,
                     $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
                     (int)http_response_code(),
-                    (int)((microtime(true) - $startTime) * 1000)
+                    (int)((microtime(true) - $startTime) * 1000),
+                    $userAgent,
+                    $payload,
+                    $e->getMessage()
                 );
                 break;
             }
@@ -100,7 +110,9 @@ switch ($routeInfo[0]) {
                 $httpMethod,
                 $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
                 (int)http_response_code(),
-                (int)((microtime(true) - $startTime) * 1000)
+                (int)((microtime(true) - $startTime) * 1000),
+                $userAgent ?? null,
+                $payload ?? null
             );
         }
 
