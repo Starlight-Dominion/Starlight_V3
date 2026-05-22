@@ -156,8 +156,7 @@ class AdminController extends BaseController
         foreach ($structures as $s) {
             $detailedStructures[] = [
                 'details' => $s,
-                'levels' => $this->adminService->getStructureLevels((int)$s->id),
-                'upgrades' => $this->adminService->getStructureUpgradeOptions((int)$s->id)
+                'levels' => $this->adminService->getStructureLevels((int)$s->id)
             ];
         }
 

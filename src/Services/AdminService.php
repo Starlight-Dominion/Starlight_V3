@@ -99,11 +99,6 @@ class AdminService
         return Capsule::table('structure_levels')->where('structure_id', $structureId)->orderBy('level', 'asc')->get()->toArray();
     }
 
-    public function getStructureUpgradeOptions(int $structureId): array
-    {
-        return Capsule::table('structure_upgrade_options')->where('structure_id', $structureId)->get()->toArray();
-    }
-
     public function addStructure(array $data): int
     {
         return Capsule::table('structures')->insertGetId($data);
