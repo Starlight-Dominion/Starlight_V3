@@ -2,7 +2,7 @@
     import { fade, fly, scale } from 'svelte/transition';
     import { game } from '../stores/gameStore.svelte.js';
 
-    let { world_stats = { players: 0, battles_24h: 0 } } = $props();
+    let { world_stats = { players: 0, battles_24h: 0, tick_interval: 900 } } = $props();
 
     let showAuthModal = $state(false);
     let authTab = $state('login'); 
@@ -85,7 +85,7 @@
                 <div class="text-[9px] font-black text-cyan-500 uppercase tracking-[3px]">Commanders</div>
             </div>
             <div class="p-8 border-r border-cyan-500/20">
-                <div class="text-3xl font-black text-white font-title mb-1">600s</div>
+                <div class="text-3xl font-black text-white font-title mb-1">{world_stats.tick_interval}s</div>
                 <div class="text-[9px] font-black text-cyan-500 uppercase tracking-[3px]">Sector Pulse</div>
             </div>
             <div class="p-8 border-r border-cyan-500/20">

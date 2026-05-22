@@ -30,12 +30,19 @@ class HomeController extends BaseController
             $this->redirect('/dashboard');
         }
 
-        // world_stats dummy data - replace with Repository calls later
+        $playerCount = \sdo\Models\User::count();
+        $tickInterval = (int)$this->configService->get('tick_interval_seconds', 900);
+        
+        $battles24h = \Illuminate\Database\Capsule\Manager::table('battle_logs')
+            ->where('battle_time', '>=', date('Y-m-d H:i:s', strtotime('-24 hours')))
+            ->count();
+
         return $this->render('home', [
-            'title' => 'Shadowreign | Strategic Military RPG',
+            'title' => 'Starlight Dominion | Strategic Sector Command',
             'world_stats' => [
-                'players' => 1240,
-                'battles_24h' => 842
+                'players' => $playerCount,
+                'battles_24h' => $battles24h,
+                'tick_interval' => $tickInterval
             ]
         ]);
     }
