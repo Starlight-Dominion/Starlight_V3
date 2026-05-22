@@ -40,6 +40,15 @@ class AdminService
             ->toArray();
     }
 
+    public function getAllKingdoms(int $limit = 50): array
+    {
+        return Dominion::with('user')
+            ->orderBy('id', 'asc')
+            ->limit($limit)
+            ->get()
+            ->toArray();
+    }
+
     public function updateKingdomStats(int $kingdomId, array $stats): bool
     {
         $dominion = Dominion::findOrFail($kingdomId);

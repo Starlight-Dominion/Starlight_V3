@@ -56,6 +56,14 @@ class AdminController extends BaseController
         return json_encode(['success' => true, 'results' => $results]);
     }
 
+    public function getAllKingdoms(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        return json_encode(['success' => true, 'results' => $this->adminService->getAllKingdoms()]);
+    }
+
     public function updateKingdom(): string
     {
         header('Content-Type: application/json');

@@ -57,6 +57,7 @@ return function (RouteCollector $r) {
     // Admin Command Center
     $r->addRoute('GET', '/admin', [\sdo\Controllers\AdminController::class, 'index']);
     $r->addRoute('GET', '/admin/search', [\sdo\Controllers\AdminController::class, 'searchKingdoms']);
+    $r->addRoute('GET', '/admin/kingdoms', [\sdo\Controllers\AdminController::class, 'getAllKingdoms']);
     $r->addRoute('POST', '/admin/update-kingdom', [\sdo\Controllers\AdminController::class, 'updateKingdom']);
     $r->addRoute('GET', '/admin/units', [\sdo\Controllers\AdminController::class, 'getUnits']);
     $r->addRoute('POST', '/admin/update-unit', [\sdo\Controllers\AdminController::class, 'updateUnit']);

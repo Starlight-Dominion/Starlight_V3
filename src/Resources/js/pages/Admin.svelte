@@ -76,12 +76,22 @@
         } catch (e) { console.error("Failed to fetch logs"); } finally { loading = false; }
     }
 
+    async function fetchAllKingdoms() {
+        loading = true;
+        try {
+            const res = await fetch('/admin/kingdoms');
+            const data = await res.json();
+            searchResults = data.results;
+        } catch (e) { console.error("Failed to fetch kingdoms"); } finally { loading = false; }
+    }
+
     $effect(() => {
         if (activeModule === 'mechanics' || activeModule === 'doctrine') fetchSettings();
         if (activeModule === 'units') fetchUnits();
         if (activeModule === 'structures') fetchStructures();
         if (activeModule === 'armory') fetchArmoryItems();
         if (activeModule === 'logs') fetchBattleLogs();
+        if (activeModule === 'players') fetchAllKingdoms();
     });
 
     async function handleSearch() {
