@@ -89,6 +89,18 @@ The **Documentation** module allows for real-time management of public-facing co
 
 ---
 
+## 📡 Neural API Gate
+
+The **API Gate** provides secure external access to Dominion telemetry and tactical data.
+
+*   **Key Matrix:** View all active access tokens, their owners, and current frequency thresholds.
+*   **Issue Key:** Grant new API access by providing a Commander's User ID. New keys are generated with a default limit of 60 RPM.
+*   **Real-time Tuning:** Directly edit the **Rate Limit (RPM)** for any specific key. Changes take effect on the next request.
+*   **Revocation:** Permanently decommission an asset's access via the **"Permanent Revoke"** (✕) action.
+*   **Audit Trail:** A dedicated log of every API interaction, including status codes, response times, and origin IPs.
+
+---
+
 ## 🏛️ Structural Engineering
 
 Manage the archetypes of all dominion buildings and their evolution paths.
