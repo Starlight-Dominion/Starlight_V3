@@ -70,11 +70,11 @@ class AdminController extends BaseController
         $this->checkAdmin();
 
         $id = (int)($_POST['id'] ?? 0);
-        $field = (string)($_POST['field'] ?? '');
-        $value = (int)($_POST['value'] ?? 0);
+        $data = $_POST;
+        unset($data['id'], $data['_csrf']);
 
         try {
-            $res = $this->adminService->updateKingdomStats($id, [$field => $value]);
+            $res = $this->adminService->updateKingdomStats($id, $data);
             return json_encode(['success' => $res]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);

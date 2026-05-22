@@ -51,18 +51,20 @@ class AdminService
 
     public function updateKingdomStats(int $kingdomId, array $stats): bool
     {
-        $dominion = Dominion::findOrFail($kingdomId);
+        $dominion = Dominion::with('user')->findOrFail($kingdomId);
         
-        // Basic protection: only allow specific fields
-        $allowed = ['credits', 'xp', 'turns', 'citizens'];
+        $allowedDominion = ['credits', 'xp', 'turns', 'citizens', 'name'];
+        $allowedUser = ['username'];
         
         foreach ($stats as $field => $value) {
-            if (in_array($field, $allowed)) {
+            if (in_array($field, $allowedDominion)) {
                 $dominion->$field = $value;
+            } elseif (in_array($field, $allowedUser) && $dominion->user) {
+                $dominion->user->$field = $value;
             }
         }
 
-        return $dominion->save();
+        return $dominion->push();
     }
 
     // --- Units Management ---

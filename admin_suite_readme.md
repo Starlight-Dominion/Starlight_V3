@@ -72,8 +72,9 @@ The **Armory Forge** provides granular control over all military equipment.
 Search and manage individual player sectors.
 
 1.  **Search:** Use the targeting array to find kingdoms by name or commander handle.
-2.  **Resource Adjustment:** Manually adjust a commander's **Credits, XP, Turns,** or **Citizens**.
-3.  **Commit Directives:** Click **"SAVE DIRECTIVES"** to apply changes to the live sector.
+2.  **Identity Management:** Directly edit a sector's **Dominion Designation** (Kingdom Name) or **Commander Handle** (Username).
+3.  **Resource Adjustment:** Manually adjust a commander's **Credits, XP, Turns,** or **Citizens**.
+4.  **Commit Directives:** Click **"SAVE DIRECTIVES"** to apply changes to the live sector.
 
 ---
 
