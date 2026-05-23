@@ -81,9 +81,20 @@ class TacticalService
     {
         $res = $this->calculateTacticalRatings($dominionId);
         $dom = Dominion::find($dominionId);
+
+        $manpowerDetails = DominionManpower::with('unit')
+            ->where('dominion_id', $dominionId)
+            ->get()
+            ->map(fn($m) => [
+                'slug' => $m->unit->slug,
+                'name' => $m->unit->name,
+                'quantity' => (int)$m->total_quantity
+            ])->toArray();
+
         return [
             'ratings' => ['offense' => $res['offense'], 'defense' => $res['defense']],
             'army' => $res['army'],
+            'manpower' => $manpowerDetails,
             'foundation' => ['hp' => $dom->foundation_hp, 'max_hp' => $dom->foundation_max_hp]
         ];
     }

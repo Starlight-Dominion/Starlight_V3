@@ -14,7 +14,7 @@
     let activeModules = $state({
         eco: true,
         mil: true,
-        pop: true,
+        manpower: true,
         sec: true
     });
 
@@ -26,9 +26,20 @@
     );
 
     const totalPopulation = $derived(totalMilitary + (resources.citizens || 0));
+
+    // Unit classification helper for visual styling
+    const getUnitClass = (slug) => {
+        if (slug === 'soldiers') return 'text-red-500 border-red-500/20 bg-red-500/5';
+        if (slug === 'guards') return 'text-blue-500 border-blue-500/20 bg-blue-500/5';
+        if (slug === 'spies') return 'text-purple-500 border-purple-500/20 bg-purple-500/5';
+        if (slug === 'sentries') return 'text-orange-500 border-orange-500/20 bg-orange-500/5';
+        if (slug === 'workers') return 'text-emerald-500 border-emerald-500/20 bg-emerald-500/5';
+        return 'text-gray-500 border-gray-500/20 bg-gray-500/5';
+    };
 </script>
 
 <div in:fade class="space-y-6">
+    <!-- Header Hero Section -->
     <div class="bg-dark-translucent border-2 border-cyan-500/20 rounded-2xl p-8 relative overflow-hidden shadow-2xl">
         <div class="absolute top-0 right-0 p-4 opacity-10">
             <span class="text-8xl font-title font-black text-white select-none uppercase tracking-tighter">HUD_01</span>
@@ -63,7 +74,9 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Economic Ledger -->
         <div class="bg-dark-translucent border border-cyan-500/10 rounded-xl overflow-hidden shadow-lg">
             <header class="bg-cyan-950/10 px-6 py-4 border-b border-cyan-500/10 flex justify-between items-center">
                 <h3 class="font-title text-cyan-400 text-[10px] font-black uppercase tracking-[3px] flex items-center gap-3">
@@ -77,11 +90,11 @@
             {#if activeModules.eco}
                 <div in:slide class="p-8 space-y-4 font-mono">
                     <div class="flex justify-between items-end border-b border-white/5 pb-2">
-                        <span class="text-[10px] text-gray-500 uppercase tracking-widest">Liquid Credits</span>
+                        <span class="text-[10px] text-gray-500 uppercase tracking-widest">Credits</span>
                         <span class="text-xl font-black text-white">{resources.credits.toLocaleString()}</span>
                     </div>
                     <div class="flex justify-between items-center text-xs">
-                        <span class="text-gray-600 uppercase font-bold">Cycle Growth</span>
+                        <span class="text-gray-600 uppercase font-bold">Income</span>
                         <span class="text-cyan-400 font-bold">+{production_total.toLocaleString()} CP</span>
                     </div>
                     <div class="flex justify-between items-center text-[9px] text-gray-700">
@@ -92,6 +105,7 @@
             {/if}
         </div>
 
+        <!-- Military Command -->
         <div class="bg-dark-translucent border border-cyan-500/10 rounded-xl overflow-hidden shadow-lg">
             <header class="bg-cyan-950/10 px-6 py-4 border-b border-cyan-500/10 flex justify-between items-center">
                 <h3 class="font-title text-cyan-400 text-[10px] font-black uppercase tracking-[3px] flex items-center gap-3">
@@ -115,6 +129,48 @@
                     <div class="flex justify-between items-center text-xs">
                         <span class="text-gray-600 uppercase font-bold">Defense Power</span>
                         <span class="text-white font-bold">{tactical.ratings?.defense?.toLocaleString() || 0}</span>
+                    </div>
+                </div>
+            {/if}
+        </div>
+
+        <!-- Manpower Roster -->
+        <div class="bg-dark-translucent border border-cyan-500/10 rounded-xl overflow-hidden shadow-lg col-md-2 lg:col-span-1">
+            <header class="bg-cyan-950/10 px-6 py-4 border-b border-cyan-500/10 flex justify-between items-center">
+                <h3 class="font-title text-cyan-400 text-[10px] font-black uppercase tracking-[3px] flex items-center gap-3">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-sm rotate-45"></span>
+                    Manpower Roster
+                </h3>
+                <button onclick={() => toggle('manpower')} class="text-[8px] font-black text-gray-600 hover:text-white uppercase tracking-widest">
+                    {activeModules.manpower ? 'Minimize' : 'Expand'}
+                </button>
+            </header>
+            {#if activeModules.manpower}
+                <div in:slide class="p-6 space-y-3 font-mono">
+                    <div class="grid grid-cols-2 gap-2">
+                        {#if tactical.manpower && tactical.manpower.length > 0}
+                            {#each tactical.manpower as unit}
+                                <div class="p-3 border rounded-lg {getUnitClass(unit.slug)} flex flex-col justify-between">
+                                    <span class="text-[9px] font-bold uppercase tracking-tighter opacity-60 leading-none mb-2">{unit.name}</span>
+                                    <span class="text-lg font-black leading-none">{unit.quantity.toLocaleString()}</span>
+                                </div>
+                            {/each}
+                        {:else}
+                            <div class="col-span-2 py-4 text-center text-[10px] text-gray-600 uppercase tracking-widest italic">
+                                No active manpower recorded
+                            </div>
+                        {/if}
+                    </div>
+                    
+                    <div class="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
+                        <div class="flex flex-col">
+                            <span class="text-[9px] text-gray-600 uppercase font-bold tracking-widest">Total Civilian</span>
+                            <span class="text-sm font-bold text-white">{resources.citizens?.toLocaleString() || 0}</span>
+                        </div>
+                        <div class="flex flex-col text-right">
+                            <span class="text-[9px] text-gray-600 uppercase font-bold tracking-widest">Total Pop</span>
+                            <span class="text-sm font-bold text-cyan-400">{totalPopulation.toLocaleString()}</span>
+                        </div>
                     </div>
                 </div>
             {/if}
