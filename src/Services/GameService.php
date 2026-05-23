@@ -58,6 +58,34 @@ class GameService
     }
 
     /**
+     * Calculates the total credit income per tick including multipliers.
+     */
+    public function getTotalIncome(int $dominionId): int
+    {
+        $baseCredits = (int)$this->configService->get('baseline_credits_per_tick', 100);
+        $multiplier = $this->getEconomyMultiplier($dominionId);
+        
+        return (int)floor($baseCredits * $multiplier);
+    }
+
+    /**
+     * Calculates the total citizen growth per tick including buffs.
+     */
+    public function getTotalCitizenGrowth(int $dominionId): int
+    {
+        $baseCitizens = (int)$this->configService->get('baseline_citizens_per_tick', 50);
+        
+        $totalBuff = (int)\sdo\Models\DominionStructure::join('structure_levels', function($join) {
+                $join->on('dominion_structures.structure_id', '=', 'structure_levels.structure_id')
+                     ->on('dominion_structures.level', '=', 'structure_levels.level');
+            })
+            ->where('dominion_structures.dominion_id', $dominionId)
+            ->sum('structure_levels.buff_citizens_per_tick');
+
+        return $baseCitizens + $totalBuff;
+    }
+
+    /**
      * Calculates the total economic multiplier from all structures.
      */
     public function getEconomyMultiplier(int $dominionId): float

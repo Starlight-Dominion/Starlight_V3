@@ -34,16 +34,16 @@ class DashboardController extends BaseController
             $this->redirect('/login?error=dominion_not_found');
         }
 
-        // Calculate production from structural multipliers
-        $multiplier = $this->gameService->getEconomyMultiplier($dominion->id);
-        $totalIncome = (int)floor(GameService::BASE_INCOME * $multiplier);
-        $bonusCredits = $totalIncome - GameService::BASE_INCOME;
+        // Use centralized growth reporting
+        $baseCredits = (int)$this->configService->get('baseline_credits_per_tick', 100);
+        $totalIncome = $this->gameService->getTotalIncome($dominion->id);
+        $bonusCredits = $totalIncome - $baseCredits;
 
         $tactical = $this->tacticalService->getTacticalOverview($dominion->id);
 
         return $this->render('dashboard/index', [
             'title' => 'Sector Dashboard',
-            'production_base' => GameService::BASE_INCOME,
+            'production_base' => $baseCredits,
             'production_mines' => $bonusCredits, // Maps to "Structural Bonus" in the UI
             'production_total' => $totalIncome,
             'tactical' => $tactical

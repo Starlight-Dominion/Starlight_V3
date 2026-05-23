@@ -30,6 +30,10 @@
                 <span class="text-white font-bold group-hover:text-cyan-400 transition-colors">{resources.credits.toLocaleString()}</span>
             </div>
             <div class="flex justify-between items-center group">
+                <span class="text-gray-600 uppercase">Income</span>
+                <span class="text-cyan-400 font-bold group-hover:text-white transition-colors">+{resources.income_per_tick?.toLocaleString() || 0} CP</span>
+            </div>
+            <div class="flex justify-between items-center group">
                 <span class="text-gray-600 uppercase">Secure Bank</span>
                 <span class="text-cyan-600 font-bold group-hover:text-cyan-400 transition-colors">{resources.bank.toLocaleString()}</span>
             </div>

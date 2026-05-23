@@ -37,6 +37,10 @@ class GameStore {
         if (this.user?.citizen_growth_rate) {
             this.resources.citizens_per_tick = this.user.citizen_growth_rate;
         }
+
+        if (this.user?.income_per_tick) {
+            this.resources.income_per_tick = this.user.income_per_tick;
+        }
         
         if (initialState.user?.secondsToNextTick) {
             this.nextTickSeconds = initialState.user.secondsToNextTick;
@@ -50,6 +54,14 @@ class GameStore {
         this.resources.turns = dominion.turns ?? 0;
         this.resources.xp = dominion.xp ?? 0;
         this.resources.deposits_today = dominion.deposits_today ?? 0;
+        
+        // Sync growth rates if provided in the update
+        if (game.user?.income_per_tick) {
+            this.resources.income_per_tick = game.user.income_per_tick;
+        }
+        if (game.user?.citizen_growth_rate) {
+            this.resources.citizens_per_tick = game.user.citizen_growth_rate;
+        }
     }
 
     startHeartbeat() {
