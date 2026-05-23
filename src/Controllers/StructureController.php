@@ -27,7 +27,7 @@ class StructureController extends BaseController
             $this->redirect('/login');
         }
 
-        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
         $state = $this->foundationService->getFoundationState($dominion->id);
         
         $structureList = [];
@@ -45,7 +45,7 @@ class StructureController extends BaseController
         }
 
         return $this->render('structures/index', [
-            'title' => 'Kingdom Structures',
+            'title' => 'Dominion Structures',
             'structures' => $structureList,
             'player_level' => $dominion->getPlayerLevel()
         ]);

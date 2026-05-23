@@ -27,7 +27,7 @@ class DashboardController extends BaseController
             $this->redirect('/login');
         }
 
-        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
 
         if (!$dominion) {
             session_destroy();

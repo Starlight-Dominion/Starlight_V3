@@ -44,10 +44,10 @@ class TrainingController extends BaseController
 
         $unitType = (string)($_POST['unit_type'] ?? '');
         $quantity = (int)($_POST['quantity'] ?? 0);
-        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
 
         try {
-            $res = $this->trainingService->train($kingdom->id, $unitType, $quantity);
+            $res = $this->trainingService->train($dominion->id, $unitType, $quantity);
             return json_encode($res);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);

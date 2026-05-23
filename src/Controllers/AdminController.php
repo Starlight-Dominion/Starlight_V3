@@ -46,26 +46,26 @@ class AdminController extends BaseController
         ]);
     }
 
-    public function searchKingdoms(): string
+    public function searchDominions(): string
     {
         header('Content-Type: application/json');
         $this->checkAdmin();
 
         $query = (string)($_GET['q'] ?? '');
-        $results = $this->adminService->searchKingdoms($query);
+        $results = $this->adminService->searchDominions($query);
 
         return json_encode(['success' => true, 'results' => $results]);
     }
 
-    public function getAllKingdoms(): string
+    public function getAllDominions(): string
     {
         header('Content-Type: application/json');
         $this->checkAdmin();
 
-        return json_encode(['success' => true, 'results' => $this->adminService->getAllKingdoms()]);
+        return json_encode(['success' => true, 'results' => $this->adminService->getAllDominions()]);
     }
 
-    public function updateKingdom(): string
+    public function updateDominion(): string
     {
         header('Content-Type: application/json');
         $this->checkAdmin();
@@ -75,7 +75,7 @@ class AdminController extends BaseController
         unset($data['id'], $data['_csrf']);
 
         try {
-            $res = $this->adminService->updateKingdomStats($id, $data);
+            $res = $this->adminService->updateDominionStats($id, $data);
             return json_encode(['success' => $res]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);

@@ -5,6 +5,7 @@ namespace sdo\Services;
 
 use sdo\Models\ApiKey;
 use sdo\Models\ApiLog;
+use sdo\Models\ApiApplication;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
@@ -59,8 +60,7 @@ class ApiService
     public function submitApplication(int $userId, string $projectName, string $justification): array
     {
         // Check for existing pending application
-        $existing = Capsule::table('api_applications')
-            ->where('user_id', $userId)
+        $existing = ApiApplication::where('user_id', $userId)
             ->where('status', 'pending')
             ->exists();
 
@@ -68,12 +68,11 @@ class ApiService
             throw new Exception("You already have an active request pending review by High Command.");
         }
 
-        Capsule::table('api_applications')->insert([
+        ApiApplication::create([
             'user_id' => $userId,
             'project_name' => $projectName,
             'justification' => $justification,
-            'status' => 'pending',
-            'created_at' => date('Y-m-d H:i:s')
+            'status' => 'pending'
         ]);
 
         return ['success' => true, 'message' => "Request transmitted. Awaiting High Command authorization."];
@@ -82,10 +81,9 @@ class ApiService
     /**
      * Get the user's latest application status.
      */
-    public function getUserApplication(int $userId): ?object
+    public function getUserApplication(int $userId): ?ApiApplication
     {
-        return Capsule::table('api_applications')
-            ->where('user_id', $userId)
+        return ApiApplication::where('user_id', $userId)
             ->orderBy('created_at', 'desc')
             ->first();
     }
@@ -103,10 +101,8 @@ class ApiService
      */
     public function getPendingApplications(): array
     {
-        return Capsule::table('api_applications')
-            ->join('users', 'api_applications.user_id', '=', 'users.id')
+        return ApiApplication::with('user')
             ->where('status', 'pending')
-            ->select('api_applications.*', 'users.username')
             ->orderBy('created_at', 'asc')
             ->get()
             ->toArray();
@@ -118,7 +114,7 @@ class ApiService
     public function processApplication(int $appId, string $action, int $rateLimit = 60, string $notes = ''): array
     {
         return Capsule::transaction(function() use ($appId, $action, $rateLimit, $notes) {
-            $app = Capsule::table('api_applications')->where('id', $appId)->first();
+            $app = ApiApplication::lockForUpdate()->find($appId);
             if (!$app || $app->status !== 'pending') {
                 throw new Exception("Application not found or already processed.");
             }
@@ -130,13 +126,10 @@ class ApiService
                 $status = 'rejected';
             }
 
-            Capsule::table('api_applications')
-                ->where('id', $appId)
-                ->update([
-                    'status' => $status,
-                    'admin_notes' => $notes,
-                    'updated_at' => date('Y-m-d H:i:s')
-                ]);
+            $app->update([
+                'status' => $status,
+                'admin_notes' => $notes
+            ]);
 
             return ['success' => true, 'message' => "Application $status."];
         });

@@ -5,11 +5,11 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use Psr\Container\ContainerInterface;
 use sdo\Infrastructure\Eloquent;
 use sdo\Repositories\Interfaces\UserRepositoryInterface;
-use sdo\Repositories\Interfaces\KingdomRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
 use sdo\Repositories\Interfaces\BankRepositoryInterface;
 use sdo\Repositories\Interfaces\CombatRepositoryInterface;
 use sdo\Repositories\Eloquent\EloquentUserRepository;
-use sdo\Repositories\Eloquent\EloquentKingdomRepository;
+use sdo\Repositories\Eloquent\EloquentDominionRepository;
 use sdo\Repositories\Eloquent\EloquentBankRepository;
 use sdo\Repositories\Eloquent\EloquentCombatRepository;
 
@@ -47,7 +47,7 @@ $containerBuilder->addDefinitions([
 
     // Repository Bindings
     UserRepositoryInterface::class => DI\create(EloquentUserRepository::class),
-    KingdomRepositoryInterface::class => DI\create(EloquentKingdomRepository::class),
+    DominionRepositoryInterface::class => DI\create(EloquentDominionRepository::class),
     BankRepositoryInterface::class => DI\create(EloquentBankRepository::class),
     CombatRepositoryInterface::class => DI\create(EloquentCombatRepository::class),
     \sdo\Services\ConfigService::class => DI\create(),

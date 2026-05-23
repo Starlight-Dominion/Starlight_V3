@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
+use sdo\Models\RecruitmentSession;
 use sdo\Services\ConfigService;
 use sdo\Services\LogService;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -22,21 +23,18 @@ class RecruitmentService
      */
     public function getStatus(int $domId): array
     {
-        $activeSession = Capsule::table('recruitment_sessions')
-            ->where('dominion_id', $domId)
+        $activeSession = RecruitmentSession::where('dominion_id', $domId)
             ->where('is_active', true)
             ->first();
 
         $dailyLimit = (int)$this->configService->get('recruitment_sessions_per_day', 2);
         $threeDayLimit = (int)$this->configService->get('recruitment_sessions_per_3days', 5);
 
-        $dailyCount = Capsule::table('recruitment_sessions')
-            ->where('dominion_id', $domId)
+        $dailyCount = RecruitmentSession::where('dominion_id', $domId)
             ->where('created_at', '>=', date('Y-m-d H:i:s', strtotime('-24 hours')))
             ->count();
 
-        $threeDayCount = Capsule::table('recruitment_sessions')
-            ->where('dominion_id', $domId)
+        $threeDayCount = RecruitmentSession::where('dominion_id', $domId)
             ->where('created_at', '>=', date('Y-m-d H:i:s', strtotime('-72 hours')))
             ->count();
 
@@ -63,16 +61,15 @@ class RecruitmentService
             throw new Exception("Recruitment authorization denied. Frequency limit reached.");
         }
 
-        $sessionId = Capsule::table('recruitment_sessions')->insertGetId([
+        $session = RecruitmentSession::create([
             'dominion_id' => $domId,
             'clicks_count' => 0,
-            'is_active' => true,
-            'created_at' => date('Y-m-d H:i:s')
+            'is_active' => true
         ]);
 
         return [
             'success' => true,
-            'session' => Capsule::table('recruitment_sessions')->find($sessionId)
+            'session' => $session
         ];
     }
 
@@ -82,8 +79,7 @@ class RecruitmentService
     public function processClick(int $domId, int $sessionId): array
     {
         return Capsule::transaction(function() use ($domId, $sessionId) {
-            $session = Capsule::table('recruitment_sessions')
-                ->where('id', $sessionId)
+            $session = RecruitmentSession::where('id', $sessionId)
                 ->where('dominion_id', $domId)
                 ->where('is_active', true)
                 ->lockForUpdate()
@@ -96,28 +92,21 @@ class RecruitmentService
             $maxClicks = (int)$this->configService->get('recruitment_clicks_per_session', 150);
             
             if ($session->clicks_count >= $maxClicks) {
-                Capsule::table('recruitment_sessions')
-                    ->where('id', $sessionId)
-                    ->update(['is_active' => false, 'completed_at' => date('Y-m-d H:i:s')]);
+                $session->update(['is_active' => false, 'completed_at' => date('Y-m-d H:i:s')]);
                 return ['success' => false, 'message' => "Mobilization complete."];
             }
 
             // 1. Increment progress
-            $newCount = $session->clicks_count + 1;
-            Capsule::table('recruitment_sessions')
-                ->where('id', $sessionId)
-                ->update(['clicks_count' => $newCount]);
+            $session->increment('clicks_count');
+            $newCount = $session->clicks_count;
 
             // 2. Grant Citizen
             $dom = Dominion::lockForUpdate()->find($domId);
-            $dom->citizens += 1;
-            $dom->save();
+            $dom->increment('citizens');
 
             // 3. Finalize if reached max
             if ($newCount >= $maxClicks) {
-                Capsule::table('recruitment_sessions')
-                    ->where('id', $sessionId)
-                    ->update(['is_active' => false, 'completed_at' => date('Y-m-d H:i:s')]);
+                $session->update(['is_active' => false, 'completed_at' => date('Y-m-d H:i:s')]);
                 
                 $this->logService->log(
                     $domId,

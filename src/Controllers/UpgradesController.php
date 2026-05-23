@@ -28,8 +28,8 @@ class UpgradesController extends BaseController
             $this->redirect('/login');
         }
 
-        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-        $upgradeData = $this->upgradesService->getUpgradeData($kingdom->id);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+        $upgradeData = $this->upgradesService->getUpgradeData($dominion->id);
 
         return $this->render('upgrades/index', [
             'title' => 'Empire Upgrades',
@@ -41,15 +41,15 @@ class UpgradesController extends BaseController
 
     public function upgradeHousing(): void
     {
-        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-        $_SESSION['message'] = $this->upgradesService->upgradeHousing($kingdom->id);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+        $_SESSION['message'] = $this->upgradesService->upgradeHousing($dominion->id);
         $this->redirect('/structures/upgrades');
     }
 
     public function upgradeMercenaryMarket(): void
     {
-        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-        $_SESSION['message'] = $this->upgradesService->upgradeMercenaryMarket($kingdom->id);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+        $_SESSION['message'] = $this->upgradesService->upgradeMercenaryMarket($dominion->id);
         $this->redirect('/structures/upgrades');
     }
 }

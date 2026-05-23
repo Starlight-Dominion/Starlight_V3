@@ -27,7 +27,7 @@ class BankController extends BaseController
             $this->redirect('/login');
         }
 
-        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
         $page = (int)($_GET['page'] ?? 1);
         $limit = (int)($_GET['limit'] ?? 10);
 
@@ -43,7 +43,7 @@ class BankController extends BaseController
     public function deposit(): string
     {
         header('Content-Type: application/json');
-        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
         $amount = (int)($_POST['amount'] ?? 0);
 
         try {
@@ -56,7 +56,7 @@ class BankController extends BaseController
     public function withdraw(): string
     {
         header('Content-Type: application/json');
-        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
         $amount = (int)($_POST['amount'] ?? 0);
 
         try {

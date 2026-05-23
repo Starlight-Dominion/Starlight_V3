@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
+use sdo\Models\BankTransaction;
 use sdo\Services\LogService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
@@ -18,13 +19,12 @@ class BankService
 
     public function getTransactions(int $dominionId, int $page, int $limit): array
     {
-        $query = Capsule::table('bank_transactions')
-            ->where('kingdom_id', $dominionId)
+        $query = BankTransaction::where('kingdom_id', $dominionId)
             ->orderBy('created_at', 'desc');
 
         $total = $query->count();
         $offset = ($page - 1) * $limit;
-        $items = $query->offset($offset)->limit($limit)->get()->toArray();
+        $items = $query->offset($offset)->limit($limit)->get();
 
         return [
             'transactions' => $items,
@@ -55,11 +55,10 @@ class BankService
             $dom->last_deposit_timestamp = new DateTime();
             $dom->save();
 
-            Capsule::table('bank_transactions')->insert([
+            BankTransaction::create([
                 'kingdom_id' => $domId,
                 'transaction_type' => 'deposit',
-                'amount' => $amount,
-                'created_at' => (new DateTime())->format('Y-m-d H:i:s')
+                'amount' => $amount
             ]);
 
             // Comprehensive Logging
@@ -96,11 +95,10 @@ class BankService
             $dom->credits += $amount;
             $dom->save();
 
-            Capsule::table('bank_transactions')->insert([
+            BankTransaction::create([
                 'kingdom_id' => $domId,
                 'transaction_type' => 'withdraw',
-                'amount' => $amount,
-                'created_at' => (new DateTime())->format('Y-m-d H:i:s')
+                'amount' => $amount
             ]);
 
             // Comprehensive Logging

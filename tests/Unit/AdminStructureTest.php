@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
@@ -62,7 +64,7 @@ class AdminStructureTest extends TestCase
         
         $all = $adminService->getAllStructures();
         $this->assertCount(1, $all);
-        $this->assertEquals('test_bldg', $all[0]->slug);
+        $this->assertEquals('test_bldg', $all[0]['slug']);
     }
 
     public function testUpdateStructureLevelBuffs(): void
@@ -77,7 +79,7 @@ class AdminStructureTest extends TestCase
             'buff_offense' => 0
         ]);
 
-        $res = $adminService->updateStructureLevel($sId, 1, ['buff_offense' => 50, 'cost' => 5000]);
+        $res = $adminService->updateStructureLevel((int)$sId, 1, ['buff_offense' => 50, 'cost' => 5000]);
         $this->assertTrue($res);
 
         $level = Capsule::table('structure_levels')->where('structure_id', $sId)->where('level', 1)->first();

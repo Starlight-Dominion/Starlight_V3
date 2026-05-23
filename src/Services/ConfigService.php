@@ -3,8 +3,7 @@ declare(strict_types=1);
 
 namespace sdo\Services;
 
-use Illuminate\Database\Capsule\Manager as Capsule;
-use Exception;
+use sdo\Models\GameSetting;
 
 class ConfigService
 {
@@ -13,7 +12,7 @@ class ConfigService
      */
     public function get(string $key, mixed $default = null): mixed
     {
-        $setting = Capsule::table('game_settings')->where('setting_key', $key)->first();
+        $setting = GameSetting::find($key);
         
         if (!$setting) {
             return $default;
@@ -34,9 +33,9 @@ class ConfigService
      */
     public function set(string $key, mixed $value): void
     {
-        Capsule::table('game_settings')->updateOrInsert(
+        GameSetting::updateOrCreate(
             ['setting_key' => $key],
-            ['setting_value' => (string)$value, 'updated_at' => date('Y-m-d H:i:s')]
+            ['setting_value' => (string)$value]
         );
     }
 
@@ -45,6 +44,6 @@ class ConfigService
      */
     public function getAll(): array
     {
-        return Capsule::table('game_settings')->get()->toArray();
+        return GameSetting::all()->toArray();
     }
 }

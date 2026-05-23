@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\User;
-use sdo\Models\Kingdom;
+use sdo\Models\Dominion;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 use DateTime;
@@ -19,18 +19,18 @@ class SettingsService
     public function updateIdentity(int $userId, string $newHandle, string $newEmail): array
     {
         $user = User::findOrFail($userId);
-        $kingdom = $user->kingdom;
+        $dominion = $user->dominion;
 
         if ($user->username !== $newHandle) {
             if (User::where('username', $newHandle)->exists()) {
                 throw new Exception("Identity handle '{$newHandle}' is already claimed.");
             }
             
-            if ($kingdom->gold < self::HANDLE_CHANGE_COST) {
+            if ($dominion->credits < self::HANDLE_CHANGE_COST) {
                 throw new Exception("Insufficient credits for handle re-assignment. Required: 1,000,000 CP.");
             }
 
-            $kingdom->gold -= self::HANDLE_CHANGE_COST;
+            $dominion->credits -= self::HANDLE_CHANGE_COST;
             $user->username = $newHandle;
             $user->handle_last_changed = new DateTime();
         }
@@ -42,9 +42,9 @@ class SettingsService
             $user->email = $newEmail;
         }
 
-        Capsule::transaction(function() use ($user, $kingdom) {
+        Capsule::transaction(function() use ($user, $dominion) {
             $user->save();
-            $kingdom->save();
+            $dominion->save();
         });
 
         return ['success' => true, 'message' => "Identity profiles synchronized."];

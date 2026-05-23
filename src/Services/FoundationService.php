@@ -4,7 +4,11 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
-use sdo\Models\User;
+use sdo\Models\Structure;
+use sdo\Models\StructureLevel;
+use sdo\Models\DominionStructure;
+use sdo\Models\DominionManpower;
+use sdo\Models\Unit;
 use sdo\Services\LogService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
@@ -17,10 +21,8 @@ class FoundationService
     {
         $dominion = Dominion::with(['user', 'race'])->findOrFail($dominionId);
         
-        // Fetch all structure types and the dominion's current levels
-        $structures = Capsule::table('structures')->get();
-        $progress = Capsule::table('dominion_structures')
-            ->where('dominion_id', $dominionId)
+        $structures = Structure::all();
+        $progress = DominionStructure::where('dominion_id', $dominionId)
             ->get()
             ->keyBy('structure_id');
 
@@ -29,8 +31,7 @@ class FoundationService
             $currentLevel = $progress->has($s->id) ? $progress->get($s->id)->level : 0;
             $nextLevel = $currentLevel + 1;
             
-            $levelData = Capsule::table('structure_levels')
-                ->where('structure_id', $s->id)
+            $levelData = StructureLevel::where('structure_id', $s->id)
                 ->where('level', $nextLevel)
                 ->first();
 
@@ -89,15 +90,13 @@ class FoundationService
             }
 
             // 2. Determine next level
-            $current = Capsule::table('dominion_structures')
-                ->where('dominion_id', $dominionId)
+            $current = DominionStructure::where('dominion_id', $dominionId)
                 ->where('structure_id', $structureId)
                 ->first();
             
             $nextLevel = ($current ? $current->level : 0) + 1;
 
-            $levelData = Capsule::table('structure_levels')
-                ->where('structure_id', $structureId)
+            $levelData = StructureLevel::where('structure_id', $structureId)
                 ->where('level', $nextLevel)
                 ->first();
 
@@ -107,7 +106,7 @@ class FoundationService
             // 3. Apply Upgrade
             $dominion->credits -= $levelData->cost;
             
-            Capsule::table('dominion_structures')->updateOrInsert(
+            DominionStructure::updateOrInsert(
                 ['dominion_id' => $dominionId, 'structure_id' => $structureId],
                 ['level' => $nextLevel]
             );
@@ -148,11 +147,12 @@ class FoundationService
 
         foreach ($mapping as $slug => $qty) {
             if ($qty > 0) {
-                Capsule::table('dominion_manpower')
-                    ->join('units', 'dominion_manpower.unit_id', '=', 'units.id')
-                    ->where('dominion_manpower.dominion_id', $domId)
-                    ->where('units.slug', $slug)
-                    ->increment('total_quantity', $qty);
+                $unit = Unit::where('slug', $slug)->first();
+                if ($unit) {
+                    DominionManpower::where('dominion_id', $domId)
+                        ->where('unit_id', $unit->id)
+                        ->increment('total_quantity', $qty);
+                }
             }
         }
     }

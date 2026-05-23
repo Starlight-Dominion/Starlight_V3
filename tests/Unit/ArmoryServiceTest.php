@@ -5,6 +5,7 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use sdo\Services\ArmoryService;
+use sdo\Services\LogService;
 use sdo\Models\Dominion;
 use sdo\Models\User;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -13,6 +14,7 @@ use Exception;
 class ArmoryServiceTest extends TestCase
 {
     private ArmoryService $armoryService;
+    private $logMock;
 
     protected function setUp(): void
     {
@@ -29,6 +31,17 @@ class ArmoryServiceTest extends TestCase
         $capsule->bootEloquent();
 
         // 2. Build Schema
+        $this->createSchema();
+
+        // 3. Populate Seed Data
+        $this->seedData();
+
+        $this->logMock = $this->createMock(LogService::class);
+        $this->armoryService = new ArmoryService($this->logMock);
+    }
+
+    private function createSchema(): void
+    {
         $schema = Capsule::schema();
         
         $schema->create('users', function($table) {
@@ -90,6 +103,7 @@ class ArmoryServiceTest extends TestCase
             $table->integer('dominion_id');
             $table->integer('unit_id');
             $table->integer('total_quantity');
+            $table->primary(['dominion_id', 'unit_id']);
         });
 
         $schema->create('structures', function($table) {
@@ -101,9 +115,12 @@ class ArmoryServiceTest extends TestCase
             $table->integer('structure_id');
             $table->integer('level');
             $table->integer('cost');
+            $table->primary(['structure_id', 'level']);
         });
+    }
 
-        // 3. Populate Seed Data
+    private function seedData(): void
+    {
         Capsule::table('users')->insert(['id' => 1, 'username' => 'TestLord']);
         Capsule::table('dominions')->insert([
             'id' => 1, 
@@ -126,8 +143,6 @@ class ArmoryServiceTest extends TestCase
 
         Capsule::table('structures')->insert(['id' => 3, 'slug' => 'armory']);
         Capsule::table('structure_levels')->insert(['structure_id' => 3, 'level' => 2, 'cost' => 210000]);
-
-        $this->armoryService = new ArmoryService();
     }
 
     public function test_get_armory_data_retrieves_complete_structure(): void

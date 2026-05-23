@@ -35,12 +35,12 @@ class GameService
         return $interval - $secondsIntoCurrentTick;
     }
 
-    public function getKingdomByUserId(int $userId): ?Dominion
+    public function getDominionByUserId(int $userId): ?Dominion
     {
         return Dominion::with(['user', 'race'])->where('user_id', $userId)->first();
     }
 
-    public function getKingdomById(int $id): ?Dominion
+    public function getDominionById(int $id): ?Dominion
     {
         return Dominion::with(['user', 'race'])->find($id);
     }
@@ -62,8 +62,7 @@ class GameService
      */
     public function getEconomyMultiplier(int $dominionId): float
     {
-        $totalBuff = (float)Capsule::table('dominion_structures')
-            ->join('structure_levels', function($join) {
+        $totalBuff = (float)\sdo\Models\DominionStructure::join('structure_levels', function($join) {
                 $join->on('dominion_structures.structure_id', '=', 'structure_levels.structure_id')
                      ->on('dominion_structures.level', '=', 'structure_levels.level');
             })

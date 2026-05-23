@@ -8,6 +8,7 @@ use sdo\Services\AdvisorService;
 use sdo\Services\SettingsService;
 use sdo\Services\AuthService;
 use sdo\Services\ConfigService;
+use sdo\Services\ApiService;
 
 class SettingsController extends BaseController
 {
@@ -16,7 +17,8 @@ class SettingsController extends BaseController
         AdvisorService $advisorService,
         ConfigService $configService,
         AuthService $authService,
-        private SettingsService $settingsService
+        private SettingsService $settingsService,
+        private ApiService $apiService
     ) {
         parent::__construct($gameService, $advisorService, $configService, $authService);
     }
@@ -27,25 +29,24 @@ class SettingsController extends BaseController
             $this->redirect('/login');
         }
 
-        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
         
         // Fetch API Status
-        $apiService = new \sdo\Services\ApiService();
-        $apiApp = $apiService->getUserApplication((int)$_SESSION['user_id']);
+        $apiApp = $this->apiService->getUserApplication((int)$_SESSION['user_id']);
         $apiStatus = null;
         if ($apiApp) {
             $apiStatus = [
                 'status' => $apiApp->status,
-                'keys' => $apiApp->status === 'approved' ? $apiService->getUserKeys((int)$_SESSION['user_id']) : []
+                'keys' => $apiApp->status === 'approved' ? $this->apiService->getUserKeys((int)$_SESSION['user_id']) : []
             ];
         }
 
         return $this->render('settings/index', [
             'title' => 'System Settings',
             'user_profile' => [
-                'avatar' => $kingdom->user->avatar_path ?? '',
-                'email' => $kingdom->user->email,
-                'stasis_until' => $kingdom->user->stasis_until?->format('Y-m-d H:i:s'),
+                'avatar' => $dominion->user->avatar_path ?? '',
+                'email' => $dominion->user->email,
+                'stasis_until' => $dominion->user->stasis_until?->format('Y-m-d H:i:s'),
                 'api_status' => $apiStatus
             ]
         ]);
@@ -54,8 +55,7 @@ class SettingsController extends BaseController
     public function applyForApi(): string
     {
         return $this->jsonResponse(function() {
-            $apiService = new \sdo\Services\ApiService();
-            return $apiService->submitApplication(
+            return $this->apiService->submitApplication(
                 (int)$_SESSION['user_id'],
                 (string)($_POST['project_name'] ?? ''),
                 (string)($_POST['justification'] ?? '')

@@ -9,7 +9,8 @@ use sdo\Services\ConfigService;
 use sdo\Services\AuthService;
 use sdo\Services\BattlefieldService;
 use sdo\Services\FoundationService;
-use Illuminate\Database\Capsule\Manager as Capsule;
+use sdo\Models\DominionManpower;
+use sdo\Models\DominionStructure;
 
 class ApiController extends BaseController
 {
@@ -86,11 +87,14 @@ class ApiController extends BaseController
         $dom = $this->getDominion($vars);
         if (!$dom) return json_encode(['success' => false, 'message' => 'Sector not found.']);
 
-        $units = Capsule::table('dominion_manpower')
-            ->join('units', 'dominion_manpower.unit_id', '=', 'units.id')
+        $units = DominionManpower::with('unit')
             ->where('dominion_id', $dom->id)
-            ->select('units.name', 'units.slug', 'dominion_manpower.total_quantity')
-            ->get();
+            ->get()
+            ->map(fn($m) => [
+                'slug' => $m->unit->slug,
+                'name' => $m->unit->name,
+                'quantity' => (int)$m->total_quantity
+            ]);
 
         return json_encode([
             'success' => true,
@@ -107,17 +111,19 @@ class ApiController extends BaseController
         $dom = $this->getDominion($vars);
         if (!$dom) return json_encode(['success' => false, 'message' => 'Sector not found.']);
 
-        $state = $this->foundationService->getFoundationState($dom->id);
-        
-        $structures = [];
-        foreach ($state['structures'] as $slug => $data) {
-            $structures[] = [
-                'slug' => $slug,
-                'name' => $data['name'],
-                'current_level' => $data['current_level'],
-                'max_level' => $data['max_level']
-            ];
-        }
+        $structures = DominionStructure::with(['structure', 'levelData'])
+            ->where('dominion_id', $dom->id)
+            ->get()
+            ->map(fn($s) => [
+                'slug' => $s->structure->slug,
+                'name' => $s->structure->name,
+                'current_level' => (int)$s->level,
+                'buffs' => [
+                    'economy' => (int)($s->levelData->buff_economy ?? 0),
+                    'offense' => (int)($s->levelData->buff_offense ?? 0),
+                    'defense' => (int)($s->levelData->buff_defense ?? 0)
+                ]
+            ]);
 
         return json_encode([
             'success' => true,

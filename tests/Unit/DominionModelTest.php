@@ -3,11 +3,11 @@
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use sdo\Models\Kingdom;
+use sdo\Models\Dominion;
 use sdo\Models\User;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
-class KingdomModelTest extends TestCase
+class DominionModelTest extends TestCase
 {
     protected function setUp(): void
     {
@@ -31,16 +31,19 @@ class KingdomModelTest extends TestCase
             $table->timestamps();
         });
 
-        Capsule::schema()->create('kingdoms', function ($table) {
+        Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id')->unsigned();
-            $table->string('kingdom_name');
-            $table->integer('gold')->default(1000);
-            $table->integer('citizens')->default(50);
+            $table->integer('race_id')->unsigned()->nullable();
+            $table->string('name')->unique();
+            $table->bigInteger('credits')->default(10000);
+            $table->bigInteger('credits_banked')->default(0);
+            $table->integer('citizens')->default(500);
             $table->integer('turns')->default(100);
-            $table->integer('miners')->default(0);
             $table->integer('xp')->default(0);
-            $table->timestamp('last_tick')->nullable();
+            $table->bigInteger('foundation_hp')->default(1000);
+            $table->bigInteger('foundation_max_hp')->default(1000);
+            $table->datetime('last_tick')->nullable();
             $table->timestamps();
         });
     }
@@ -53,76 +56,74 @@ class KingdomModelTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $kingdom = $user->kingdom()->create([
-            'kingdom_name' => 'Test Kingdom',
+        $dominion = $user->dominion()->create([
+            'name' => 'Test Dominion',
         ]);
 
-        $this->assertInstanceOf(User::class, $kingdom->user);
-        $this->assertEquals('testuser', $kingdom->user->username);
+        $this->assertInstanceOf(User::class, $dominion->user);
+        $this->assertEquals('testuser', $dominion->user->username);
     }
 
     public function testGetPlayerLevelLevel1(): void
     {
-        $kingdom = Kingdom::create([
+        $dominion = Dominion::create([
             'user_id' => 1,
-            'kingdom_name' => 'Test',
+            'name' => 'Test',
             'xp' => 0,
         ]);
 
-        $this->assertEquals(1, $kingdom->getPlayerLevel());
+        $this->assertEquals(1, $dominion->getPlayerLevel());
     }
 
     public function testGetPlayerLevelGrowth(): void
     {
-        $kingdom = Kingdom::create([
+        $dominion = Dominion::create([
             'user_id' => 1,
-            'kingdom_name' => 'Test',
+            'name' => 'Test',
             'xp' => 10000,
         ]);
 
         // floor(sqrt(10000 / 100)) + 1 = floor(10) + 1 = 11
-        $this->assertEquals(11, $kingdom->getPlayerLevel());
+        $this->assertEquals(11, $dominion->getPlayerLevel());
     }
 
     public function testGetPlayerLevelIntermediate(): void
     {
-        $kingdom = Kingdom::create([
+        $dominion = Dominion::create([
             'user_id' => 1,
-            'kingdom_name' => 'Test',
+            'name' => 'Test',
             'xp' => 300,
         ]);
 
         // floor(sqrt(300 / 100)) + 1 = floor(1.73) + 1 = 2
-        $this->assertEquals(2, $kingdom->getPlayerLevel());
+        $this->assertEquals(2, $dominion->getPlayerLevel());
     }
 
     public function testCastsWorkCorrectly(): void
     {
-        $kingdom = Kingdom::create([
+        $dominion = Dominion::create([
             'user_id' => 1,
-            'kingdom_name' => 'Test',
-            'gold' => '500',
-            'citizens' => '25',
+            'name' => 'Test',
+            'credits' => '5000',
+            'citizens' => '250',
             'turns' => '50',
-            'miners' => '10',
             'xp' => '100',
         ]);
 
-        $this->assertIsInt($kingdom->gold);
-        $this->assertIsInt($kingdom->citizens);
-        $this->assertIsInt($kingdom->turns);
-        $this->assertIsInt($kingdom->miners);
-        $this->assertIsInt($kingdom->xp);
+        $this->assertIsInt($dominion->credits);
+        $this->assertIsInt($dominion->citizens);
+        $this->assertIsInt($dominion->turns);
+        $this->assertIsInt($dominion->xp);
     }
 
     public function testDateTimeCasts(): void
     {
-        $kingdom = Kingdom::create([
+        $dominion = Dominion::create([
             'user_id' => 1,
-            'kingdom_name' => 'Test',
+            'name' => 'Test',
         ]);
 
-        $this->assertInstanceOf(\DateTime::class, $kingdom->created_at);
-        $this->assertInstanceOf(\DateTime::class, $kingdom->updated_at);
+        $this->assertInstanceOf(\DateTime::class, $dominion->created_at);
+        $this->assertInstanceOf(\DateTime::class, $dominion->updated_at);
     }
 }

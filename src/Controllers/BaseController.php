@@ -34,20 +34,20 @@ abstract class BaseController
         $userData = null;
 
         if (isset($_SESSION['user_id'])) {
-            $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
             if ($dominion) {
-                $advice = $this->advisorService->getContextualAdviceFromKingdom($dominion->toArray());
+                $advice = $this->advisorService->getContextualAdviceFromDominion($dominion);
                 $vm = new GameStateViewModel(
                     $dominion,
                     $this->gameService,
                     $advice,
-                    $_SESSION['username'] ?? 'Unknown Lord',
+                    $_SESSION['username'] ?? 'Unknown Commander',
                     $_SESSION['advisor_history'] ?? []
                 );
 
                 $userData = [
                     'username' => $vm->username,
-                    'kingdomName' => $vm->kingdomName,
+                    'dominionName' => $vm->kingdomName,
                     'raceName' => $vm->raceName,
                     'level' => $vm->level,
                     'xpProgress' => $vm->xpProgress,
@@ -56,7 +56,7 @@ abstract class BaseController
                     'secondsToNextTick' => $vm->secondsToNextTick,
                     'citizen_growth_rate' => (int)$this->configService->get('baseline_citizens_per_tick', 50),
                     'is_admin' => $this->authService->isAdmin($dominion->user),
-                    'kingdom' => $dominion->toArray(),
+                    'dominion' => $dominion->toArray(),
                     'avatar_path' => $dominion->user->avatar_path,
                     'advisorHistory' => $vm->advisorHistory
                 ];

@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
+use sdo\Models\Unit;
+use sdo\Models\DominionManpower;
 use sdo\Services\LogService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
@@ -14,7 +16,7 @@ class TrainingService
 
     public function getUnitConfig(): array
     {
-        return Capsule::table('units')->orderBy('cost_credits', 'asc')->get()->keyBy('slug')->toArray();
+        return Unit::orderBy('cost_credits', 'asc')->get()->keyBy('slug')->toArray();
     }
 
     public function train(int $dominionId, string $unitSlug, int $quantity): array
@@ -24,7 +26,7 @@ class TrainingService
 
         return Capsule::transaction(function() use ($dominionId, $unitSlug, $quantity, $units) {
             $dom = Dominion::lockForUpdate()->find($dominionId);
-            $unit = $units[$unitSlug];
+            $unit = (object)$units[$unitSlug]; // Cast to object for property access if keyBy returns array of arrays
 
             $cost = $unit->cost_credits * $quantity;
             $citizens = $unit->cost_citizens * $quantity;
@@ -39,10 +41,21 @@ class TrainingService
             $dom->turns -= $turns;
             $dom->save();
 
-            Capsule::table('dominion_manpower')
-                ->where('dominion_id', $dominionId)
+            $exists = DominionManpower::where('dominion_id', $dominionId)
                 ->where('unit_id', $unit->id)
-                ->increment('total_quantity', $quantity);
+                ->exists();
+
+            if ($exists) {
+                DominionManpower::where('dominion_id', $dominionId)
+                    ->where('unit_id', $unit->id)
+                    ->increment('total_quantity', $quantity);
+            } else {
+                DominionManpower::create([
+                    'dominion_id' => $dominionId,
+                    'unit_id' => $unit->id,
+                    'total_quantity' => $quantity
+                ]);
+            }
 
             $this->logService->log(
                 $dominionId,

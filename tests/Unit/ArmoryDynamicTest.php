@@ -4,12 +4,15 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use sdo\Services\ArmoryService;
-use sdo\Models\Kingdom;
+use sdo\Services\LogService;
+use sdo\Models\Dominion;
 use sdo\Models\User;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class ArmoryDynamicTest extends TestCase
 {
+    private $logMock;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -18,6 +21,8 @@ class ArmoryDynamicTest extends TestCase
         $capsule->setAsGlobal();
         $capsule->bootEloquent();
         $this->createTables();
+
+        $this->logMock = $this->createMock(LogService::class);
     }
 
     private function createTables(): void
@@ -31,17 +36,15 @@ class ArmoryDynamicTest extends TestCase
             $table->timestamps();
         });
 
-        Capsule::schema()->create('kingdoms', function ($table) {
+        Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id');
-            $table->string('kingdom_name');
-            $table->integer('gold')->default(1000);
+            $table->string('name');
+            $table->bigInteger('credits')->default(1000);
             $table->integer('citizens')->default(50);
             $table->integer('turns')->default(100);
             $table->integer('xp')->default(0);
-            $table->integer('foundation_level')->default(1);
             $table->integer('armory_level')->default(1);
-            $table->integer('unit_soldiers')->default(0);
             $table->timestamps();
         });
 
@@ -67,7 +70,6 @@ class ArmoryDynamicTest extends TestCase
             $table->string('name');
             $table->string('unit_type');
             $table->integer('cost');
-            $table->string('requirement_slug')->nullable();
             $table->integer('armory_level_req')->default(0);
             $table->integer('attack_bonus')->default(0);
             $table->integer('defense_bonus')->default(0);
@@ -80,15 +82,23 @@ class ArmoryDynamicTest extends TestCase
             $table->primary(['kingdom_id', 'item_id']);
         });
 
-        Capsule::schema()->create('hidden_armory_items', function ($table) {
-            $table->integer('kingdom_id');
-            $table->integer('item_id');
-            $table->primary(['kingdom_id', 'item_id']);
+        Capsule::schema()->create('units', function ($table) {
+            $table->increments('id');
+            $table->string('slug');
         });
 
-        Capsule::schema()->create('armory_upgrades', function ($table) {
-            $table->integer('level')->primary();
-            $table->bigInteger('cost');
+        Capsule::schema()->create('dominion_manpower', function ($table) {
+            $table->integer('dominion_id');
+            $table->integer('unit_id');
+            $table->integer('total_quantity');
+            $table->primary(['dominion_id', 'unit_id']);
+        });
+        
+        Capsule::schema()->create('structure_levels', function ($table) {
+            $table->integer('structure_id');
+            $table->integer('level');
+            $table->integer('cost');
+            $table->primary(['structure_id', 'level']);
         });
     }
 
@@ -103,10 +113,10 @@ class ArmoryDynamicTest extends TestCase
 
         // 2. Setup User
         $user = User::create(['username' => 'u', 'email' => 'e', 'password' => 'p']);
-        $kingdom = $user->kingdom()->create(['kingdom_name' => 'K', 'armory_level' => 1]);
+        $dominion = $user->dominion()->create(['name' => 'K', 'armory_level' => 1]);
 
-        $service = new ArmoryService();
-        $data = $service->getArmoryData($kingdom->id);
+        $service = new ArmoryService($this->logMock);
+        $data = $service->getArmoryData($dominion->id);
 
         $this->assertArrayHasKey('soldiers', $data['loadouts']);
         $this->assertArrayHasKey('weapon', $data['loadouts']['soldiers']['categories']);
@@ -114,32 +124,30 @@ class ArmoryDynamicTest extends TestCase
         $this->assertEquals('Sword', $data['loadouts']['soldiers']['categories']['weapon']['items']['sword']['name']);
     }
 
-    public function testUnlockLogicWithDynamicPrerequisites(): void
+    public function testUnlockLogicWithArmoryLevel(): void
     {
         $utId = Capsule::table('armory_unit_types')->insertGetId(['slug' => 'soldiers', 'name' => 'S', 'title' => 'T']);
         $catId = Capsule::table('armory_categories')->insertGetId(['unit_type_id' => $utId, 'slug' => 'w', 'name' => 'W']);
         
-        $pId = Capsule::table('armory_items')->insertGetId([
-            'category_id' => $catId, 'slug' => 'pre', 'name' => 'Prereq', 'cost' => 10, 'unit_type' => 'soldiers'
-        ]);
         Capsule::table('armory_items')->insert([
-            'category_id' => $catId, 'slug' => 'adv', 'name' => 'Advanced', 'cost' => 50, 'unit_type' => 'soldiers', 'requirement_slug' => 'pre'
+            'category_id' => $catId, 'slug' => 'adv', 'name' => 'Advanced', 'cost' => 50, 'unit_type' => 'soldiers', 'armory_level_req' => 2
         ]);
 
         $user = User::create(['username' => 'u', 'email' => 'e', 'password' => 'p']);
-        $kingdom = $user->kingdom()->create(['kingdom_name' => 'K', 'armory_level' => 1]);
+        $dominion = $user->dominion()->create(['name' => 'K', 'armory_level' => 1]);
 
-        $service = new ArmoryService();
+        $service = new ArmoryService($this->logMock);
         
-        // Initially, Advanced should be locked
-        $data = $service->getArmoryData($kingdom->id);
+        // Initially, Advanced should be locked (Req 2, Level 1)
+        $data = $service->getArmoryData($dominion->id);
         $this->assertFalse($data['loadouts']['soldiers']['categories']['w']['items']['adv']['unlocked']);
 
-        // Give player the prerequisite
-        Capsule::table('kingdom_armory_items')->insert(['kingdom_id' => $kingdom->id, 'item_id' => $pId, 'quantity' => 1]);
+        // Upgrade Armory Level
+        $dominion->armory_level = 2;
+        $dominion->save();
 
         // Now, Advanced should be unlocked
-        $data = $service->getArmoryData($kingdom->id);
+        $data = $service->getArmoryData($dominion->id);
         $this->assertTrue($data['loadouts']['soldiers']['categories']['w']['items']['adv']['unlocked']);
     }
 }

@@ -4,15 +4,53 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use sdo\Controllers\HomeController;
+use sdo\Services\GameService;
+use sdo\Services\AdvisorService;
+use sdo\Services\ConfigService;
+use sdo\Services\AuthService;
+use sdo\Models\User;
+use Illuminate\Database\Capsule\Manager as Capsule;
 
 class HomeControllerTest extends TestCase
 {
-    public function testIndexReturnsWelcomeMessage()
-    {
-        $db = new \PDO('sqlite::memory:');
-        $controller = new HomeController($db);
-        $response = $controller->index();
+    private HomeController $controller;
 
-        $this->assertStringContainsString('Shadowreign', $response);
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $capsule = new Capsule();
+        $capsule->addConnection([
+            'driver'   => 'sqlite',
+            'database' => ':memory:',
+            'prefix'   => '',
+        ]);
+        $capsule->setAsGlobal();
+        $capsule->bootEloquent();
+
+        Capsule::schema()->create('users', function ($table) {
+            $table->increments('id');
+            $table->string('username');
+            $table->timestamps();
+        });
+
+        Capsule::schema()->create('battle_logs', function ($table) {
+            $table->increments('id');
+            $table->timestamp('battle_time');
+        });
+
+        $gameService = $this->createMock(GameService::class);
+        $advisorService = $this->createMock(AdvisorService::class);
+        $configService = $this->createMock(ConfigService::class);
+        $authService = $this->createMock(AuthService::class);
+
+        $this->controller = new HomeController($gameService, $advisorService, $configService, $authService);
+    }
+
+    public function testIndexReturnsWelcomeMessage(): void
+    {
+        $response = $this->controller->index();
+        $this->assertIsString($response);
+        $this->assertStringContainsString('Starlight Dominion', $response);
     }
 }

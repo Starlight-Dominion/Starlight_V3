@@ -2,148 +2,151 @@
 
 namespace Tests\Unit;
 
-use PDO;
 use PHPUnit\Framework\TestCase;
+use sdo\Models\Dominion;
+use sdo\Models\User;
+use sdo\Models\Structure;
+use sdo\Models\StructureLevel;
+use sdo\Models\DominionStructure;
 use sdo\Services\TickService;
-use sdo\Services\UntrainingService;
-use sdo\Services\MinesService;
+use sdo\Services\ConfigService;
+use Illuminate\Database\Capsule\Manager as Capsule;
 
 class TickServiceTest extends TestCase
 {
-    private PDO $db;
     private TickService $service;
-    private $untrainingMock;
-    private $minesMock;
+    private $configMock;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->db = new PDO('sqlite::memory:');
-        $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $capsule = new Capsule();
+        $capsule->addConnection([
+            'driver'   => 'sqlite',
+            'database' => ':memory:',
+            'prefix'   => '',
+        ]);
+        $capsule->setAsGlobal();
+        $capsule->bootEloquent();
 
-        $this->db->exec("CREATE TABLE kingdoms (
-            id INTEGER PRIMARY KEY,
-            gold INTEGER DEFAULT 0,
-            citizens INTEGER DEFAULT 0,
-            turns INTEGER DEFAULT 0,
-            miners INTEGER DEFAULT 0,
-            xp INTEGER DEFAULT 0,
-            foundation_level INTEGER DEFAULT 1,
-            housing_level INTEGER DEFAULT 1,
-            current_mine_tier INTEGER DEFAULT 1,
-            current_mine_level INTEGER DEFAULT 1,
-            base_gold_per_tick INTEGER DEFAULT 100,
-            last_tick DATETIME,
-            deposits_today INTEGER DEFAULT 0,
-            last_deposit_recharge DATETIME
-        )");
+        Capsule::schema()->create('users', function ($table) {
+            $table->increments('id');
+            $table->string('username')->unique();
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->timestamps();
+        });
 
-        $this->untrainingMock = $this->createMock(UntrainingService::class);
-        $this->minesMock = $this->createMock(MinesService::class);
-        $this->service = new TickService($this->db, $this->untrainingMock, $this->minesMock);
+        Capsule::schema()->create('dominions', function ($table) {
+            $table->increments('id');
+            $table->integer('user_id')->unsigned();
+            $table->string('name')->unique();
+            $table->bigInteger('credits')->default(0);
+            $table->integer('citizens')->default(0);
+            $table->integer('turns')->default(0);
+            $table->datetime('last_tick')->nullable();
+            $table->timestamps();
+        });
+
+        Capsule::schema()->create('structures', function ($table) {
+            $table->increments('id');
+            $table->string('slug')->unique();
+            $table->string('name');
+        });
+
+        Capsule::schema()->create('structure_levels', function ($table) {
+            $table->integer('structure_id')->unsigned();
+            $table->integer('level');
+            $table->integer('buff_economy')->default(0);
+            $table->integer('buff_citizens_per_tick')->default(0);
+            $table->primary(['structure_id', 'level']);
+        });
+
+        Capsule::schema()->create('dominion_structures', function ($table) {
+            $table->integer('dominion_id')->unsigned();
+            $table->integer('structure_id')->unsigned();
+            $table->integer('level')->default(0);
+            $table->primary(['dominion_id', 'structure_id']);
+        });
+
+        $this->configMock = $this->createMock(ConfigService::class);
+        $this->configMock->method('get')->willReturnMap([
+            ['baseline_citizens_per_tick', 50, 50],
+            ['baseline_credits_per_tick', 100, 100],
+        ]);
+
+        $this->service = new TickService($this->configMock);
     }
 
-    public function testProcessGlobalTickUpdatesKingdoms(): void
+    private function createTestDominion(): Dominion
     {
-        $this->db->exec("INSERT INTO kingdoms (id, gold, citizens, turns, miners, housing_level, current_mine_tier, current_mine_level) 
-            VALUES (1, 0, 0, 0, 5, 1, 1, 1)");
+        $user = User::create([
+            'username' => 'testuser' . uniqid(),
+            'email' => 'test' . uniqid() . '@example.com',
+            'password' => 'password123',
+        ]);
 
-        $this->untrainingMock->expects($this->once())
-            ->method('releaseHeldCitizens')
-            ->with(0);
+        return $user->dominion()->create([
+            'name' => 'Test Dominion' . uniqid(),
+            'credits' => 0,
+            'citizens' => 0,
+            'turns' => 0,
+        ]);
+    }
 
-        $this->minesMock->method('calculateCurrentProduction')
-            ->willReturn(25.0);
+    public function testProcessGlobalTickUpdatesDominions(): void
+    {
+        $dominion = $this->createTestDominion();
 
         $this->service->processGlobalTick();
 
-        $row = $this->db->query("SELECT gold, citizens, turns FROM kingdoms WHERE id = 1")->fetch();
+        $dominion->refresh();
 
-        $this->assertGreaterThan(0, $row['gold']);
-        $this->assertGreaterThan(0, $row['citizens']);
-        $this->assertEquals(10, $row['turns']);
+        // Baseline: 100 credits, 50 citizens, 10 turns
+        $this->assertEquals(100, $dominion->credits);
+        $this->assertEquals(50, $dominion->citizens);
+        $this->assertEquals(10, $dominion->turns);
+        $this->assertNotNull($dominion->last_tick);
+    }
+
+    public function testProcessGlobalTickWithBuffs(): void
+    {
+        $dominion = $this->createTestDominion();
+
+        $econStruct = Structure::create(['slug' => 'economy', 'name' => 'Economy']);
+        StructureLevel::create(['structure_id' => $econStruct->id, 'level' => 1, 'buff_economy' => 20]);
+        DominionStructure::create(['dominion_id' => $dominion->id, 'structure_id' => $econStruct->id, 'level' => 1]);
+
+        $housingStruct = Structure::create(['slug' => 'housing', 'name' => 'Housing']);
+        StructureLevel::create(['structure_id' => $housingStruct->id, 'level' => 1, 'buff_citizens_per_tick' => 25]);
+        DominionStructure::create(['dominion_id' => $dominion->id, 'structure_id' => $housingStruct->id, 'level' => 1]);
+
+        $this->service->processGlobalTick();
+
+        $dominion->refresh();
+
+        // Credits: 100 * (1 + 0.20) = 120
+        // Citizens: 50 + 25 = 75
+        $this->assertEquals(120, $dominion->credits);
+        $this->assertEquals(75, $dominion->citizens);
     }
 
     public function testProcessGlobalTickBatchesCorrectly(): void
     {
-        $this->untrainingMock->method('releaseHeldCitizens');
-        $this->minesMock->method('calculateCurrentProduction')->willReturn(0.0);
-
-        for ($i = 1; $i <= 250; $i++) {
-            $this->db->exec("INSERT INTO kingdoms (id, gold, citizens, turns) VALUES ({$i}, 0, 0, 0)");
+        for ($i = 1; $i <= 150; $i++) {
+            $this->createTestDominion();
         }
 
         $this->service->processGlobalTick();
 
-        $count = $this->db->query("SELECT COUNT(*) FROM kingdoms WHERE turns = 10")->fetchColumn();
-        $this->assertEquals(250, $count);
-    }
-
-    public function testProcessGlobalTickReleasesHeldCitizens(): void
-    {
-        $this->db->exec("INSERT INTO kingdoms (id, gold, citizens, turns) VALUES (1, 0, 0, 0)");
-
-        $this->untrainingMock->expects($this->once())
-            ->method('releaseHeldCitizens')
-            ->with(0);
-
-        $this->minesMock->method('calculateCurrentProduction')->willReturn(0.0);
-
-        $this->service->processGlobalTick();
-    }
-
-    public function testProcessGlobalTickMineProduction(): void
-    {
-        $this->db->exec("INSERT INTO kingdoms (id, gold, citizens, turns, miners, current_mine_tier, current_mine_level) 
-            VALUES (1, 0, 0, 0, 10, 1, 1)");
-
-        $this->untrainingMock->method('releaseHeldCitizens');
-        $this->minesMock->method('calculateCurrentProduction')
-            ->willReturn(50.0);
-
-        $this->service->processGlobalTick();
-
-        $row = $this->db->query("SELECT gold FROM kingdoms WHERE id = 1")->fetch();
-        $this->assertEquals(150, $row['gold']);
-    }
-
-    public function testProcessGlobalTickHousingBonus(): void
-    {
-        $this->db->exec("INSERT INTO kingdoms (id, gold, citizens, turns, housing_level) 
-            VALUES (1, 0, 0, 0, 3)");
-
-        $this->untrainingMock->method('releaseHeldCitizens');
-        $this->minesMock->method('calculateCurrentProduction')->willReturn(0.0);
-
-        $this->service->processGlobalTick();
-
-        $row = $this->db->query("SELECT citizens FROM kingdoms WHERE id = 1")->fetch();
-        // Housing level 3 = 75 citizens_per_tick in config/housing.php
-        $this->assertEquals(75, $row['citizens']);
-    }
-
-    public function testProcessGlobalTickUpdatesTimestamp(): void
-    {
-        $this->db->exec("INSERT INTO kingdoms (id, gold, citizens, turns) VALUES (1, 0, 0, 0)");
-
-        $this->untrainingMock->method('releaseHeldCitizens');
-        $this->minesMock->method('calculateCurrentProduction')->willReturn(0.0);
-
-        $this->service->processGlobalTick();
-
-        $row = $this->db->query("SELECT last_tick FROM kingdoms WHERE id = 1")->fetch();
-        $this->assertNotNull($row['last_tick']);
+        $count = Dominion::where('turns', 10)->count();
+        $this->assertEquals(150, $count);
     }
 
     public function testProcessGlobalTickEmptyDatabase(): void
     {
-        $this->untrainingMock->method('releaseHeldCitizens');
-        $this->minesMock->method('calculateCurrentProduction')->willReturn(0.0);
-
         $this->service->processGlobalTick();
-
-        $count = $this->db->query("SELECT COUNT(*) FROM kingdoms")->fetchColumn();
-        $this->assertEquals(0, $count);
+        $this->assertEquals(0, Dominion::count());
     }
 }

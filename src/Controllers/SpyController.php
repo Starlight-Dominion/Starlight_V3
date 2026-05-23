@@ -22,38 +22,40 @@ class SpyController extends BaseController
         parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
-public function index(): string
-{
-if (!$this->authService->isLoggedIn($_SESSION)) $this->redirect('/login');
+    public function index(): string
+    {
+        if (!$this->authService->isLoggedIn($_SESSION)) {
+            $this->redirect('/login');
+        }
 
-$kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-$spyIntel = $this->spyService->getSpyIntel($kingdom->id);
-$recruitmentOptions = $this->spyService->getSpyRecruitmentOptions($kingdom->id);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+        $spyIntel = $this->spyService->getSpyIntel($dominion->id);
+        $availableSpies = $this->spyService->getAvailableSpies($dominion->id);
 
-return $this->render('spy/index', [
-'title' => 'Intelligence Operations',
-'spyIntel' => $spyIntel,
-'recruitmentOptions' => $recruitmentOptions,
-'spyCount' => (int)($kingdom->unit_spies ?? 0),
-]);
-}
+        return $this->render('spy/index', [
+            'title' => 'Intelligence Operations',
+            'spyIntel' => $spyIntel,
+            'availableSpies' => $availableSpies,
+            'spyCount' => $availableSpies['available_spies'] ?? 0,
+        ]);
+    }
 
-public function executeReconnaissance(): void
-{
-header('Content-Type: application/json');
-if (!$this->authService->isLoggedIn($_SESSION)) {
-echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-return;
-}
+    public function executeReconnaissance(): void
+    {
+        header('Content-Type: application/json');
+        if (!$this->authService->isLoggedIn($_SESSION)) {
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            return;
+        }
 
-$targetId = (int)($_POST['target_id'] ?? 0);
-$kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $targetId = (int)($_POST['target_id'] ?? 0);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
 
-try {
-$result = $this->spyService->executeReconnaissance($kingdom->id, $targetId);
-echo json_encode($result);
-} catch (\Exception $e) {
-echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-}
-}
+        try {
+            $result = $this->spyService->executeReconnaissance($dominion->id, $targetId);
+            echo json_encode($result);
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
 }

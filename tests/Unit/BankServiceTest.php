@@ -1,111 +1,126 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit;
 
-use PDO;
-use PDOStatement;
 use PHPUnit\Framework\TestCase;
 use sdo\Services\BankService;
+use sdo\Services\LogService;
+use sdo\Models\Dominion;
+use sdo\Models\BankTransaction;
+use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class BankServiceTest extends TestCase
 {
-    private $pdoMock;
-    private $stmtMock;
+    private $logServiceMock;
     private BankService $bankService;
 
     protected function setUp(): void
     {
-        // Create mocks for PDO and PDOStatement
-        $this->pdoMock = $this->createMock(PDO::class);
-        $this->stmtMock = $this->createMock(PDOStatement::class);
-        
-        // Instantiate the service with the mock database connection
-        $this->bankService = new BankService($this->pdoMock);
+        parent::setUp();
+
+        $capsule = new Capsule();
+        $capsule->addConnection([
+            'driver'   => 'sqlite',
+            'database' => ':memory:',
+            'prefix'   => '',
+        ]);
+        $capsule->setAsGlobal();
+        $capsule->bootEloquent();
+
+        $this->createTables();
+
+        $this->logServiceMock = $this->createMock(LogService::class);
+        $this->bankService = new BankService($this->logServiceMock);
     }
 
-    public function testSuccessfulDeposit()
+    private function createTables(): void
     {
-        $kingdomData = [
-            'id' => 1,
-            'gold' => 10000,
-            'gold_in_bank' => 0,
-            'deposits_today' => 0,
-            'last_deposit_recharge' => null
-        ];
-        
-        // Mock the database fetching the kingdom
-        $this->stmtMock->method('fetch')->willReturn($kingdomData);
-        $this->pdoMock->method('prepare')->willReturn($this->stmtMock);
-        
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->stmtMock->expects($this->atLeastOnce())->method('execute');
-        $this->pdoMock->expects($this->once())->method('commit');
+        Capsule::schema()->create('dominions', function ($table) {
+            $table->increments('id');
+            $table->integer('user_id')->default(1);
+            $table->string('name')->unique();
+            $table->bigInteger('credits')->default(10000);
+            $table->bigInteger('credits_banked')->default(0);
+            $table->integer('deposits_today')->default(0);
+            $table->dateTime('last_deposit_timestamp')->nullable();
+            $table->timestamps();
+        });
 
-        $result = $this->bankService->deposit(1, 5000);
+        Capsule::schema()->create('bank_transactions', function ($table) {
+            $table->increments('id');
+            $table->integer('kingdom_id'); // Legacy name in model probably, check model
+            $table->string('transaction_type');
+            $table->bigInteger('amount');
+            $table->timestamps();
+        });
+    }
+
+    public function testSuccessfulDeposit(): void
+    {
+        $dom = Dominion::create(['name' => 'BankTest', 'credits' => 10000]);
+
+        $this->logServiceMock->expects($this->once())->method('log');
+
+        $result = $this->bankService->deposit($dom->id, 5000);
         
         $this->assertTrue($result['success']);
+        
+        $updated = Dominion::find($dom->id);
+        $this->assertEquals(5000, $updated->credits);
+        $this->assertEquals(5000, $updated->credits_banked);
+        $this->assertEquals(1, $updated->deposits_today);
     }
 
-    public function testSuccessfulWithdrawal()
+    public function testSuccessfulWithdrawal(): void
     {
-        $kingdomData = ['gold_in_bank' => 5000];
+        $dom = Dominion::create(['name' => 'WithdrawTest', 'credits' => 0, 'credits_banked' => 5000]);
 
-        $this->stmtMock->method('fetchColumn')->willReturn($kingdomData['gold_in_bank']);
-        $this->pdoMock->method('prepare')->willReturn($this->stmtMock);
+        $this->logServiceMock->expects($this->once())->method('log');
 
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->stmtMock->expects($this->atLeastOnce())->method('execute');
-        $this->pdoMock->expects($this->once())->method('commit');
-
-        $result = $this->bankService->withdraw(1, 2000);
+        $result = $this->bankService->withdraw($dom->id, 2000);
 
         $this->assertTrue($result['success']);
+        
+        $updated = Dominion::find($dom->id);
+        $this->assertEquals(2000, $updated->credits);
+        $this->assertEquals(3000, $updated->credits_banked);
     }
 
-    public function testDepositFailsWhenOverEightyPercent()
+    public function testDepositFailsWhenOverEightyPercent(): void
     {
-        $kingdomData = ['id' => 1, 'gold' => 1000, 'deposits_today' => 0, 'last_deposit_recharge' => null];
-        
-        $this->stmtMock->method('fetch')->willReturn($kingdomData);
-        $this->pdoMock->method('prepare')->willReturn($this->stmtMock);
+        $dom = Dominion::create(['name' => 'EightyPercentTest', 'credits' => 1000]);
 
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('rollBack');
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Security Protocol: Cannot deposit more than 80% of liquid assets.");
 
-        $result = $this->bankService->deposit(1, 801); // 80.1%
-
-        $this->assertFalse($result['success']);
-        $this->assertEquals("You cannot deposit more than 80% of your on-hand gold.", $result['message']);
+        $this->bankService->deposit($dom->id, 801);
     }
 
-    public function testDepositFailsWhenDepositLimitExceeded()
+    public function testDepositFailsWhenDepositLimitExceeded(): void
     {
-        $kingdomData = ['id' => 1, 'gold' => 10000, 'deposits_today' => 4, 'last_deposit_recharge' => date('Y-m-d H:i:s')];
-        
-        $this->stmtMock->method('fetch')->willReturn($kingdomData);
-        $this->pdoMock->method('prepare')->willReturn($this->stmtMock);
+        $dom = Dominion::create([
+            'name' => 'LimitTest', 
+            'credits' => 10000, 
+            'deposits_today' => 6, 
+            'last_deposit_timestamp' => new \DateTime()
+        ]);
 
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('rollBack');
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Bank Vault Locked: Daily deposit frequency exceeded. Cooldown active.");
 
-        $result = $this->bankService->deposit(1, 1000);
-
-        $this->assertFalse($result['success']);
-        $this->assertEquals("You have no available deposits. They recharge 6 hours after use.", $result['message']);
+        $this->bankService->deposit($dom->id, 1000);
     }
     
-    public function testWithdrawFailsOnInsufficientFunds()
+    public function testWithdrawFailsOnInsufficientFunds(): void
     {
-        $this->stmtMock->method('fetchColumn')->willReturn(500); // 500 gold in bank
-        $this->pdoMock->method('prepare')->willReturn($this->stmtMock);
+        $dom = Dominion::create(['name' => 'InsufficientTest', 'credits_banked' => 500]);
 
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('rollBack');
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage("Insufficient vault reserves.");
 
-        $result = $this->bankService->withdraw(1, 501); // Trying to withdraw 501
-
-        $this->assertFalse($result['success']);
-        $this->assertEquals("Insufficient funds in bank.", $result['message']);
+        $this->bankService->withdraw($dom->id, 501);
     }
 }

@@ -27,7 +27,7 @@ class ArmoryController extends BaseController
             $this->redirect('/login');
         }
 
-        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
         $data = $this->armoryService->getArmoryData($dominion->id);
 
         return $this->render('armory/index', [
@@ -51,7 +51,7 @@ class ArmoryController extends BaseController
             return json_encode(['success' => false, 'message' => 'Invalid tactical parameters.']);
         }
 
-        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
         $itemId = (int)$_POST['item_id'];
         $qty = (int)$_POST['quantity'];
 
@@ -79,7 +79,7 @@ class ArmoryController extends BaseController
             return json_encode(['success' => false, 'message' => 'Invalid tactical parameters.']);
         }
 
-        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
         $itemId = (int)$_POST['item_id'];
         $qty = (int)$_POST['quantity'];
 
@@ -97,7 +97,7 @@ class ArmoryController extends BaseController
     public function upgrade(): string
     {
         header('Content-Type: application/json');
-        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
 
         try {
             return json_encode($this->armoryService->upgradeArmory($dominion->id));

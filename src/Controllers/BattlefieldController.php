@@ -45,15 +45,15 @@ class BattlefieldController extends BaseController
 
         $targetId = (int)($_POST['target_id'] ?? 0);
         $turns = (int)($_POST['turns'] ?? 1);
-        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
 
-        if (!$kingdom) {
-            echo json_encode(['success' => false, 'message' => 'Kingdom not found.']);
+        if (!$dominion) {
+            echo json_encode(['success' => false, 'message' => 'Sector not found.']);
             return;
         }
 
         try {
-            $result = $this->battlefieldService->executeAttack($kingdom->id, $targetId, $turns);
+            $result = $this->battlefieldService->executeAttack($dominion->id, $targetId, $turns);
             echo json_encode($result);
         } catch (\Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -67,19 +67,19 @@ class BattlefieldController extends BaseController
         }
 
         $id = (int)($vars['id'] ?? 0);
-        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
         $log = $this->battlefieldService->getBattleLog($id);
 
         // Security check: Must be attacker or defender
-        if (!$log || ((int)$log->attacker_id !== $kingdom->id && (int)$log->defender_id !== $kingdom->id)) {
+        if (!$log || ((int)$log->attacker_id !== $dominion->id && (int)$log->defender_id !== $dominion->id)) {
             $this->redirect('/combat/battlefield');
         }
 
         return $this->render('battlefield/report', [
             'title' => 'Battle Report',
             'log' => $log,
-            'attacker' => $this->gameService->getKingdomById((int)$log->attacker_id),
-            'defender' => $this->gameService->getKingdomById((int)$log->defender_id),
+            'attacker' => $this->gameService->getDominionById((int)$log->attacker_id),
+            'defender' => $this->gameService->getDominionById((int)$log->defender_id),
         ]);
     }
 }

@@ -6,8 +6,13 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use Dotenv\Dotenv;
-use Shadowreign\Infrastructure\Eloquent;
-use Shadowreign\Models\User;
+use sdo\Infrastructure\Eloquent;
+use sdo\Models\User;
+use sdo\Models\Race;
+use sdo\Models\Structure;
+use sdo\Models\DominionStructure;
+use sdo\Models\Unit;
+use sdo\Models\DominionManpower;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 // Load environment variables
@@ -53,7 +58,7 @@ function generateBotName($prefixes, $suffixes, $middle) {
     return $prefix . $suffix;
 }
 
-function generateKingdomName($botName) {
+function generateDominionName($botName) {
     $suffixes = ['Kingdom', 'Empire', 'Realm', 'Domain', 'Lands', 'Territory', 'Nation', 'State', 'Republic', 'Union'];
     return $botName . "'s " . $suffixes[array_rand($suffixes)];
 }
@@ -62,22 +67,26 @@ $created = 0;
 $attempts = 0;
 $maxAttempts = 200;
 
+$races = Race::all();
+$structures = Structure::all();
+$units = Unit::all();
+
 while ($created < 100 && $attempts < $maxAttempts) {
     $attempts++;
 
     $botName = generateBotName($prefixes, $suffixes, $middle);
 
     // Ensure unique username
-    $existing = User::where('username', $botName)->first();
+    $existing = User::where('username', $botName)->exists();
     if ($existing) {
         continue;
     }
 
-    $kingdomName = generateKingdomName($botName);
-    $email = 'bot_' . strtolower(str_replace("'", "", str_replace(" ", "_", $botName))) . '@shadowreign.ai';
+    $dominionName = generateDominionName($botName);
+    $email = 'bot_' . strtolower(str_replace("'", "", str_replace(" ", "_", $botName))) . '@starlight.ai';
 
     try {
-        Capsule::transaction(function () use ($botName, $email, $kingdomName) {
+        Capsule::transaction(function () use ($botName, $email, $dominionName, $races, $structures, $units) {
             $user = User::create([
                 'username' => $botName,
                 'email' => $email,
@@ -85,22 +94,34 @@ while ($created < 100 && $attempts < $maxAttempts) {
                 'is_bot' => true,
             ]);
 
-            $user->kingdom()->create([
-                'kingdom_name' => $kingdomName,
-                'gold' => rand(5000, 50000),
+            $dominion = $user->dominion()->create([
+                'name'    => $dominionName,
+                'race_id' => $races->random()->id,
+                'credits' => rand(5000, 50000),
                 'citizens' => rand(300, 1000),
-                'turns' => rand(50, 150),
-                'unit_guards' => rand(0, 30),
-                'unit_soldiers' => rand(0, 20),
-                'unit_spies' => rand(0, 10),
-                'unit_sentries' => rand(0, 15),
-                'miners' => rand(0, 25),
-                'base_gold_per_tick' => rand(80, 200),
+                'turns'    => rand(50, 150),
+                'foundation_hp' => 1000,
+                'foundation_max_hp' => 1000,
                 'current_mine_tier' => rand(1, 3),
                 'current_mine_level' => rand(1, 5),
-                'foundation_level' => rand(1, 5),
                 'housing_level' => rand(1, 4),
             ]);
+
+            foreach ($structures as $s) {
+                DominionStructure::create([
+                    'dominion_id' => $dominion->id,
+                    'structure_id' => $s->id,
+                    'level' => rand(0, 5)
+                ]);
+            }
+
+            foreach ($units as $u) {
+                DominionManpower::create([
+                    'dominion_id' => $dominion->id,
+                    'unit_id' => $u->id,
+                    'total_quantity' => rand(0, 50)
+                ]);
+            }
         });
 
         $created++;

@@ -4,6 +4,12 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
+use sdo\Models\DominionManpower;
+use sdo\Models\DominionStructure;
+use sdo\Models\DominionArmoryItem;
+use sdo\Models\StructureLevel;
+use sdo\Models\ArmoryItem;
+use sdo\Models\Unit;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class TacticalService
@@ -14,12 +20,10 @@ class TacticalService
     {
         $dom = Dominion::findOrFail($dominionId);
         
-        $manpower = Capsule::table('dominion_manpower')
-            ->join('units', 'dominion_manpower.unit_id', '=', 'units.id')
-            ->where('dominion_manpower.dominion_id', $dominionId)
-            ->select('units.slug', 'dominion_manpower.total_quantity')
+        $manpower = DominionManpower::with('unit')
+            ->where('dominion_id', $dominionId)
             ->get()
-            ->pluck('total_quantity', 'slug');
+            ->mapWithKeys(fn($m) => [$m->unit->slug => $m->total_quantity]);
 
         $soldiers = (int)($manpower['soldiers'] ?? 0);
         $guards = (int)($manpower['guards'] ?? 0);
@@ -33,8 +37,7 @@ class TacticalService
         $defArmoryBonus = $this->getArmoryBonus($dominionId, 'guards', $guards, 'defense_bonus');
 
         // Structural Multipliers (From dominion_structures table)
-        $structs = Capsule::table('dominion_structures')
-            ->join('structure_levels', function($j) {
+        $structs = DominionStructure::join('structure_levels', function($j) {
                 $j->on('dominion_structures.structure_id', '=', 'structure_levels.structure_id')
                   ->on('dominion_structures.level', '=', 'structure_levels.level');
             })
@@ -60,18 +63,16 @@ class TacticalService
     {
         if ($unitCount <= 0) return 0.0;
 
-        $items = Capsule::table('kingdom_armory_items')
-            ->join('armory_items', 'kingdom_armory_items.item_id', '=', 'armory_items.id')
-            ->where('kingdom_armory_items.kingdom_id', $domId)
-            ->where('armory_items.unit_type', $type)
-            ->select('armory_items.' . $field, 'kingdom_armory_items.quantity')
+        $items = DominionArmoryItem::with('item')
+            ->where('kingdom_id', $domId)
+            ->whereHas('item', fn($q) => $q->where('unit_type', $type))
             ->get();
 
         $bonus = 0.0;
         foreach ($items as $item) {
             // Only as many items as we have units can provide a bonus
             $effectiveQty = min($unitCount, $item->quantity);
-            $bonus += ($effectiveQty * (float)$item->$field);
+            $bonus += ($effectiveQty * (float)$item->item->$field);
         }
         return $bonus;
     }

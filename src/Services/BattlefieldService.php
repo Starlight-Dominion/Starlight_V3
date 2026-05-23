@@ -4,7 +4,8 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
-use sdo\Models\User;
+use sdo\Models\DominionManpower;
+use sdo\Models\Unit;
 use sdo\Services\LogService;
 use sdo\Services\ConfigService;
 use Illuminate\Database\Capsule\Manager as Capsule;
@@ -167,11 +168,10 @@ class BattlefieldService
     {
         if ($qty <= 0) return;
         
-        $unit = Capsule::table('units')->where('slug', $slug)->first();
+        $unit = Unit::where('slug', $slug)->first();
         if (!$unit) return;
 
-        Capsule::table('dominion_manpower')
-            ->where('dominion_id', $domId)
+        DominionManpower::where('dominion_id', $domId)
             ->where('unit_id', $unit->id)
             ->decrement('total_quantity', $qty);
     }

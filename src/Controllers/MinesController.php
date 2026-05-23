@@ -30,13 +30,13 @@ if (!$this->authService->isLoggedIn($_SESSION)) {
 $this->redirect('/login');
 }
 
-$kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-$this->untrainingService->releaseHeldCitizens($kingdom->id);
+$dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+$this->untrainingService->releaseHeldCitizens($dominion->id);
 
 return $this->render('mines/index', [
 'title' => 'The Deep Mines',
 'minesConfig' => $this->minesService->getMinesConfig(),
-'totalProduction' => $this->minesService->calculateCurrentProduction($kingdom->toArray()),
+'totalProduction' => $this->minesService->calculateCurrentProduction($dominion),
 'message' => $_SESSION['message'] ?? null,
 ]);
 }
@@ -44,30 +44,30 @@ return $this->render('mines/index', [
 public function assign(): void
 {
 $qty = (int)($_POST['quantity'] ?? 0);
-$kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-$_SESSION['message'] = $this->minesService->assignMiners($kingdom->id, $qty);
+$dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+$_SESSION['message'] = $this->minesService->assignMiners($dominion->id, $qty);
 $this->redirect('/structures/mines');
 }
 
 public function unassign(): void
 {
 $qty = (int)($_POST['quantity'] ?? 0);
-$kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-$_SESSION['message'] = $this->minesService->unassignMiners($kingdom->id, $qty);
+$dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+$_SESSION['message'] = $this->minesService->unassignMiners($dominion->id, $qty);
 $this->redirect('/structures/mines');
 }
 
 public function upgradeCurrentMine(): void
 {
-$kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-$_SESSION['message'] = $this->minesService->upgradeCurrentMine($kingdom->id);
+$dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+$_SESSION['message'] = $this->minesService->upgradeCurrentMine($dominion->id);
 $this->redirect('/structures/mines');
 }
 
 public function upgradeMineTier(): void
 {
-$kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-$_SESSION['message'] = $this->minesService->upgradeMineTier($kingdom->id);
+$dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+$_SESSION['message'] = $this->minesService->upgradeMineTier($dominion->id);
 $this->redirect('/structures/mines');
 }
 }

@@ -4,42 +4,51 @@ declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Models\Kingdom;
-use sdo\Repositories\Interfaces\KingdomRepositoryInterface;
+use sdo\Models\Dominion;
+use sdo\Models\DominionManpower;
+use sdo\Models\Unit;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class SpyService
 {
     public function __construct(
-        private KingdomRepositoryInterface $kingdomRepository,
+        private DominionRepositoryInterface $dominionRepository,
         private TacticalService $tacticalService
     ) {}
 
-    public function executeReconnaissance(int $attackerKingdomId, int $targetKingdomId): array
+    public function executeReconnaissance(int $attackerDominionId, int $targetDominionId): array
     {
-        return Capsule::transaction(function() use ($attackerKingdomId, $targetKingdomId) {
-            $attacker = $this->kingdomRepository->lockForUpdate($attackerKingdomId);
+        return Capsule::transaction(function() use ($attackerDominionId, $targetDominionId) {
+            $attacker = $this->dominionRepository->lockForUpdate($attackerDominionId);
             
-            if (!$attacker || (int)($attacker->stabled_unit_spies ?? 0) <= 0) {
+            $spyUnit = Unit::where('slug', 'spies')->first();
+            if (!$spyUnit) throw new Exception('Spy unit configuration not found.');
+
+            $attackerSpies = DominionManpower::where('dominion_id', $attackerDominionId)
+                ->where('unit_id', $spyUnit->id)
+                ->first();
+
+            if (!$attackerSpies || $attackerSpies->total_quantity <= 0) {
                 throw new Exception('No active spies available for reconnaissance.');
             }
 
-            $spyCount = (int)$attacker->stabled_unit_spies;
-            $missionCostGold = (int)($spyCount * 0.8);
+            $spyCount = $attackerSpies->total_quantity;
+            $missionCostCredits = (int)($spyCount * 0.8);
             $missionCostCitizens = (int)floor($spyCount / 3);
             $missionCostTurns = (int)($spyCount * 1.5);
 
-            if ($attacker->gold < $missionCostGold) throw new Exception('Insufficient gold.');
+            if ($attacker->credits < $missionCostCredits) throw new Exception('Insufficient credits.');
             if ($attacker->citizens < $missionCostCitizens) throw new Exception('Insufficient citizens.');
-            if ($attacker->turns < $missionCostTurns) throw new Exception('Insufficient turns.');
+            if ($attacker->turns < $missionCostTurns) throw new Exception('Insufficient strike capacity.');
 
-            $target = $this->kingdomRepository->findById($targetKingdomId);
-            if (!$target) throw new Exception('Target kingdom not found.');
+            $target = $this->dominionRepository->findById($targetDominionId);
+            if (!$target) throw new Exception('Target sector not found.');
 
             // Use TacticalService for power comparison
-            $atkRatings = $this->tacticalService->calculateTacticalRatings($attackerKingdomId);
-            $defRatings = $this->tacticalService->calculateTacticalRatings($targetKingdomId);
+            $atkRatings = $this->tacticalService->calculateTacticalRatings($attackerDominionId);
+            $defRatings = $this->tacticalService->calculateTacticalRatings($targetDominionId);
 
             $spyPower = $atkRatings['espionage'] ?? 1;
             $sentryPower = $defRatings['sentry'] ?? 1;
@@ -53,13 +62,14 @@ class SpyService
                 $spiesLost = max(1, (int)floor($spyCount * $lossFactor));
             }
 
-            $this->kingdomRepository->update($attackerKingdomId, [
-                'gold' => $attacker->gold - $missionCostGold,
-                'citizens' => $attacker->citizens - $missionCostCitizens,
-                'turns' => $attacker->turns - $missionCostTurns,
-                'unit_spies' => max(0, $attacker->unit_spies - $spiesLost),
-                'stabled_unit_spies' => max(0, $attacker->stabled_unit_spies - $spiesLost)
-            ]);
+            $attacker->credits -= $missionCostCredits;
+            $attacker->citizens -= $missionCostCitizens;
+            $attacker->turns -= $missionCostTurns;
+            $attacker->save();
+
+            if ($spiesLost > 0) {
+                $attackerSpies->decrement('total_quantity', $spiesLost);
+            }
 
             if (!$isSuccess) {
                 return [
@@ -68,19 +78,25 @@ class SpyService
                 ];
             }
 
+            // Gather Intel using Eloquent
+            $targetManpower = DominionManpower::with('unit')
+                ->where('dominion_id', $targetDominionId)
+                ->get()
+                ->pluck('total_quantity', 'unit.slug');
+
             $intel = [
-                'kingdom_name' => $target->kingdom_name,
-                'gold' => (int)$target->gold,
+                'name' => $target->name,
+                'credits' => (int)$target->credits,
                 'citizens' => (int)$target->citizens,
                 'army' => [
-                    'guards' => (int)$target->stabled_unit_guards,
-                    'soldiers' => (int)$target->stabled_unit_soldiers,
-                    'spies' => (int)$target->stabled_unit_spies,
-                    'sentries' => (int)$target->stabled_unit_sentries,
-                    'total' => (int)$target->stabled_unit_guards + (int)$target->stabled_unit_soldiers + (int)$target->stabled_unit_spies + (int)$target->stabled_unit_sentries,
+                    'guards' => (int)($targetManpower['guards'] ?? 0),
+                    'soldiers' => (int)($targetManpower['soldiers'] ?? 0),
+                    'spies' => (int)($targetManpower['spies'] ?? 0),
+                    'sentries' => (int)($targetManpower['sentries'] ?? 0),
+                    'total' => $targetManpower->sum(),
                 ],
-                'foundation_level' => (int)$target->foundation_level,
-                'housing_level' => (int)$target->housing_level,
+                'foundation_hp' => (int)$target->foundation_hp,
+                'level' => $target->getPlayerLevel(),
             ];
 
             return [
@@ -92,27 +108,37 @@ class SpyService
         });
     }
 
-    public function getSpyIntel(int $kingdomId): array
+    public function getSpyIntel(int $dominionId): array
     {
-        $kingdom = $this->kingdomRepository->findById($kingdomId);
-        $spyCount = (int)($kingdom->stabled_unit_spies ?? 0);
+        $spyUnit = Unit::where('slug', 'spies')->first();
+        $spyCount = 0;
+        if ($spyUnit) {
+            $spyCount = DominionManpower::where('dominion_id', $dominionId)
+                ->where('unit_id', $spyUnit->id)
+                ->value('total_quantity') ?? 0;
+        }
 
         return [
             'success' => true,
             'intel_gathered' => null,
-            'spy_count' => $spyCount,
+            'spy_count' => (int)$spyCount,
             'available_actions' => ['reconnaissance' => $spyCount > 0],
         ];
     }
 
-    public function getAvailableSpies(int $kingdomId): array
+    public function getAvailableSpies(int $dominionId): array
     {
-        $kingdom = $this->kingdomRepository->findById($kingdomId);
-        $spyCount = (int)($kingdom->stabled_unit_spies ?? 0);
+        $spyUnit = Unit::where('slug', 'spies')->first();
+        $spyCount = 0;
+        if ($spyUnit) {
+            $spyCount = DominionManpower::where('dominion_id', $dominionId)
+                ->where('unit_id', $spyUnit->id)
+                ->value('total_quantity') ?? 0;
+        }
 
         return [
             'success' => true,
-            'available_spies' => $spyCount,
+            'available_spies' => (int)$spyCount,
             'available_for_training' => $spyCount > 0,
         ];
     }

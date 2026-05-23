@@ -2,6 +2,8 @@
 
 namespace sdo\Services;
 
+use sdo\Models\Dominion;
+
 class AdvisorService
 {
     private const ADVICE = [
@@ -35,7 +37,7 @@ class AdvisorService
         if ($progress < 20) {
             return 'You are just starting to grow. Focus on steady resource collection and expand housing to support population growth.';
         } elseif ($progress < 50) {
-            return 'Your kingdom is gaining momentum. Consider boosting mining and growth to accelerate XP progression.';
+            return 'Your sector is gaining momentum. Consider boosting extraction and growth to accelerate XP progression.';
         } elseif ($progress < 75) {
             return 'You are approaching a new tier. Prepare for upgrades that unlock higher production and defenses.';
         } else {
@@ -44,13 +46,13 @@ class AdvisorService
     }
     
     /**
-     * Return contextual advisor advice based on kingdom data when available.
+     * Return contextual advisor advice based on dominion data when available.
      */
-    public function getContextualAdviceFromKingdom(?array $kingdom): string
+    public function getContextualAdviceFromDominion(?Dominion $dominion): string
     {
-        if ($kingdom && isset($kingdom['xp'])) {
-            $xp = (int) $kingdom['xp'];
-            $level = (int)floor(sqrt($xp / 100)) + 1;
+        if ($dominion) {
+            $xp = (int)$dominion->xp;
+            $level = $dominion->getPlayerLevel();
             return $this->getContextualAdvice($level, $xp);
         }
         return $this->getAdvice();

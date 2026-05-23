@@ -30,7 +30,7 @@ class FoundationController extends BaseController
             $this->redirect('/login');
         }
 
-        $dominion = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
         $state = $this->foundationService->getFoundationState($dominion->id);
 
         return $this->render('foundation/index', [
@@ -61,7 +61,7 @@ class FoundationController extends BaseController
     public function repair(): string
     {
         return $this->jsonResponse(fn() => $this->foundationService->repair(
-            (int)$this->gameService->getKingdomByUserId((int)$_SESSION['user_id'])->id
+            (int)$this->gameService->getDominionByUserId((int)$_SESSION['user_id'])->id
         ));
     }
 
@@ -71,7 +71,7 @@ class FoundationController extends BaseController
     public function upgrade(): string
     {
         return $this->jsonResponse(fn() => $this->foundationService->upgrade(
-            (int)$this->gameService->getKingdomByUserId((int)$_SESSION['user_id'])->id,
+            (int)$this->gameService->getDominionByUserId((int)$_SESSION['user_id'])->id,
             (int)($_POST['structure_id'] ?? 0)
         ));
     }

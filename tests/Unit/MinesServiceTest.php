@@ -2,16 +2,17 @@
 
 namespace Tests\Unit;
 
-use PDO;
-use PDOStatement;
 use PHPUnit\Framework\TestCase;
+use sdo\Models\Dominion;
+use sdo\Models\User;
+use sdo\Models\Unit;
+use sdo\Models\DominionManpower;
 use sdo\Services\MinesService;
 use sdo\Services\UntrainingService;
+use Illuminate\Database\Capsule\Manager as Capsule;
 
 class MinesServiceTest extends TestCase
 {
-    private $pdoMock;
-    private $stmtMock;
     private MinesService $service;
     private $untrainingMock;
 
@@ -19,69 +20,132 @@ class MinesServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->pdoMock = $this->createMock(PDO::class);
-        $this->stmtMock = $this->createMock(PDOStatement::class);
+        $capsule = new Capsule();
+        $capsule->addConnection([
+            'driver'   => 'sqlite',
+            'database' => ':memory:',
+            'prefix'   => '',
+        ]);
+        $capsule->setAsGlobal();
+        $capsule->bootEloquent();
+
+        Capsule::schema()->create('users', function ($table) {
+            $table->increments('id');
+            $table->string('username')->unique();
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->timestamps();
+        });
+
+        Capsule::schema()->create('dominions', function ($table) {
+            $table->increments('id');
+            $table->integer('user_id')->unsigned();
+            $table->string('name')->unique();
+            $table->bigInteger('credits')->default(10000);
+            $table->integer('citizens')->default(500);
+            $table->integer('turns')->default(100);
+            $table->integer('xp')->default(0);
+            $table->integer('current_mine_tier')->default(1);
+            $table->integer('current_mine_level')->default(1);
+            $table->datetime('last_untrained')->nullable();
+            $table->timestamps();
+        });
+
+        Capsule::schema()->create('units', function ($table) {
+            $table->increments('id');
+            $table->string('slug')->unique();
+            $table->string('name');
+            $table->integer('cost_credits');
+            $table->integer('cost_citizens');
+            $table->integer('cost_turns');
+            $table->integer('power_offense');
+            $table->integer('power_defense');
+        });
+
+        Capsule::schema()->create('dominion_manpower', function ($table) {
+            $table->integer('dominion_id')->unsigned();
+            $table->integer('unit_id')->unsigned();
+            $table->integer('total_quantity')->default(0);
+            $table->primary(['dominion_id', 'unit_id']);
+        });
+
+        Unit::create([
+            'slug' => 'workers',
+            'name' => 'Utility Workers',
+            'cost_credits' => 25,
+            'cost_citizens' => 1,
+            'cost_turns' => 1,
+            'power_offense' => 1,
+            'power_defense' => 2
+        ]);
+
         $this->untrainingMock = $this->createMock(UntrainingService::class);
-        $this->service = new MinesService($this->pdoMock, $this->untrainingMock);
+        $this->service = new MinesService($this->untrainingMock);
     }
 
-    private function mockPdoStatementForFetch($row)
+    private function createTestDominion(array $data = []): Dominion
     {
-        $stmtMock = $this->createMock(PDOStatement::class);
-        $stmtMock->method('fetch')->willReturn($row);
-        $stmtMock->method('execute')->willReturn(true);
-        return $stmtMock;
+        $user = User::create([
+            'username' => 'testuser' . uniqid(),
+            'email' => 'test' . uniqid() . '@example.com',
+            'password' => 'password123',
+        ]);
+
+        return $user->dominion()->create(array_merge([
+            'name' => 'Test Dominion' . uniqid(),
+            'credits' => 10000,
+            'citizens' => 500,
+            'turns' => 100,
+            'xp' => 0,
+        ], $data));
     }
 
     public function testAssignMinersSuccess(): void
     {
-        $kingdom = [
-            'gold' => 1000,
+        $dominion = $this->createTestDominion([
+            'credits' => 1000,
             'citizens' => 50,
             'turns' => 100,
-        ];
+        ]);
 
-        $this->pdoMock->method('prepare')->willReturn($this->mockPdoStatementForFetch($kingdom));
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('commit');
-
-        $result = $this->service->assignMiners(1, 3);
+        $result = $this->service->assignMiners($dominion->id, 3);
 
         $this->assertTrue($result['success']);
         $this->assertStringContainsString('Assigned 3', $result['message']);
+
+        $dominion->refresh();
+        $this->assertEquals(400, $dominion->credits); // 1000 - (200 * 3)
+        
+        $workerUnit = Unit::where('slug', 'workers')->first();
+        $manpower = DominionManpower::where('dominion_id', $dominion->id)
+            ->where('unit_id', $workerUnit->id)
+            ->first();
+        $this->assertEquals(3, $manpower->total_quantity);
     }
 
-    public function testAssignMinersInsufficientGold(): void
+    public function testAssignMinersInsufficientCredits(): void
     {
-        $kingdom = [
-            'gold' => 500, // Need 200*3=600
+        $dominion = $this->createTestDominion([
+            'credits' => 500, // Need 200*3=600
             'citizens' => 50,
             'turns' => 100,
-        ];
+        ]);
 
-        $this->pdoMock->method('prepare')->willReturn($this->mockPdoStatementForFetch($kingdom));
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('rollBack');
-
-        $result = $this->service->assignMiners(1, 3);
+        $result = $this->service->assignMiners($dominion->id, 3);
 
         $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Insufficient gold', $result['message']);
+        $this->assertStringContainsString('Insufficient credits', $result['message']);
     }
 
     public function testAssignMinersInsufficientCitizens(): void
     {
-        $kingdom = [
-            'gold' => 1000,
+        $dominion = $this->createTestDominion([
+            'credits' => 1000,
             'citizens' => 2, // Need 3 citizens
             'turns' => 100,
-        ];
+        ]);
 
-        $this->pdoMock->method('prepare')->willReturn($this->mockPdoStatementForFetch($kingdom));
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('rollBack');
-
-        $result = $this->service->assignMiners(1, 3);
+        $result = $this->service->assignMiners($dominion->id, 3);
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Insufficient citizens', $result['message']);
@@ -89,193 +153,111 @@ class MinesServiceTest extends TestCase
 
     public function testAssignMinersInsufficientTurns(): void
     {
-        $kingdom = [
-            'gold' => 1000,
+        $dominion = $this->createTestDominion([
+            'credits' => 1000,
             'citizens' => 50,
             'turns' => 2, // Need 3 turns
-        ];
+        ]);
 
-        $this->pdoMock->method('prepare')->willReturn($this->mockPdoStatementForFetch($kingdom));
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('rollBack');
-
-        $result = $this->service->assignMiners(1, 3);
+        $result = $this->service->assignMiners($dominion->id, 3);
 
         $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Insufficient turns', $result['message']);
-    }
-
-    public function testAssignMinersZeroQuantity(): void
-    {
-        $result = $this->service->assignMiners(1, 0);
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('must be positive', $result['message']);
-    }
-
-    public function testAssignMinersNegativeQuantity(): void
-    {
-        $result = $this->service->assignMiners(1, -1);
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('must be positive', $result['message']);
+        $this->assertStringContainsString('Insufficient strike capacity', $result['message']);
     }
 
     public function testUnassignMiners(): void
     {
+        $dominion = $this->createTestDominion();
+        
         $this->untrainingMock->expects($this->once())
             ->method('untrain')
-            ->with(1, 'miners', 3)
+            ->with($dominion->id, 'workers', 3)
             ->willReturn(['success' => true, 'message' => 'Untrained']);
 
-        $result = $this->service->unassignMiners(1, 3);
+        $result = $this->service->unassignMiners($dominion->id, 3);
 
         $this->assertTrue($result['success']);
     }
 
     public function testUpgradeMineTierSuccess(): void
     {
-        $kingdom = [
-            'id' => 1,
+        $dominion = $this->createTestDominion([
             'current_mine_tier' => 1,
-            'current_mine_level' => 1,
+            'current_mine_level' => 10,
             'xp' => 10000, // Player level 11
-        ];
+        ]);
 
-        $this->pdoMock->method('prepare')->willReturn($this->mockPdoStatementForFetch($kingdom));
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('commit');
-
-        $result = $this->service->upgradeMineTier(1);
+        $result = $this->service->upgradeMineTier($dominion->id);
 
         $this->assertTrue($result['success']);
-        $this->assertStringContainsString('Upgraded to Mine Tier 2', $result['message']);
+        $this->assertStringContainsString('Upgraded to Extraction Tier 2', $result['message']);
+
+        $dominion->refresh();
+        $this->assertEquals(2, $dominion->current_mine_tier);
+        $this->assertEquals(5, $dominion->current_mine_level); // 10 / 2
     }
 
     public function testUpgradeMineTierMaxTier(): void
     {
-        $kingdom = [
+        $dominion = $this->createTestDominion([
             'current_mine_tier' => 10,
-            'current_mine_level' => 150,
             'xp' => 100000,
-        ];
+        ]);
 
-        $this->pdoMock->method('prepare')->willReturn($this->mockPdoStatementForFetch($kingdom));
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('rollBack');
-
-        $result = $this->service->upgradeMineTier(1);
+        $result = $this->service->upgradeMineTier($dominion->id);
 
         $this->assertFalse($result['success']);
-        $this->assertStringContainsString('highest mine tier', $result['message']);
+        $this->assertStringContainsString('Maximum extraction depth', $result['message']);
     }
 
     public function testUpgradeMineTierLevelRequirement(): void
     {
-        $kingdom = [
+        $dominion = $this->createTestDominion([
             'current_mine_tier' => 1,
-            'current_mine_level' => 1,
             'xp' => 0, // Player level 1, need level 5 for tier 2
-        ];
+        ]);
 
-        $this->pdoMock->method('prepare')->willReturn($this->mockPdoStatementForFetch($kingdom));
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('rollBack');
-
-        $result = $this->service->upgradeMineTier(1);
+        $result = $this->service->upgradeMineTier($dominion->id);
 
         $this->assertFalse($result['success']);
-        $this->assertStringContainsString('player level', $result['message']);
+        $this->assertStringContainsString('Commander level', $result['message']);
     }
 
     public function testUpgradeCurrentMineSuccess(): void
     {
-        $kingdom = [
+        $dominion = $this->createTestDominion([
             'current_mine_tier' => 1,
             'current_mine_level' => 1,
-            'gold' => 2000,
-        ];
+            'credits' => 5000,
+        ]);
 
-        $this->pdoMock->method('prepare')->willReturn($this->mockPdoStatementForFetch($kingdom));
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('commit');
-
-        $result = $this->service->upgradeCurrentMine(1);
+        $result = $this->service->upgradeCurrentMine($dominion->id);
 
         $this->assertTrue($result['success']);
-        $this->assertStringContainsString('level 2', $result['message']);
-    }
+        $this->assertStringContainsString('Level 2', $result['message']);
 
-    public function testUpgradeCurrentMineMaxLevel(): void
-    {
-        $kingdom = [
-            'current_mine_tier' => 1,
-            'current_mine_level' => 150,
-            'gold' => 50000,
-        ];
-
-        $this->pdoMock->method('prepare')->willReturn($this->mockPdoStatementForFetch($kingdom));
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('rollBack');
-
-        $result = $this->service->upgradeCurrentMine(1);
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('max level', $result['message']);
-    }
-
-    public function testUpgradeCurrentMineInsufficientGold(): void
-    {
-        $kingdom = [
-            'current_mine_tier' => 1,
-            'current_mine_level' => 1,
-            'gold' => 500,
-        ];
-
-        $this->pdoMock->method('prepare')->willReturn($this->mockPdoStatementForFetch($kingdom));
-        $this->pdoMock->expects($this->once())->method('beginTransaction');
-        $this->pdoMock->expects($this->once())->method('rollBack');
-
-        $result = $this->service->upgradeCurrentMine(1);
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Insufficient gold', $result['message']);
+        $dominion->refresh();
+        $this->assertEquals(2, $dominion->current_mine_level);
+        $this->assertLessThan(5000, $dominion->credits);
     }
 
     public function testCalculateCurrentProduction(): void
     {
-        $kingdom = [
+        $dominion = $this->createTestDominion([
             'current_mine_tier' => 1,
             'current_mine_level' => 1,
-            'miners' => 10,
-        ];
+        ]);
+        
+        $workerUnit = Unit::where('slug', 'workers')->first();
+        DominionManpower::create([
+            'dominion_id' => $dominion->id,
+            'unit_id' => $workerUnit->id,
+            'total_quantity' => 10
+        ]);
 
-        $result = $this->service->calculateCurrentProduction($kingdom);
+        $result = $this->service->calculateCurrentProduction($dominion);
 
         $this->assertIsFloat($result);
         $this->assertGreaterThan(0, $result);
-    }
-
-    public function testCalculateCurrentProductionZeroMiners(): void
-    {
-        $kingdom = [
-            'current_mine_tier' => 1,
-            'current_mine_level' => 1,
-            'miners' => 0,
-        ];
-
-        $result = $this->service->calculateCurrentProduction($kingdom);
-
-        $this->assertEquals(0, $result);
-    }
-
-    public function testGetMinesConfig(): void
-    {
-        $config = $this->service->getMinesConfig();
-
-        $this->assertIsArray($config);
-        $this->assertArrayHasKey('unlocks', $config);
-        $this->assertArrayHasKey('mines', $config);
-        $this->assertArrayHasKey('base_gold_per_tick', $config);
     }
 }

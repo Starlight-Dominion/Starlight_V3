@@ -2,18 +2,19 @@
 
 namespace sdo\Services;
 
-use PDO;
+use sdo\Models\Dominion;
+use sdo\Models\DominionManpower;
+use sdo\Models\Unit;
 use Exception;
+use Illuminate\Database\Capsule\Manager as Capsule;
 
 class MinesService
 {
-    private PDO $db;
     private UntrainingService $untrainingService;
     private array $minesConfig;
 
-    public function __construct(PDO $db, UntrainingService $untrainingService)
+    public function __construct(UntrainingService $untrainingService)
     {
-        $this->db = $db;
         $this->untrainingService = $untrainingService;
         $this->minesConfig = require __DIR__ . '/../../config/mines.php';
     }
@@ -23,155 +24,149 @@ class MinesService
         return $this->minesConfig;
     }
 
-    public function calculateCurrentProduction(array $kingdom): float
+    public function calculateCurrentProduction(Dominion $dominion): float
     {
-        $tier = $kingdom['current_mine_tier'];
-        $level = $kingdom['current_mine_level'];
+        $tier = (int)($dominion->current_mine_tier ?? 1);
+        $level = (int)($dominion->current_mine_level ?? 1);
         $productionPerMiner = $this->minesConfig['mines'][$tier][$level]['production_per_miner'] ?? 0;
         
-        return $productionPerMiner * $kingdom['miners'];
+        $workerUnit = Unit::where('slug', 'workers')->first();
+        $minersCount = 0;
+        if ($workerUnit) {
+            $minersCount = DominionManpower::where('dominion_id', $dominion->id)
+                ->where('unit_id', $workerUnit->id)
+                ->value('total_quantity') ?? 0;
+        }
+        
+        return (float)($productionPerMiner * $minersCount);
     }
 
-    public function assignMiners(int $kingdomId, int $quantity): array
+    public function assignMiners(int $dominionId, int $quantity): array
     {
         if ($quantity <= 0) {
             return ['success' => false, 'message' => 'Quantity must be positive.'];
         }
 
-        $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare("SELECT gold, citizens, turns FROM kingdoms WHERE id = ? FOR UPDATE");
-            $stmt->execute([$kingdomId]);
-            $kingdom = $stmt->fetch();
+            return Capsule::transaction(function() use ($dominionId, $quantity) {
+                $dominion = Dominion::lockForUpdate()->find($dominionId);
+                if (!$dominion) throw new Exception('Sector not found.');
 
-            $totalGoldCost = 200 * $quantity;
-            $totalCitizenCost = 1 * $quantity;
-            $totalTurnsCost = 1 * $quantity;
+                $workerUnit = Unit::where('slug', 'workers')->first();
+                if (!$workerUnit) throw new Exception('Worker unit configuration not found.');
 
-            if ($kingdom['gold'] < $totalGoldCost) {
-                throw new Exception('Insufficient gold.');
-            }
-            if ($kingdom['citizens'] < $totalCitizenCost) {
-                throw new Exception('Insufficient citizens.');
-            }
-            if ($kingdom['turns'] < $totalTurnsCost) {
-                throw new Exception('Insufficient turns.');
-            }
+                $totalCreditsCost = 200 * $quantity;
+                $totalCitizenCost = 1 * $quantity;
+                $totalTurnsCost = 1 * $quantity;
 
-            $updateStmt = $this->db->prepare(
-                "UPDATE kingdoms SET 
-                    gold = gold - :gold,
-                    citizens = citizens - :citizens,
-                    turns = turns - :turns,
-                    miners = miners + :quantity
-                 WHERE id = :id"
-            );
-            $updateStmt->execute([
-                ':gold' => $totalGoldCost,
-                ':citizens' => $totalCitizenCost,
-                ':turns' => $totalTurnsCost,
-                ':quantity' => $quantity,
-                ':id' => $kingdomId,
-            ]);
+                if ($dominion->credits < $totalCreditsCost) {
+                    throw new Exception('Insufficient credits.');
+                }
+                if ($dominion->citizens < $totalCitizenCost) {
+                    throw new Exception('Insufficient citizens.');
+                }
+                if ($dominion->turns < $totalTurnsCost) {
+                    throw new Exception('Insufficient strike capacity.');
+                }
 
-            $this->db->commit();
-            return ['success' => true, 'message' => "Assigned {$quantity} citizens to mining."];
+                $dominion->decrement('credits', $totalCreditsCost);
+                $dominion->decrement('citizens', $totalCitizenCost);
+                $dominion->decrement('turns', $totalTurnsCost);
+                $dominion->save();
+
+                $exists = DominionManpower::where('dominion_id', $dominionId)
+                    ->where('unit_id', $workerUnit->id)
+                    ->exists();
+
+                if ($exists) {
+                    DominionManpower::where('dominion_id', $dominionId)
+                        ->where('unit_id', $workerUnit->id)
+                        ->increment('total_quantity', $quantity);
+                } else {
+                    DominionManpower::create([
+                        'dominion_id' => $dominionId,
+                        'unit_id' => $workerUnit->id,
+                        'total_quantity' => $quantity
+                    ]);
+                }
+
+                return ['success' => true, 'message' => "Assigned {$quantity} utility workers to extraction duty."];
+            });
         } catch (Exception $e) {
-            $this->db->rollBack();
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 
-    public function unassignMiners(int $kingdomId, int $quantity): array
+    public function unassignMiners(int $dominionId, int $quantity): array
     {
         if ($quantity <= 0) {
             return ['success' => false, 'message' => 'Quantity must be positive.'];
         }
-        return $this->untrainingService->untrain($kingdomId, 'miners', $quantity);
+        return $this->untrainingService->untrain($dominionId, 'workers', $quantity);
     }
 
-    public function upgradeMineTier(int $kingdomId): array
+    public function upgradeMineTier(int $dominionId): array
     {
-        $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare("SELECT * FROM kingdoms WHERE id = ? FOR UPDATE");
-            $stmt->execute([$kingdomId]);
-            $kingdom = $stmt->fetch();
+            return Capsule::transaction(function() use ($dominionId) {
+                $dominion = Dominion::lockForUpdate()->find($dominionId);
+                if (!$dominion) throw new Exception('Sector not found.');
 
-            $currentTier = $kingdom['current_mine_tier'];
-            $currentLevel = $kingdom['current_mine_level'];
-            $nextTier = $currentTier + 1;
+                $currentTier = (int)($dominion->current_mine_tier ?? 1);
+                $currentLevel = (int)($dominion->current_mine_level ?? 1);
+                $nextTier = $currentTier + 1;
 
-            if ($nextTier > 10) {
-                throw new Exception("You are already at the highest mine tier.");
-            }
+                if ($nextTier > 10) {
+                    throw new Exception("Maximum extraction depth reached for current tech.");
+                }
 
-            $playerLevel = floor(sqrt($kingdom['xp'] / 100)) + 1; // Example formula
-            $requiredLevel = $this->minesConfig['unlocks'][$nextTier];
-            if ($playerLevel < $requiredLevel) {
-                throw new Exception("You must be at least player level {$requiredLevel} to unlock the next mine tier.");
-            }
+                $playerLevel = $dominion->getPlayerLevel();
+                $requiredLevel = $this->minesConfig['unlocks'][$nextTier];
+                if ($playerLevel < $requiredLevel) {
+                    throw new Exception("Commander level {$requiredLevel} required for next extraction tier.");
+                }
 
-            $newLevel = floor($currentLevel / 2);
+                $newLevel = (int)floor($currentLevel / 2);
 
-            $updateStmt = $this->db->prepare(
-                "UPDATE kingdoms SET 
-                    current_mine_tier = :new_tier,
-                    current_mine_level = :new_level
-                 WHERE id = :id"
-            );
-            $updateStmt->execute([
-                ':new_tier' => $nextTier,
-                ':new_level' => $newLevel,
-                ':id' => $kingdomId,
-            ]);
+                $dominion->current_mine_tier = $nextTier;
+                $dominion->current_mine_level = $newLevel;
+                $dominion->save();
 
-            $this->db->commit();
-            return ['success' => true, 'message' => "Upgraded to Mine Tier {$nextTier}! Your previous mine's efforts have granted you Level {$newLevel}."];
+                return ['success' => true, 'message' => "Upgraded to Extraction Tier {$nextTier}! Previous efforts translated to Level {$newLevel}."];
+            });
         } catch (Exception $e) {
-            $this->db->rollBack();
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }
     
-    public function upgradeCurrentMine(int $kingdomId): array
+    public function upgradeCurrentMine(int $dominionId): array
     {
-        $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare("SELECT * FROM kingdoms WHERE id = ? FOR UPDATE");
-            $stmt->execute([$kingdomId]);
-            $kingdom = $stmt->fetch();
+            return Capsule::transaction(function() use ($dominionId) {
+                $dominion = Dominion::lockForUpdate()->find($dominionId);
+                if (!$dominion) throw new Exception('Sector not found.');
 
-            $currentTier = $kingdom['current_mine_tier'];
-            $currentLevel = $kingdom['current_mine_level'];
-            $nextLevel = $currentLevel + 1;
+                $currentTier = (int)($dominion->current_mine_tier ?? 1);
+                $currentLevel = (int)($dominion->current_mine_level ?? 1);
+                $nextLevel = $currentLevel + 1;
 
-            if ($nextLevel > 150) {
-                throw new Exception("This mine is already at max level.");
-            }
+                if ($nextLevel > 150) {
+                    throw new Exception("Maximum efficiency reached for this extraction site.");
+                }
 
-            $cost = $this->minesConfig['mines'][$currentTier][$nextLevel]['cost'];
+                $cost = $this->minesConfig['mines'][$currentTier][$nextLevel]['cost'];
 
-            if ($kingdom['gold'] < $cost) {
-                throw new Exception("Insufficient gold to upgrade.");
-            }
+                if ($dominion->credits < $cost) {
+                    throw new Exception("Insufficient credits for infrastructure upgrade.");
+                }
 
-            $updateStmt = $this->db->prepare(
-                "UPDATE kingdoms SET 
-                    gold = gold - :cost,
-                    current_mine_level = :new_level
-                 WHERE id = :id"
-            );
-            $updateStmt->execute([
-                ':cost' => $cost,
-                ':new_level' => $nextLevel,
-                ':id' => $kingdomId,
-            ]);
+                $dominion->decrement('credits', $cost);
+                $dominion->current_mine_level = $nextLevel;
+                $dominion->save();
 
-            $this->db->commit();
-            return ['success' => true, 'message' => "Mine Tier {$currentTier} upgraded to level {$nextLevel}."];
+                return ['success' => true, 'message' => "Extraction Tier {$currentTier} upgraded to Level {$nextLevel}."];
+            });
         } catch (Exception $e) {
-            $this->db->rollBack();
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }

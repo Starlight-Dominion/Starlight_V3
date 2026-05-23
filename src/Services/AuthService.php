@@ -6,6 +6,10 @@ namespace sdo\Services;
 use sdo\Models\User;
 use sdo\Models\Dominion;
 use sdo\Models\Race;
+use sdo\Models\Structure;
+use sdo\Models\DominionStructure;
+use sdo\Models\Unit;
+use sdo\Models\DominionManpower;
 use sdo\Services\ConfigService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
@@ -59,9 +63,9 @@ class AuthService
                 ]);
 
                 // Initialize Structural Blueprints
-                $structures = Capsule::table('structures')->get();
+                $structures = Structure::all();
                 foreach ($structures as $s) {
-                    Capsule::table('dominion_structures')->insert([
+                    DominionStructure::create([
                         'dominion_id' => $dominion->id,
                         'structure_id' => $s->id,
                         'level' => 0
@@ -69,9 +73,9 @@ class AuthService
                 }
 
                 // Initialize Manpower Roster
-                $units = Capsule::table('units')->get();
+                $units = Unit::all();
                 foreach ($units as $u) {
-                    Capsule::table('dominion_manpower')->insert([
+                    DominionManpower::create([
                         'dominion_id' => $dominion->id,
                         'unit_id' => $u->id,
                         'total_quantity' => 0

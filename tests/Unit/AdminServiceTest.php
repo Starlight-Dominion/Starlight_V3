@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use sdo\Services\AdminService;
 use sdo\Models\User;
-use sdo\Models\Kingdom;
+use sdo\Models\Dominion;
+use sdo\Models\Unit;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class AdminServiceTest extends TestCase
@@ -38,21 +41,14 @@ class AdminServiceTest extends TestCase
             $table->timestamps();
         });
 
-        Capsule::schema()->create('kingdoms', function ($table) {
+        Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id')->unsigned();
-            $table->string('kingdom_name');
-            $table->integer('gold')->default(1000);
-            $table->integer('citizens')->default(50);
+            $table->string('name')->unique();
+            $table->bigInteger('credits')->default(10000);
+            $table->integer('citizens')->default(500);
             $table->integer('turns')->default(100);
             $table->integer('xp')->default(0);
-            $table->integer('foundation_level')->default(1);
-            $table->integer('armory_level')->default(0);
-            $table->integer('stable_level')->default(0);
-            $table->integer('unit_guards')->default(0);
-            $table->integer('unit_soldiers')->default(0);
-            $table->integer('unit_spies')->default(0);
-            $table->integer('unit_sentries')->default(0);
             $table->timestamps();
         });
 
@@ -61,11 +57,12 @@ class AdminServiceTest extends TestCase
             $table->string('slug')->unique();
             $table->string('name');
             $table->text('description');
-            $table->integer('cost_gold');
+            $table->integer('cost_credits');
             $table->integer('cost_citizens');
             $table->integer('cost_turns');
             $table->integer('power_offense');
             $table->integer('power_defense');
+            $table->timestamps();
         });
     }
 
@@ -73,7 +70,7 @@ class AdminServiceTest extends TestCase
     {
         User::create(['username' => 'admin', 'email' => 'admin@test.com', 'password' => 'pass', 'is_admin' => true]);
         $user = User::create(['username' => 'player', 'email' => 'player@test.com', 'password' => 'pass']);
-        $user->kingdom()->create(['kingdom_name' => 'Test Kingdom']);
+        $user->dominion()->create(['name' => 'Test Dominion']);
 
         $adminService = new AdminService();
         $stats = $adminService->getSystemStats();
@@ -83,46 +80,46 @@ class AdminServiceTest extends TestCase
         $this->assertArrayHasKey('server_time', $stats);
     }
 
-    public function testSearchKingdoms(): void
+    public function testSearchDominions(): void
     {
         $user1 = User::create(['username' => 'alpha', 'email' => 'a@t.com', 'password' => 'p']);
-        $user1->kingdom()->create(['kingdom_name' => 'First Kingdom']);
+        $user1->dominion()->create(['name' => 'First Dominion']);
         
         $user2 = User::create(['username' => 'beta', 'email' => 'b@t.com', 'password' => 'p']);
-        $user2->kingdom()->create(['kingdom_name' => 'Second Realm']);
+        $user2->dominion()->create(['name' => 'Second Realm']);
 
         $adminService = new AdminService();
         
-        $results = $adminService->searchKingdoms('First');
+        $results = $adminService->searchDominions('First');
         $this->assertCount(1, $results);
-        $this->assertEquals('First Kingdom', $results[0]['kingdom_name']);
+        $this->assertEquals('First Dominion', $results[0]['name']);
 
-        $results = $adminService->searchKingdoms('alpha');
+        $results = $adminService->searchDominions('alpha');
         $this->assertCount(1, $results);
         $this->assertEquals('alpha', $results[0]['user']['username']);
     }
 
-    public function testUpdateKingdomStats(): void
+    public function testUpdateDominionStats(): void
     {
         $user = User::create(['username' => 'player', 'email' => 'p@t.com', 'password' => 'p']);
-        $kingdom = $user->kingdom()->create(['kingdom_name' => 'K', 'gold' => 100]);
+        $dominion = $user->dominion()->create(['name' => 'D', 'credits' => 100]);
 
         $adminService = new AdminService();
-        $res = $adminService->updateKingdomStats($kingdom->id, ['gold' => 5000, 'xp' => 1000]);
+        $res = $adminService->updateDominionStats($dominion->id, ['credits' => 5000, 'xp' => 1000]);
 
         $this->assertTrue($res);
-        $updated = Kingdom::find($kingdom->id);
-        $this->assertEquals(5000, $updated->gold);
+        $updated = Dominion::find($dominion->id);
+        $this->assertEquals(5000, $updated->credits);
         $this->assertEquals(1000, $updated->xp);
     }
 
     public function testUpdateUnit(): void
     {
-        $unitId = Capsule::table('units')->insertGetId([
+        $unit = Unit::create([
             'slug' => 'soldiers',
             'name' => 'Soldiers',
             'description' => 'Desc',
-            'cost_gold' => 100,
+            'cost_credits' => 100,
             'cost_citizens' => 1,
             'cost_turns' => 2,
             'power_offense' => 10,
@@ -130,10 +127,10 @@ class AdminServiceTest extends TestCase
         ]);
 
         $adminService = new AdminService();
-        $res = $adminService->updateUnit($unitId, ['cost_gold' => 999]);
+        $res = $adminService->updateUnit((int)$unit->id, ['cost_credits' => 999]);
 
         $this->assertTrue($res);
-        $unit = Capsule::table('units')->where('id', $unitId)->first();
-        $this->assertEquals(999, $unit->cost_gold);
+        $updatedUnit = Unit::find($unit->id);
+        $this->assertEquals(999, $updatedUnit->cost_credits);
     }
 }

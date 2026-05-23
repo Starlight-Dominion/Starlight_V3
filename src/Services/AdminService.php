@@ -6,16 +6,18 @@ namespace sdo\Services;
 
 use sdo\Models\User;
 use sdo\Models\Dominion;
+use sdo\Models\Unit;
+use sdo\Models\Structure;
+use sdo\Models\StructureLevel;
+use sdo\Models\ArmoryItem;
+use sdo\Models\ArmoryUnitType;
+use sdo\Models\ArmoryCategory;
+use sdo\Models\BattleLog;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class AdminService
 {
-    private function getPdo(): \PDO
-    {
-        return Capsule::connection()->getPdo();
-    }
-
     public function getSystemStats(): array
     {
         $playerCount = User::count();
@@ -28,7 +30,7 @@ class AdminService
         ];
     }
 
-    public function searchKingdoms(string $query): array
+    public function searchDominions(string $query): array
     {
         return Dominion::with('user')
             ->where('name', 'LIKE', "%{$query}%")
@@ -40,7 +42,7 @@ class AdminService
             ->toArray();
     }
 
-    public function getAllKingdoms(int $limit = 50): array
+    public function getAllDominions(int $limit = 50): array
     {
         return Dominion::with('user')
             ->orderBy('id', 'asc')
@@ -49,9 +51,9 @@ class AdminService
             ->toArray();
     }
 
-    public function updateKingdomStats(int $kingdomId, array $stats): bool
+    public function updateDominionStats(int $dominionId, array $stats): bool
     {
-        $dominion = Dominion::with('user')->findOrFail($kingdomId);
+        $dominion = Dominion::with('user')->findOrFail($dominionId);
         
         $allowedDominion = ['credits', 'xp', 'turns', 'citizens', 'name'];
         $allowedUser = ['username'];
@@ -70,99 +72,106 @@ class AdminService
     // --- Units Management ---
     public function getAllUnits(): array
     {
-        return Capsule::table('units')->get()->toArray();
+        return Unit::all()->toArray();
     }
 
     public function updateUnit(int $id, array $data): bool
     {
-        return Capsule::table('units')->where('id', $id)->update($data) > 0;
+        $unit = Unit::findOrFail($id);
+        return $unit->update($data);
     }
 
     public function addUnit(array $data): int
     {
-        return Capsule::table('units')->insertGetId($data);
+        $unit = Unit::create($data);
+        return (int)$unit->id;
     }
 
     public function deleteUnit(int $id): bool
     {
-        return Capsule::table('units')->where('id', $id)->delete() > 0;
+        return Unit::where('id', $id)->delete() > 0;
     }
 
     // --- Overhauled Structures Management ---
     public function getAllStructures(): array
     {
-        return Capsule::table('structures')->get()->toArray();
+        return Structure::all()->toArray();
     }
 
     public function getStructureLevels(int $structureId): array
     {
-        return Capsule::table('structure_levels')->where('structure_id', $structureId)->orderBy('level', 'asc')->get()->toArray();
+        return StructureLevel::where('structure_id', $structureId)
+            ->orderBy('level', 'asc')
+            ->get()
+            ->toArray();
     }
 
     public function addStructure(array $data): int
     {
-        return Capsule::table('structures')->insertGetId($data);
+        $structure = Structure::create($data);
+        return (int)$structure->id;
     }
 
     public function updateStructure(int $id, array $data): bool
     {
-        return Capsule::table('structures')->where('id', $id)->update($data) > 0;
+        $structure = Structure::findOrFail($id);
+        return $structure->update($data);
     }
 
     public function deleteStructure(int $id): bool
     {
-        return Capsule::table('structures')->where('id', $id)->delete() > 0;
+        return Structure::where('id', $id)->delete() > 0;
     }
 
     public function updateStructureLevel(int $structureId, int $level, array $data): bool
     {
-        return Capsule::table('structure_levels')
-            ->where('structure_id', $structureId)
+        return StructureLevel::where('structure_id', $structureId)
             ->where('level', $level)
             ->update($data) > 0;
     }
 
     public function addStructureLevel(array $data): bool
     {
-        return Capsule::table('structure_levels')->insert($data);
+        return StructureLevel::create($data)->exists;
     }
 
     // --- Armory Items Management ---
     public function getAllArmoryItems(): array
     {
-        return Capsule::table('armory_items')->orderBy('unit_type', 'asc')->get()->toArray();
+        return ArmoryItem::orderBy('unit_type', 'asc')->get()->toArray();
     }
 
     public function updateArmoryItem(int $id, array $data): bool
     {
-        return Capsule::table('armory_items')->where('id', $id)->update($data) > 0;
+        $item = ArmoryItem::findOrFail($id);
+        return $item->update($data);
     }
 
     public function addArmoryItem(array $data): int
     {
-        return Capsule::table('armory_items')->insertGetId($data);
+        $item = ArmoryItem::create($data);
+        return (int)$item->id;
     }
 
     public function deleteArmoryItem(int $id): bool
     {
-        return Capsule::table('armory_items')->where('id', $id)->delete() > 0;
+        return ArmoryItem::where('id', $id)->delete() > 0;
     }
 
     public function getArmoryUnitTypes(): array
     {
-        return Capsule::table('armory_unit_types')->get()->toArray();
+        return ArmoryUnitType::all()->toArray();
     }
 
     public function getArmoryCategories(): array
     {
-        return Capsule::table('armory_categories')->get()->toArray();
+        return ArmoryCategory::all()->toArray();
     }
 
     // --- Logs Oversight ---
     public function getRecentBattleLogs(int $limit = 50): array
     {
-        return Capsule::table('battle_logs')
-            ->orderBy('created_at', 'desc')
+        return BattleLog::orderBy('battle_time', 'desc')
             ->limit($limit)
             ->get()
             ->toArray();

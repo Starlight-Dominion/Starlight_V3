@@ -2,123 +2,137 @@
 
 namespace sdo\Services;
 
-use PDO;
+use sdo\Models\Dominion;
+use sdo\Models\Unit;
+use sdo\Models\DominionManpower;
+use sdo\Services\LogService;
 use Exception;
+use Illuminate\Database\Capsule\Manager as Capsule;
 
 class UpgradesService
 {
-    private PDO $db;
     private array $housingConfig;
     private array $mercenaryMarketConfig;
 
-    public function __construct(PDO $db)
+    public function __construct(private LogService $logService)
     {
-        $this->db = $db;
         $this->housingConfig = require __DIR__ . '/../../config/housing.php';
         $this->mercenaryMarketConfig = require __DIR__ . '/../../config/mercenary_market.php';
     }
 
-    public function getUpgradeData(int $kingdomId): array
+    public function getUpgradeData(int $dominionId): array
     {
-        $stmt = $this->db->prepare("SELECT * FROM kingdoms WHERE id = ?");
-        $stmt->execute([$kingdomId]);
-        $kingdom = $stmt->fetch();
+        $dominion = Dominion::findOrFail($dominionId);
 
         return [
-            'kingdom' => $kingdom,
+            'dominion' => $dominion,
             'housing_config' => $this->housingConfig,
             'mercenary_market_config' => $this->mercenaryMarketConfig,
         ];
     }
 
-    public function upgradeHousing(int $kingdomId): array
+    public function upgradeHousing(int $dominionId): array
     {
-        $this->db->beginTransaction();
         try {
-            $data = $this->getUpgradeData($kingdomId);
-            $kingdom = $data['kingdom'];
-            $housingConfig = $data['housing_config'];
+            return Capsule::transaction(function() use ($dominionId) {
+                $dominion = Dominion::lockForUpdate()->find($dominionId);
+                
+                $currentLevel = (int)($dominion->housing_level ?? 1);
+                $nextLevel = $currentLevel + 1;
 
-            $currentLevel = $kingdom['housing_level'];
-            $nextLevel = $currentLevel + 1;
+                if ($nextLevel > $this->housingConfig['max_level']) {
+                    throw new Exception("Housing infrastructure is already at peak efficiency.");
+                }
 
-            if ($nextLevel > $housingConfig['max_level']) {
-                throw new Exception("Housing is already at max level.");
-            }
+                $cost = $this->housingConfig['levels'][$nextLevel]['cost'];
 
-            $cost = $housingConfig['levels'][$nextLevel]['cost'];
+                if ($dominion->credits < $cost) {
+                    throw new Exception("Insufficient credits for housing expansion.");
+                }
 
-            if ($kingdom['gold'] < $cost) {
-                throw new Exception("Insufficient gold to upgrade housing.");
-            }
+                $dominion->decrement('credits', $cost);
+                $dominion->housing_level = $nextLevel;
+                $dominion->save();
 
-            $updateStmt = $this->db->prepare(
-                "UPDATE kingdoms SET 
-                    gold = gold - :cost,
-                    housing_level = :new_level
-                 WHERE id = :id"
-            );
-            $updateStmt->execute([
-                ':cost' => $cost,
-                ':new_level' => $nextLevel,
-                ':id' => $kingdomId,
-            ]);
+                $this->logService->log(
+                    $dominionId,
+                    'upgrade_housing',
+                    "Commander expanded residential sectors to Tier {$nextLevel}.",
+                    $cost
+                );
 
-            $this->db->commit();
-            return ['success' => true, 'message' => "Housing upgraded to level {$nextLevel}."];
+                return ['success' => true, 'message' => "Housing expanded to Tier {$nextLevel}."];
+            });
         } catch (Exception $e) {
-            $this->db->rollBack();
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 
-    public function upgradeMercenaryMarket(int $kingdomId): array
+    public function upgradeMercenaryMarket(int $dominionId): array
     {
-        $this->db->beginTransaction();
         try {
-            $data = $this->getUpgradeData($kingdomId);
-            $kingdom = $data['kingdom'];
-            $mercenaryMarketConfig = $data['mercenary_market_config'];
+            return Capsule::transaction(function() use ($dominionId) {
+                $dominion = Dominion::lockForUpdate()->find($dominionId);
+                
+                $currentLevel = (int)($dominion->mercenary_market_level ?? 0);
+                $nextLevel = $currentLevel + 1;
 
-            $currentLevel = $kingdom['mercenary_market_level'];
-            $nextLevel = $currentLevel + 1;
+                if ($nextLevel > $this->mercenaryMarketConfig['max_level']) {
+                    throw new Exception("Mercenary contact network is already at maximum reach.");
+                }
 
-            if ($nextLevel > $mercenaryMarketConfig['max_level']) {
-                throw new Exception("Mercenary Market is already at max level.");
-            }
+                $levelData = $this->mercenaryMarketConfig['levels'][$nextLevel];
+                $cost = $levelData['cost'];
 
-            $cost = $mercenaryMarketConfig['levels'][$nextLevel]['cost'];
+                if ($dominion->credits < $cost) {
+                    throw new Exception("Insufficient credits to secure new mercenary contracts.");
+                }
 
-            if ($kingdom['gold'] < $cost) {
-                throw new Exception("Insufficient gold to upgrade Mercenary Market.");
-            }
+                $dominion->decrement('credits', $cost);
+                $dominion->mercenary_market_level = $nextLevel;
+                $dominion->save();
 
-            $unitsGranted = $mercenaryMarketConfig['levels'][$nextLevel];
+                // Grant units
+                $unitsToGrant = [
+                    'guards' => $levelData['guards'] ?? 0,
+                    'soldiers' => $levelData['soldiers'] ?? 0,
+                    'spies' => $levelData['spies'] ?? 0,
+                    'sentries' => $levelData['sentries'] ?? 0
+                ];
 
-            $updateStmt = $this->db->prepare(
-                "UPDATE kingdoms SET 
-                    gold = gold - :cost,
-                    mercenary_market_level = :new_level,
-                    unit_guards = unit_guards + :guards,
-                    unit_soldiers = unit_soldiers + :soldiers,
-                    unit_spies = unit_spies + :spies,
-                    unit_sentries = unit_sentries + :sentries
-                 WHERE id = :id"
-            );
-            $updateStmt->execute([
-                ':cost' => $cost,
-                ':new_level' => $nextLevel,
-                ':guards' => $unitsGranted['guards'] ?? 0,
-                ':soldiers' => $unitsGranted['soldiers'] ?? 0,
-                ':spies' => $unitsGranted['spies'] ?? 0,
-                ':sentries' => $unitsGranted['sentries'] ?? 0,
-                ':id' => $kingdomId,
-            ]);
+                foreach ($unitsToGrant as $slug => $qty) {
+                    if ($qty > 0) {
+                        $unit = Unit::where('slug', $slug)->first();
+                        if ($unit) {
+                            $exists = DominionManpower::where('dominion_id', $dominionId)
+                                ->where('unit_id', $unit->id)
+                                ->exists();
 
-            $this->db->commit();
-            return ['success' => true, 'message' => "Mercenary Market upgraded to level {$nextLevel}. You gained new units!"];
+                            if ($exists) {
+                                DominionManpower::where('dominion_id', $dominionId)
+                                    ->where('unit_id', $unit->id)
+                                    ->increment('total_quantity', $qty);
+                            } else {
+                                DominionManpower::create([
+                                    'dominion_id' => $dominionId,
+                                    'unit_id' => $unit->id,
+                                    'total_quantity' => $qty
+                                ]);
+                            }
+                        }
+                    }
+                }
+
+                $this->logService->log(
+                    $dominionId,
+                    'upgrade_mercenary_market',
+                    "Commander expanded mercenary network to Tier {$nextLevel}. New recruits acquired.",
+                    $cost
+                );
+
+                return ['success' => true, 'message' => "Mercenary network expanded to Tier {$nextLevel}. Enforcements deployed."];
+            });
         } catch (Exception $e) {
-            $this->db->rollBack();
             return ['success' => false, 'message' => $e->getMessage()];
         }
     }

@@ -27,8 +27,8 @@ class RecruitmentController extends BaseController
             $this->redirect('/login');
         }
 
-        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
-        $status = $this->recruitmentService->getStatus($kingdom->id);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+        $status = $this->recruitmentService->getStatus($dominion->id);
 
         return $this->render('combat/recruit', [
             'title' => 'Civilian Mobilization',
@@ -43,10 +43,10 @@ class RecruitmentController extends BaseController
             return json_encode(['success' => false, 'message' => 'Unauthorized']);
         }
 
-        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
 
         try {
-            $res = $this->recruitmentService->startSession($kingdom->id);
+            $res = $this->recruitmentService->startSession($dominion->id);
             return json_encode($res);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -61,10 +61,10 @@ class RecruitmentController extends BaseController
         }
 
         $sessionId = (int)($_POST['session_id'] ?? 0);
-        $kingdom = $this->gameService->getKingdomByUserId((int)$_SESSION['user_id']);
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
 
         try {
-            $res = $this->recruitmentService->processClick($kingdom->id, $sessionId);
+            $res = $this->recruitmentService->processClick($dominion->id, $sessionId);
             return json_encode($res);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);

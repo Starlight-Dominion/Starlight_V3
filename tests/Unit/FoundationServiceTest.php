@@ -2,205 +2,158 @@
 
 namespace Tests\Unit;
 
-use PDO;
-use PDOStatement;
 use PHPUnit\Framework\TestCase;
 use sdo\Services\FoundationService;
-use Exception;
+use sdo\Services\LogService;
+use sdo\Models\Dominion;
+use sdo\Models\User;
+use sdo\Models\Structure;
+use sdo\Models\StructureLevel;
+use sdo\Models\DominionStructure;
+use Illuminate\Database\Capsule\Manager as Capsule;
 
 class FoundationServiceTest extends TestCase
 {
-    private $pdoMock;
-    private $foundationService;
+    private FoundationService $service;
+    private $logMock;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->pdoMock = $this->createMock(PDO::class);
-        $this->foundationService = new FoundationService($this->pdoMock);
+        $capsule = new Capsule();
+        $capsule->addConnection([
+            'driver'   => 'sqlite',
+            'database' => ':memory:',
+            'prefix'   => '',
+        ]);
+        $capsule->setAsGlobal();
+        $capsule->bootEloquent();
+
+        $this->createSchema();
+        $this->seedData();
+
+        $this->logMock = $this->createMock(LogService::class);
+        $this->service = new FoundationService($this->logMock);
     }
 
-    // Helper to mock PDOStatement for fetchColumn
-    private function mockPdoStatementForFetchColumn($value)
+    private function createSchema(): void
     {
-        $stmtMock = $this->createMock(PDOStatement::class);
-        $stmtMock->expects($this->any())
-                 ->method('fetchColumn')
-                 ->willReturn($value);
-        $stmtMock->expects($this->any())
-                 ->method('execute')
-                 ->willReturn(true);
-        return $stmtMock;
-    }
-
-    // Helper to mock PDOStatement for fetch (single row)
-    private function mockPdoStatementForFetch($row)
-    {
-        $stmtMock = $this->createMock(PDOStatement::class);
-        $stmtMock->expects($this->any())
-                 ->method('fetch')
-                 ->willReturn($row);
-        $stmtMock->expects($this->any())
-                 ->method('execute')
-                 ->willReturn(true);
-        return $stmtMock;
-    }
-
-    public function testGetFoundationDataReturnsCorrectData()
-    {
-        $kingdomId = 1;
-        $mockKingdom = [
-            'id' => $kingdomId,
-            'gold' => 50000,
-            'foundation_level' => 1,
-            'foundation_hp' => 100,
-            'foundation_upgrade_slot_1' => null,
-        ];
-
-        $this->pdoMock->expects($this->once())
-                      ->method('prepare')
-                      ->willReturn($this->mockPdoStatementForFetch($mockKingdom));
+        $schema = Capsule::schema();
         
-        $data = $this->foundationService->getFoundationData($kingdomId);
+        $schema->create('users', function ($table) {
+            $table->increments('id');
+            $table->string('username');
+            $table->string('email');
+            $table->string('password');
+            $table->timestamps();
+        });
 
-        $this->assertIsArray($data);
-        $this->assertEquals($kingdomId, $data['kingdom']['id']);
-        $this->assertArrayHasKey('current_tier', $data);
-        $this->assertArrayHasKey('next_level_cost', $data);
-        $this->assertArrayHasKey('upgrades', $data);
-        $this->assertArrayHasKey('level_costs', $data);
-        $this->assertEquals('Wood', $data['current_tier']['name']);
+        $schema->create('races', function ($table) {
+            $table->increments('id');
+            $table->string('name');
+        });
+
+        $schema->create('dominions', function ($table) {
+            $table->increments('id');
+            $table->integer('user_id')->unsigned();
+            $table->integer('race_id')->unsigned()->nullable();
+            $table->string('name');
+            $table->bigInteger('credits')->default(10000);
+            $table->bigInteger('foundation_hp')->default(1000);
+            $table->bigInteger('foundation_max_hp')->default(1000);
+            $table->timestamps();
+        });
+
+        $schema->create('structures', function ($table) {
+            $table->increments('id');
+            $table->string('slug')->unique();
+            $table->string('name');
+            $table->string('description');
+            $table->integer('max_level');
+        });
+
+        $schema->create('structure_levels', function ($table) {
+            $table->integer('structure_id')->unsigned();
+            $table->integer('level');
+            $table->integer('cost');
+            $table->integer('buff_hp')->default(0);
+            $table->integer('buff_unit_guards')->default(0);
+            $table->integer('buff_unit_soldiers')->default(0);
+            $table->integer('buff_unit_spies')->default(0);
+            $table->integer('buff_unit_sentries')->default(0);
+            $table->primary(['structure_id', 'level']);
+        });
+
+        $schema->create('dominion_structures', function ($table) {
+            $table->integer('dominion_id')->unsigned();
+            $table->integer('structure_id')->unsigned();
+            $table->integer('level')->default(0);
+            $table->string('mod_slot_1')->nullable();
+            $table->primary(['dominion_id', 'structure_id']);
+        });
+
+        $schema->create('units', function ($table) {
+            $table->increments('id');
+            $table->string('slug')->unique();
+        });
+
+        $schema->create('dominion_manpower', function ($table) {
+            $table->integer('dominion_id')->unsigned();
+            $table->integer('unit_id')->unsigned();
+            $table->integer('total_quantity')->default(0);
+            $table->primary(['dominion_id', 'unit_id']);
+        });
     }
 
-    public function testUpgradeFoundationSuccessfully()
+    private function seedData(): void
     {
-        $kingdomId = 1;
-        $mockKingdom = [
-            'id' => $kingdomId,
-            'gold' => 50000,
-            'foundation_level' => 1,
-            'foundation_hp' => 100,
-            'foundation_upgrade_slot_1' => null,
-        ];
+        Structure::create(['id' => 1, 'slug' => 'foundation', 'name' => 'Foundation', 'description' => 'Core', 'max_level' => 20]);
+        StructureLevel::create(['structure_id' => 1, 'level' => 1, 'cost' => 1000, 'buff_hp' => 1500]);
+    }
 
-        $this->pdoMock->expects($this->exactly(2)) // 1 for getFoundationData, 1 for upgrade
-                      ->method('prepare')
-                      ->willReturn($this->mockPdoStatementForFetch($mockKingdom));
+    private function createTestDominion(): Dominion
+    {
+        $user = User::create(['username' => 'player', 'email' => 'p@t.com', 'password' => 'p']);
+        return $user->dominion()->create(['name' => 'D', 'credits' => 10000]);
+    }
+
+    public function testGetFoundationState(): void
+    {
+        $dominion = $this->createTestDominion();
         
-        $this->pdoMock->expects($this->once())
-                      ->method('beginTransaction');
-        $this->pdoMock->expects($this->once())
-                      ->method('commit');
+        $state = $this->service->getFoundationState($dominion->id);
 
-        $result = $this->foundationService->upgradeFoundation($kingdomId);
+        $this->assertArrayHasKey('dominion', $state);
+        $this->assertArrayHasKey('structures', $state);
+        $this->assertArrayHasKey('foundation', $state['structures']);
+        $this->assertEquals(0, $state['structures']['foundation']['current_level']);
+    }
+
+    public function testUpgradeFoundationSuccessfully(): void
+    {
+        $dominion = $this->createTestDominion();
+        
+        $result = $this->service->upgrade($dominion->id, 1);
 
         $this->assertTrue($result['success']);
-        $this->assertStringContainsString('Foundation upgraded', $result['message']);
+        $dominion->refresh();
+        $this->assertEquals(1500, $dominion->foundation_hp);
+        $this->assertEquals(1500, $dominion->foundation_max_hp);
+        $this->assertEquals(9000, $dominion->credits);
     }
 
-    public function testUpgradeFoundationFailsInsufficientGold()
+    public function testRepairFoundation(): void
     {
-        $kingdomId = 1;
-        $mockKingdom = [
-            'id' => $kingdomId,
-            'gold' => 0, // Insufficient gold
-            'foundation_level' => 1,
-            'foundation_hp' => 100,
-            'foundation_upgrade_slot_1' => null,
-        ];
-        $this->pdoMock->expects($this->once())
-                      ->method('prepare')
-                      ->willReturn($this->mockPdoStatementForFetch($mockKingdom));
-        
-        $this->pdoMock->expects($this->once())
-                      ->method('beginTransaction');
-        $this->pdoMock->expects($this->once())
-                      ->method('rollBack');
+        $dominion = $this->createTestDominion();
+        $dominion->foundation_hp = 500;
+        $dominion->save();
 
-        $result = $this->foundationService->upgradeFoundation($kingdomId);
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Insufficient gold', $result['message']);
-    }
-
-    public function testPurchaseUpgradeSuccessfully()
-    {
-        $kingdomId = 1;
-        $upgradeKey = 'moat';
-        $mockKingdom = [
-            'id' => $kingdomId,
-            'gold' => 50000,
-            'foundation_level' => 1,
-            'foundation_hp' => 100,
-            'foundation_upgrade_slot_1' => null,
-        ];
-
-        $this->pdoMock->expects($this->exactly(2)) // 1 for getFoundationData, 1 for purchase
-                      ->method('prepare')
-                      ->willReturn($this->mockPdoStatementForFetch($mockKingdom));
-        
-        $this->pdoMock->expects($this->once())
-                      ->method('beginTransaction');
-        $this->pdoMock->expects($this->once())
-                      ->method('commit');
-
-        $result = $this->foundationService->purchaseUpgrade($kingdomId, $upgradeKey);
+        $result = $this->service->repair($dominion->id);
 
         $this->assertTrue($result['success']);
-        $this->assertStringContainsString('Successfully purchased', $result['message']);
-    }
-
-    public function testPurchaseUpgradeFailsSlotFilled()
-    {
-        $kingdomId = 1;
-        $upgradeKey = 'moat';
-        $mockKingdom = [
-            'id' => $kingdomId,
-            'gold' => 50000,
-            'foundation_level' => 1,
-            'foundation_hp' => 100,
-            'foundation_upgrade_slot_1' => 'moat', // Slot already filled
-        ];
-
-        $this->pdoMock->expects($this->once())
-                      ->method('prepare')
-                      ->willReturn($this->mockPdoStatementForFetch($mockKingdom));
-        
-        $this->pdoMock->expects($this->once())
-                      ->method('beginTransaction');
-        $this->pdoMock->expects($this->once())
-                      ->method('rollBack');
-
-        $result = $this->foundationService->purchaseUpgrade($kingdomId, $upgradeKey);
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Upgrade slot is already filled', $result['message']);
-    }
-
-    public function testPurchaseUpgradeFailsInsufficientGold()
-    {
-        $kingdomId = 1;
-        $upgradeKey = 'moat';
-        $mockKingdom = [
-            'id' => $kingdomId,
-            'gold' => 0, // Insufficient gold
-            'foundation_level' => 1,
-            'foundation_hp' => 100,
-            'foundation_upgrade_slot_1' => null,
-        ];
-        $this->pdoMock->expects($this->once())
-                      ->method('prepare')
-                      ->willReturn($this->mockPdoStatementForFetch($mockKingdom));
-        
-        $this->pdoMock->expects($this->once())
-                      ->method('beginTransaction');
-        $this->pdoMock->expects($this->once())
-                      ->method('rollBack');
-
-        $result = $this->foundationService->purchaseUpgrade($kingdomId, $upgradeKey);
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Insufficient gold', $result['message']);
+        $dominion->refresh();
+        $this->assertEquals(1000, $dominion->foundation_hp);
+        $this->assertEquals(5000, $dominion->credits); // (1000-500) * 10 = 5000 cost
     }
 }

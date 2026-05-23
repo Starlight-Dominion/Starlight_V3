@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
@@ -25,15 +27,13 @@ class AdminUnitCRUDTest extends TestCase
             $table->string('slug')->unique();
             $table->string('name');
             $table->text('description');
-            $table->integer('cost_gold');
+            $table->integer('cost_credits');
             $table->integer('cost_citizens');
             $table->integer('cost_turns');
             $table->integer('power_offense');
             $table->integer('power_defense');
             $table->string('requirement_slug')->nullable();
             $table->integer('foundation_level_req')->default(0);
-            $table->integer('stable_level_req')->default(0);
-            $table->integer('armory_level_req')->default(0);
         });
     }
 
@@ -46,7 +46,7 @@ class AdminUnitCRUDTest extends TestCase
             'slug' => 'test_unit',
             'name' => 'Test Unit',
             'description' => 'Test Desc',
-            'cost_gold' => 100,
+            'cost_credits' => 100,
             'cost_citizens' => 1,
             'cost_turns' => 1,
             'power_offense' => 10,
@@ -69,10 +69,14 @@ class AdminUnitCRUDTest extends TestCase
             'slug' => 'soldiers',
             'name' => 'Soldiers',
             'description' => 'D',
-            'cost_gold' => 100, 'cost_citizens' => 1, 'cost_turns' => 1, 'power_offense' => 1, 'power_defense' => 1
+            'cost_credits' => 100, 
+            'cost_citizens' => 1, 
+            'cost_turns' => 1, 
+            'power_offense' => 1, 
+            'power_defense' => 1
         ]);
 
-        $res = $adminService->updateUnit($unitId, [
+        $res = $adminService->updateUnit((int)$unitId, [
             'requirement_slug' => 'guards',
             'foundation_level_req' => 5
         ]);

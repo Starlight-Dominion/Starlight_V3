@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use sdo\Models\User;
-use sdo\Models\Kingdom;
+use sdo\Models\Dominion;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class UserModelTest extends TestCase
@@ -31,10 +33,10 @@ class UserModelTest extends TestCase
             $table->timestamps();
         });
 
-        Capsule::schema()->create('kingdoms', function ($table) {
+        Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id')->unsigned();
-            $table->string('kingdom_name');
+            $table->string('name')->unique();
             $table->timestamps();
         });
     }
@@ -70,7 +72,7 @@ class UserModelTest extends TestCase
         $this->assertArrayNotHasKey('password', $array);
     }
 
-    public function testKingdomRelationship(): void
+    public function testDominionRelationship(): void
     {
         $user = User::create([
             'username' => 'testuser',
@@ -78,13 +80,13 @@ class UserModelTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $kingdom = $user->kingdom()->create([
-            'kingdom_name' => 'Test Kingdom',
+        $dominion = $user->dominion()->create([
+            'name' => 'Test Dominion',
         ]);
 
-        $this->assertInstanceOf(Kingdom::class, $user->kingdom);
-        $this->assertEquals('Test Kingdom', $user->kingdom->kingdom_name);
-        $this->assertEquals($user->id, $kingdom->user_id);
+        $this->assertInstanceOf(Dominion::class, $user->dominion);
+        $this->assertEquals('Test Dominion', $user->dominion->name);
+        $this->assertEquals($user->id, $dominion->user_id);
     }
 
     public function testIsBotCastToBoolean(): void

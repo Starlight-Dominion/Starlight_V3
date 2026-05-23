@@ -66,7 +66,7 @@ class AuthController extends BaseController
             'username' => 'required|min:3',
             'email' => 'required|email',
             'password' => 'required|min:6|confirmed',
-            'kingdom_name' => 'required|min:3',
+            'dominion_name' => 'required|min:3',
             'race' => 'required'
         ]);
 
@@ -82,7 +82,7 @@ class AuthController extends BaseController
             $_POST['username'],
             $_POST['email'],
             $_POST['password'],
-            $_POST['kingdom_name'],
+            $_POST['dominion_name'],
             $_POST['race']
         );
 
