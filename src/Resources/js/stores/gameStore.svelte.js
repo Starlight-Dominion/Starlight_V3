@@ -30,8 +30,8 @@ class GameStore {
         this.user = initialState.user || null;
         this.csrf = initialState.csrf || '';
 
-        if (this.user?.kingdom) {
-            this.syncResources(this.user.kingdom);
+        if (this.user?.dominion) {
+            this.syncResources(this.user.dominion);
         }
 
         if (this.user?.citizen_growth_rate) {
@@ -43,13 +43,13 @@ class GameStore {
         }
     }
 
-    syncResources(kingdom) {
-        this.resources.credits = kingdom.credits ?? 0;
-        this.resources.bank = kingdom.credits_banked ?? 0;
-        this.resources.citizens = kingdom.citizens ?? 0;
-        this.resources.turns = kingdom.turns ?? 0;
-        this.resources.xp = kingdom.xp ?? 0;
-        this.resources.deposits_today = kingdom.deposits_today ?? 0;
+    syncResources(dominion) {
+        this.resources.credits = dominion.credits ?? 0;
+        this.resources.bank = dominion.credits_banked ?? 0;
+        this.resources.citizens = dominion.citizens ?? 0;
+        this.resources.turns = dominion.turns ?? 0;
+        this.resources.xp = dominion.xp ?? 0;
+        this.resources.deposits_today = dominion.deposits_today ?? 0;
     }
 
     startHeartbeat() {
@@ -71,8 +71,8 @@ class GameStore {
                 headers: { 'Accept': 'application/json' }
             });
             const data = await res.json();
-            if (data.user?.kingdom) {
-                this.syncResources(data.user.kingdom);
+            if (data.user?.dominion) {
+                this.syncResources(data.user.dominion);
             }
         } catch (e) {
             console.error("Telemetry link lost.");
