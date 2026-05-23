@@ -30,9 +30,9 @@ class InitialDataSeeder extends AbstractSeed {
 
         // Structures
         $this->table('structures')->insert([
-            ['slug' => 'foundation', 'name' => 'Planetary Foundation', 'description' => 'Core integrity.', 'max_level' => 20],
-            ['slug' => 'economy', 'name' => 'Economic Hub', 'description' => 'Credit generation and trade networks.', 'max_level' => 20],
-            ['slug' => 'armory', 'name' => 'Sector Armory', 'description' => 'Advanced tactical gear unlocking.', 'max_level' => 20]
+            ['slug' => 'foundation', 'name' => 'Planetary Foundation', 'description' => 'The Capital of your Dominion, the last line of defense.', 'max_level' => 20],
+            ['slug' => 'economy', 'name' => 'Economic Hub', 'description' => 'The Economic center of your dominion.', 'max_level' => 20],
+            ['slug' => 'armory', 'name' => 'Sector Armory', 'description' => 'Advanced military research and development facility for tactical equipment.', 'max_level' => 20]
         ])->saveData();
 
         // 1. Foundation Levels
