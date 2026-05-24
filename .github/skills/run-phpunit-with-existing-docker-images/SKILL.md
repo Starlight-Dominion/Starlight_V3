@@ -3,7 +3,7 @@ name: run-phpunit-with-existing-docker-images
 description: >
   Run PHPUnit in Starlight_V3 using existing Docker images and containers first,
    without local PHP dependency and with automatic pull or build only when required. Use when tests
-  fail locally due PHP version mismatch, or when asked to run specific PHPUnit files,
+   fail locally due to PHP version mismatch, or when asked to run specific PHPUnit files,
   suites, or filters through Docker Compose.
 ---
 

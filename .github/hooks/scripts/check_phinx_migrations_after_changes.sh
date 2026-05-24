@@ -4,7 +4,7 @@ set -u
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$repo_root" || exit 0
 
-mapfile -t changed_files < <((git diff --name-only; git diff --name-only --cached) | sort -u)
+mapfile -t changed_files < <({ git diff --name-only; git diff --name-only --cached; } | sort -u)
 
 has_migration_change=false
 for path in "${changed_files[@]}"; do

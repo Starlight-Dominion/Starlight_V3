@@ -9,7 +9,7 @@ if git diff --quiet && git diff --cached --quiet; then
   exit 0
 fi
 
-mapfile -t changed_files < <((git diff --name-only; git diff --name-only --cached) | sort -u)
+mapfile -t changed_files < <({ git diff --name-only; git diff --name-only --cached; } | sort -u)
 
 has_php_related_change=false
 for path in "${changed_files[@]}"; do
@@ -39,12 +39,12 @@ fi
 
 declare -a targets
 for path in "${changed_files[@]}"; do
-  if [[ "$path" == tests/*Test.php ]]; then
+  if [[ "$path" =~ ^tests/.+Test\.php$ ]]; then
     targets+=("$path")
     continue
   fi
 
-  if [[ "$path" == src/*.php || "$path" == src/*/*.php || "$path" == src/*/*/*.php ]]; then
+  if [[ "$path" =~ ^src/.+\.php$ ]]; then
     base="$(basename "$path" .php)"
     for candidate in "tests/Unit/${base}Test.php" "tests/Integration/${base}Test.php" "tests/Feature/${base}Test.php"; do
       if [[ -f "$candidate" ]]; then
