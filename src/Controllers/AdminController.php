@@ -151,20 +151,24 @@ class AdminController extends BaseController
         header('Content-Type: application/json');
         $this->checkAdmin();
 
-        $structures = $this->adminService->getAllStructures();
-        $detailedStructures = [];
+        try {
+            $structures = $this->adminService->getAllStructures();
+            $detailedStructures = [];
 
-        foreach ($structures as $s) {
-            $detailedStructures[] = [
-                'details' => $s,
-                'levels' => $this->adminService->getStructureLevels((int)$s->id)
-            ];
+            foreach ($structures as $s) {
+                $detailedStructures[] = [
+                    'details' => $s,
+                    'levels' => $this->adminService->getStructureLevels((int)$s['id'])
+                ];
+            }
+
+            return json_encode([
+                'success' => true,
+                'structures' => $detailedStructures
+            ]);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
-
-        return json_encode([
-            'success' => true,
-            'structures' => $detailedStructures
-        ]);
     }
 
     public function updateStructure(): string
