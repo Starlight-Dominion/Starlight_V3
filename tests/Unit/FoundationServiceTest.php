@@ -60,6 +60,13 @@ class FoundationServiceTest extends TestCase
             $table->integer('race_id')->unsigned()->nullable();
             $table->string('name');
             $table->bigInteger('credits')->default(10000);
+            $table->integer('armory_level')->default(0);
+            $table->integer('current_mine_tier')->default(1);
+            $table->integer('current_mine_level')->default(0);
+            $table->integer('housing_level')->default(0);
+            $table->integer('mercenary_market_level')->default(0);
+            $table->integer('held_citizens')->default(0);
+            $table->datetime('last_untrained')->nullable();
             $table->bigInteger('foundation_hp')->default(1000);
             $table->bigInteger('foundation_max_hp')->default(1000);
             $table->timestamps();

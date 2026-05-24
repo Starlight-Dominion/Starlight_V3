@@ -105,4 +105,31 @@ class ArmoryController extends BaseController
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }
+
+    public function toggleEquip(): string
+    {
+        header('Content-Type: application/json');
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+        $itemId = (int)($_POST['item_id'] ?? 0);
+
+        try {
+            return json_encode($this->armoryService->toggleEquip($dominion->id, $itemId));
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function upgradeItem(): string
+    {
+        header('Content-Type: application/json');
+        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+        $itemId = (int)($_POST['item_id'] ?? 0);
+        $qty = (int)($_POST['quantity'] ?? 1);
+
+        try {
+            return json_encode($this->armoryService->upgradeItem($dominion->id, $itemId, $qty));
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
 }

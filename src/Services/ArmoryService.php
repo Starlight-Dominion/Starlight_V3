@@ -26,11 +26,10 @@ class ArmoryService
         $categories = ArmoryCategory::all();
         $inventory = DominionArmoryItem::where('kingdom_id', $domId)
             ->get()
-            ->pluck('quantity', 'item_id');
+            ->keyBy('item_id');
 
         $loadouts = [];
         foreach ($unitTypes as $uType) {
-            // Map units from manpower table
             $count = DominionManpower::join('units', 'dominion_manpower.unit_id', '=', 'units.id')
                 ->where('dominion_manpower.dominion_id', $domId)
                 ->where('units.slug', $uType->slug)
@@ -47,7 +46,9 @@ class ArmoryService
                 $items = ArmoryItem::where('category_id', $cat->id)
                     ->get()
                     ->map(function($item) use ($inventory, $dom) {
-                        $item->owned_quantity = $inventory[$item->id] ?? 0;
+                        $invItem = $inventory[$item->id] ?? null;
+                        $item->owned_quantity = $invItem ? $invItem->quantity : 0;
+                        $item->is_equipped = $invItem ? $invItem->is_equipped : false;
                         $item->unlocked = ($dom->armory_level >= $item->armory_level_req);
                         return $item;
                     })->keyBy('slug');
@@ -61,7 +62,7 @@ class ArmoryService
         }
 
         $nextLevel = $dom->armory_level + 1;
-        $upgrade = StructureLevel::where('structure_id', 3) // Assuming Armory ID is 3
+        $upgrade = StructureLevel::where('structure_id', 3) 
             ->where('level', $nextLevel)
             ->first();
 
@@ -70,6 +71,115 @@ class ArmoryService
             'armory_level' => $dom->armory_level,
             'upgrade_cost' => $upgrade ? $upgrade->cost : null
         ];
+    }
+
+    public function toggleEquip(int $domId, int $itemId): array
+    {
+        return Capsule::transaction(function() use ($domId, $itemId) {
+            $inv = DominionArmoryItem::where('kingdom_id', $domId)
+                ->where('item_id', $itemId)
+                ->first();
+
+            if (!$inv || $inv->quantity <= 0) {
+                throw new Exception("Item not found in inventory.");
+            }
+
+            $newState = !$inv->is_equipped;
+            
+            DominionArmoryItem::where('kingdom_id', $domId)
+                ->where('item_id', $itemId)
+                ->update(['is_equipped' => $newState]);
+
+            $item = ArmoryItem::find($itemId);
+            $status = $newState ? "equipped" : "unequipped";
+
+            $this->logService->log(
+                $domId,
+                'armory_equip',
+                "Commander $status {$item->name}.",
+                0,
+                ['item' => $item->slug, 'is_equipped' => $newState]
+            );
+
+            return ['success' => true, 'is_equipped' => $newState, 'message' => "Item $status."];
+        });
+    }
+
+    public function upgradeItem(int $domId, int $itemId, int $qty): array
+    {
+        return Capsule::transaction(function() use ($domId, $itemId, $qty) {
+            $dom = Dominion::lockForUpdate()->find($domId);
+            $targetItem = ArmoryItem::find($itemId);
+
+            if (!$targetItem || !$targetItem->requirement_slug) {
+                throw new Exception("Invalid upgrade target.");
+            }
+
+            if ($dom->armory_level < $targetItem->armory_level_req) {
+                throw new Exception("Tech requirement not met.");
+            }
+
+            $reqItem = ArmoryItem::where('slug', $targetItem->requirement_slug)->first();
+            if (!$reqItem) throw new Exception("Requirement data missing.");
+
+            $invReq = DominionArmoryItem::where('kingdom_id', $domId)
+                ->where('item_id', $reqItem->id)
+                ->first();
+
+            if (!$invReq || $invReq->quantity < $qty) {
+                throw new Exception("Insufficient {$reqItem->name} for upgrade.");
+            }
+
+            $totalCost = $targetItem->cost * $qty;
+            if ($dom->credits < $totalCost) throw new Exception("Insufficient credits.");
+
+            // Process Upgrade
+            $dom->credits -= $totalCost;
+            $dom->save();
+
+            // Consume Req via Query Builder
+            DominionArmoryItem::where('kingdom_id', $domId)
+                ->where('item_id', $reqItem->id)
+                ->decrement('quantity', $qty);
+            
+            $remaining = DominionArmoryItem::where('kingdom_id', $domId)
+                ->where('item_id', $reqItem->id)
+                ->value('quantity');
+
+            if ($remaining <= 0) {
+                DominionArmoryItem::where('kingdom_id', $domId)
+                    ->where('item_id', $reqItem->id)
+                    ->delete();
+            }
+
+            // Add Target via Query Builder
+            $exists = DominionArmoryItem::where('kingdom_id', $domId)
+                ->where('item_id', $itemId)
+                ->exists();
+
+            if ($exists) {
+                DominionArmoryItem::where('kingdom_id', $domId)
+                    ->where('item_id', $itemId)
+                    ->increment('quantity', $qty);
+            } else {
+                DominionArmoryItem::insert([
+                    'kingdom_id' => $domId,
+                    'item_id' => $itemId,
+                    'quantity' => $qty,
+                    'is_equipped' => false
+                ]);
+            }
+
+            $this->logService->log(
+                $domId,
+                'armory_upgrade_item',
+                "Commander upgraded $qty x {$reqItem->name} into {$targetItem->name}.",
+                $totalCost,
+                ['from' => $reqItem->slug, 'to' => $targetItem->slug, 'quantity' => $qty]
+            );
+
+            return ['success' => true, 'message' => "Successfully upgraded $qty items."];
+        });
     }
 
     public function buyItem(int $domId, int $itemId, int $qty): array
@@ -97,10 +207,11 @@ class ArmoryService
                     ->where('item_id', $itemId)
                     ->increment('quantity', $qty);
             } else {
-                DominionArmoryItem::create([
+                DominionArmoryItem::insert([
                     'kingdom_id' => $domId,
                     'item_id' => $itemId,
-                    'quantity' => $qty
+                    'quantity' => $qty,
+                    'is_equipped' => false
                 ]);
             }
 
@@ -132,7 +243,19 @@ class ArmoryService
             $dom->credits += $refund;
             $dom->save();
 
-            $inv->decrement('quantity', $qty);
+            DominionArmoryItem::where('kingdom_id', $domId)
+                ->where('item_id', $itemId)
+                ->decrement('quantity', $qty);
+            
+            $remaining = DominionArmoryItem::where('kingdom_id', $domId)
+                ->where('item_id', $itemId)
+                ->value('quantity');
+
+            if ($remaining <= 0) {
+                DominionArmoryItem::where('kingdom_id', $domId)
+                    ->where('item_id', $itemId)
+                    ->delete();
+            }
 
             $this->logService->log(
                 $domId,

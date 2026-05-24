@@ -63,17 +63,26 @@ class TacticalService
     {
         if ($unitCount <= 0) return 0.0;
 
+        // Fetch equipped items for this unit type, sorted by the bonus field descending
         $items = DominionArmoryItem::with('item')
             ->where('kingdom_id', $domId)
+            ->where('is_equipped', true)
             ->whereHas('item', fn($q) => $q->where('unit_type', $type))
-            ->get();
+            ->get()
+            ->sortByDesc(fn($m) => $m->item->$field);
 
         $bonus = 0.0;
+        $remainingCapacity = $unitCount;
+
         foreach ($items as $item) {
-            // Only as many items as we have units can provide a bonus
-            $effectiveQty = min($unitCount, $item->quantity);
+            // Apply items up to the unit limit
+            $effectiveQty = min($remainingCapacity, $item->quantity);
             $bonus += ($effectiveQty * (float)$item->item->$field);
+            
+            $remainingCapacity -= $effectiveQty;
+            if ($remainingCapacity <= 0) break;
         }
+
         return $bonus;
     }
 

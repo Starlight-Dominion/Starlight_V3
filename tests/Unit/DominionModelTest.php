@@ -40,6 +40,13 @@ class DominionModelTest extends TestCase
             $table->bigInteger('credits_banked')->default(0);
             $table->integer('citizens')->default(500);
             $table->integer('turns')->default(100);
+            $table->integer('armory_level')->default(0);
+            $table->integer('current_mine_tier')->default(1);
+            $table->integer('current_mine_level')->default(0);
+            $table->integer('housing_level')->default(0);
+            $table->integer('mercenary_market_level')->default(0);
+            $table->integer('held_citizens')->default(0);
+            $table->dateTime('last_untrained')->nullable();
             $table->integer('xp')->default(0);
             $table->bigInteger('foundation_hp')->default(1000);
             $table->bigInteger('foundation_max_hp')->default(1000);

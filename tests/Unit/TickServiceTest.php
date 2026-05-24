@@ -45,6 +45,13 @@ class TickServiceTest extends TestCase
             $table->bigInteger('credits')->default(0);
             $table->integer('citizens')->default(0);
             $table->integer('turns')->default(0);
+            $table->integer('armory_level')->default(0);
+            $table->integer('current_mine_tier')->default(1);
+            $table->integer('current_mine_level')->default(0);
+            $table->integer('housing_level')->default(0);
+            $table->integer('mercenary_market_level')->default(0);
+            $table->integer('held_citizens')->default(0);
+            $table->datetime('last_untrained')->nullable();
             $table->datetime('last_tick')->nullable();
             $table->timestamps();
         });

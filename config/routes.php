@@ -105,8 +105,9 @@ return function (RouteCollector $r) {
     //Armory Actions
     $r->addRoute('POST', '/structures/armory/buy', [\sdo\Controllers\ArmoryController::class, 'buy']);
     $r->addRoute('POST', '/structures/armory/sell', [\sdo\Controllers\ArmoryController::class, 'sell']);
-    $r->addRoute('POST', '/structures/armory/toggle-hide', [\sdo\Controllers\ArmoryController::class, 'toggleHide']);
     $r->addRoute('POST', '/structures/armory/upgrade', [\sdo\Controllers\ArmoryController::class, 'upgrade']);
+    $r->addRoute('POST', '/structures/armory/equip', [\sdo\Controllers\ArmoryController::class, 'toggleEquip']);
+    $r->addRoute('POST', '/structures/armory/upgrade-item', [\sdo\Controllers\ArmoryController::class, 'upgradeItem']);
 
     // Settings Routes
     $r->addRoute('GET', '/settings', [\sdo\Controllers\SettingsController::class, 'index']);

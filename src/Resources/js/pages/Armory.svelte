@@ -23,9 +23,6 @@
 
     function buyMax(item) {
         const affordable = Math.floor(resources.credits / item.cost);
-        const needed = Math.max(0, currentLoadout.unit_count - item.owned_quantity);
-        // We can buy more than we need, but usually 'max' means 'what I can afford' or 'what I need'
-        // Let's go with 'what I can afford' but cap it at a reasonable large number if needed.
         setQty(item.id, affordable);
     }
 
@@ -48,6 +45,7 @@
             const data = await res.json();
             message = data;
             if (data.success) {
+                // Refresh local state or reload
                 window.location.reload();
             }
         } catch (e) {
@@ -108,15 +106,26 @@
             <section class="space-y-6">
                 <div class="flex justify-between items-center bg-cyan-950/10 p-4 border border-cyan-500/10 rounded-xl">
                     <h3 class="text-xs font-title font-black text-white uppercase tracking-[4px]">{category.title}</h3>
-                    <span class="text-[9px] font-bold text-cyan-600 uppercase">Operational Force: {currentLoadout.unit_count.toLocaleString()} Units</span>
+                    <div class="flex items-center gap-4">
+                        <span class="text-[9px] font-bold text-cyan-600 uppercase">Operational Force: {currentLoadout.unit_count.toLocaleString()} Units</span>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {#each Object.entries(category.items) as [slug, item]}
-                        <div class="bg-dark-translucent border border-white/5 p-6 rounded-2xl relative group hover:border-cyan-500/30 transition-all {!item.unlocked ? 'opacity-30' : ''}">
+                        <div class="bg-dark-translucent border border-white/5 p-6 rounded-2xl relative group hover:border-cyan-500/30 transition-all {!item.unlocked && item.owned_quantity === 0 ? 'opacity-30' : ''} {item.is_equipped ? 'ring-1 ring-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.1)]' : ''}">
+                            {#if item.is_equipped}
+                                <div class="absolute -top-2 -right-2 bg-cyan-500 text-black text-[7px] font-black px-2 py-1 rounded uppercase tracking-widest z-20 shadow-lg">Equipped</div>
+                            {/if}
+
                             <header class="flex justify-between items-start mb-4">
-                                <h4 class="text-white font-bold text-sm uppercase font-title">{item.name}</h4>
-                                <span class="text-xs font-mono font-bold text-cyan-500">{item.owned_quantity.toLocaleString()}</span>
+                                <div>
+                                    <h4 class="text-white font-bold text-sm uppercase font-title">{item.name}</h4>
+                                    {#if item.requirement_slug}
+                                        <p class="text-[7px] text-gray-500 uppercase mt-1">Requires: {item.requirement_slug.replace(/_/g, ' ')}</p>
+                                    {/if}
+                                </div>
+                                <span class="text-xs font-mono font-bold {item.owned_quantity > 0 ? 'text-cyan-500' : 'text-gray-700'}">{item.owned_quantity.toLocaleString()}</span>
                             </header>
 
                             <div class="space-y-2 mb-6">
@@ -130,8 +139,8 @@
                                 </div>
                             </div>
 
-                            {#if item.unlocked}
-                                <div class="space-y-4">
+                            <div class="space-y-4">
+                                {#if item.unlocked}
                                     <div class="flex items-center gap-2">
                                         <input 
                                             type="number" 
@@ -148,21 +157,40 @@
                                     <div class="grid grid-cols-2 gap-2">
                                         <button 
                                             onclick={() => handleAction('buy', item.id, getQty(item.id))}
-                                            class="bg-cyan-950/40 border border-cyan-500/20 text-cyan-400 py-3 rounded text-[9px] font-black uppercase tracking-widest hover:bg-cyan-500 hover:text-black transition-all"
+                                            class="bg-cyan-950/40 border border-cyan-500/20 text-cyan-400 py-3 rounded text-[9px] font-black uppercase tracking-widest hover:bg-cyan-500 hover:text-black transition-all disabled:opacity-50"
                                             disabled={loading || resources.credits < (item.cost * getQty(item.id))}
                                         >Purchase</button>
-                                        <button 
-                                            onclick={() => handleAction('sell', item.id, getQty(item.id))}
-                                            class="bg-red-950/20 border border-red-900/30 text-red-900 py-3 rounded text-[9px] font-black uppercase tracking-widest hover:bg-red-900 hover:text-white transition-all"
-                                            disabled={loading || item.owned_quantity < getQty(item.id)}
-                                        >Salvage</button>
+                                        
+                                        {#if item.requirement_slug}
+                                            <button 
+                                                onclick={() => handleAction('upgrade-item', item.id, getQty(item.id))}
+                                                class="bg-purple-950/20 border border-purple-500/30 text-purple-400 py-3 rounded text-[9px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all disabled:opacity-50"
+                                                disabled={loading || resources.credits < (item.cost * getQty(item.id))}
+                                            >Upgrade</button>
+                                        {:else}
+                                            <button 
+                                                onclick={() => handleAction('sell', item.id, getQty(item.id))}
+                                                class="bg-red-950/20 border border-red-900/30 text-red-900 py-3 rounded text-[9px] font-black uppercase tracking-widest hover:bg-red-900 hover:text-white transition-all disabled:opacity-50"
+                                                disabled={loading || item.owned_quantity < getQty(item.id)}
+                                            >Salvage</button>
+                                        {/if}
                                     </div>
-                                </div>
-                            {:else}
-                                <div class="absolute inset-0 flex items-center justify-center bg-black/60 rounded-2xl z-10">
-                                    <span class="text-[8px] font-black text-white uppercase tracking-[3px]">Tech Rank {item.armory_level_req} Required</span>
-                                </div>
-                            {/if}
+                                {:else if item.owned_quantity === 0}
+                                    <div class="bg-black/40 border border-white/5 p-3 rounded text-center">
+                                        <span class="text-[8px] font-black text-gray-600 uppercase tracking-[2px]">Tech Rank {item.armory_level_req} Required</span>
+                                    </div>
+                                {/if}
+
+                                {#if item.owned_quantity > 0}
+                                    <button 
+                                        onclick={() => handleAction('equip', item.id)}
+                                        class="w-full py-3 rounded text-[9px] font-black uppercase tracking-widest transition-all {item.is_equipped ? 'bg-cyan-500 text-black hover:bg-cyan-600' : 'bg-white/5 text-gray-400 border border-white/10 hover:border-cyan-500/50 hover:text-white'}"
+                                        disabled={loading}
+                                    >
+                                        {item.is_equipped ? 'Unequip Unit' : 'Equip Unit'}
+                                    </button>
+                                {/if}
+                            </div>
                         </div>
                     {/each}
                 </div>

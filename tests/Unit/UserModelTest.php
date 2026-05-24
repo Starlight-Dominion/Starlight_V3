@@ -37,6 +37,13 @@ class UserModelTest extends TestCase
             $table->increments('id');
             $table->integer('user_id')->unsigned();
             $table->string('name')->unique();
+            $table->integer('armory_level')->default(0);
+            $table->integer('current_mine_tier')->default(1);
+            $table->integer('current_mine_level')->default(0);
+            $table->integer('housing_level')->default(0);
+            $table->integer('mercenary_market_level')->default(0);
+            $table->integer('held_citizens')->default(0);
+            $table->dateTime('last_untrained')->nullable();
             $table->timestamps();
         });
     }

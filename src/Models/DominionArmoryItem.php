@@ -15,7 +15,8 @@ class DominionArmoryItem extends Model
     protected $casts = [
         'kingdom_id' => 'integer',
         'item_id' => 'integer',
-        'quantity' => 'integer'
+        'quantity' => 'integer',
+        'is_equipped' => 'boolean'
     ];
 
     public function item()

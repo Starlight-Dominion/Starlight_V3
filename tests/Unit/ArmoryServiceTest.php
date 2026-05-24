@@ -56,6 +56,12 @@ class ArmoryServiceTest extends TestCase
             $table->string('name');
             $table->integer('credits')->default(0);
             $table->integer('armory_level')->default(0);
+            $table->integer('current_mine_tier')->default(1);
+            $table->integer('current_mine_level')->default(0);
+            $table->integer('housing_level')->default(0);
+            $table->integer('mercenary_market_level')->default(0);
+            $table->integer('held_citizens')->default(0);
+            $table->dateTime('last_untrained')->nullable();
             $table->integer('xp')->default(0);
             $table->timestamps();
         });
@@ -91,6 +97,7 @@ class ArmoryServiceTest extends TestCase
             $table->integer('kingdom_id');
             $table->integer('item_id');
             $table->integer('quantity')->default(0);
+            $table->boolean('is_equipped')->default(false);
             $table->primary(['kingdom_id', 'item_id']);
         });
 
