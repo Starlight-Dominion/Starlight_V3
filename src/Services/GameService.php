@@ -14,7 +14,7 @@ class GameService
     public const TIMEZONE = 'America/New_York';
     public const BASE_INCOME = 100;
 
-    public const BASE_TURNS_PER_TICK = 10;
+    public const BASE_TURNS_PER_TICK = 4;
 
     public function __construct(private ConfigService $configService) {}
 

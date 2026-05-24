@@ -110,10 +110,10 @@ class TickServiceTest extends TestCase
 
         $dominion->refresh();
 
-        // Baseline: 100 credits, 50 citizens, 10 turns
+        // Baseline: 100 credits, 50 citizens, 4 turns
         $this->assertEquals(100, $dominion->credits);
         $this->assertEquals(50, $dominion->citizens);
-        $this->assertEquals(10, $dominion->turns);
+        $this->assertEquals(4, $dominion->turns);
         $this->assertNotNull($dominion->last_tick);
     }
 
@@ -147,7 +147,7 @@ class TickServiceTest extends TestCase
 
         $this->service->processGlobalTick();
 
-        $count = Dominion::where('turns', 10)->count();
+        $count = Dominion::where('turns', 4)->count();
         $this->assertEquals(150, $count);
     }
 

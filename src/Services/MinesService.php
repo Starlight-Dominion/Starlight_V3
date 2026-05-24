@@ -57,7 +57,6 @@ class MinesService
 
                 $totalCreditsCost = 200 * $quantity;
                 $totalCitizenCost = 1 * $quantity;
-                $totalTurnsCost = 1 * $quantity;
 
                 if ($dominion->credits < $totalCreditsCost) {
                     throw new Exception('Insufficient credits.');
@@ -65,13 +64,9 @@ class MinesService
                 if ($dominion->citizens < $totalCitizenCost) {
                     throw new Exception('Insufficient citizens.');
                 }
-                if ($dominion->turns < $totalTurnsCost) {
-                    throw new Exception('Insufficient strike capacity.');
-                }
 
                 $dominion->decrement('credits', $totalCreditsCost);
                 $dominion->decrement('citizens', $totalCitizenCost);
-                $dominion->decrement('turns', $totalTurnsCost);
                 $dominion->save();
 
                 $exists = DominionManpower::where('dominion_id', $dominionId)

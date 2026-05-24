@@ -119,6 +119,7 @@ class MinesServiceTest extends TestCase
 
         $dominion->refresh();
         $this->assertEquals(400, $dominion->credits); // 1000 - (200 * 3)
+        $this->assertEquals(100, $dominion->turns); // Turn count remains unchanged
         
         $workerUnit = Unit::where('slug', 'workers')->first();
         $manpower = DominionManpower::where('dominion_id', $dominion->id)
@@ -153,20 +154,6 @@ class MinesServiceTest extends TestCase
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Insufficient citizens', $result['message']);
-    }
-
-    public function testAssignMinersInsufficientTurns(): void
-    {
-        $dominion = $this->createTestDominion([
-            'credits' => 1000,
-            'citizens' => 50,
-            'turns' => 2, // Need 3 turns
-        ]);
-
-        $result = $this->service->assignMiners($dominion->id, 3);
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Insufficient strike capacity', $result['message']);
     }
 
     public function testUnassignMiners(): void

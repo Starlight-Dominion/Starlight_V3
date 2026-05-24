@@ -141,4 +141,20 @@ class SpyServiceTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertEquals(5, $result['spy_count']);
     }
+
+    public function testExecuteReconnaissanceDeductsFlatTurns(): void
+    {
+        $attacker = $this->createTestDominion(['credits' => 10000, 'citizens' => 1000, 'turns' => 100]);
+        $defender = $this->createTestDominion();
+
+        $spyUnit = Unit::where('slug', 'spies')->first();
+        DominionManpower::create(['dominion_id' => $attacker->id, 'unit_id' => $spyUnit->id, 'total_quantity' => 50]);
+
+        $this->tacticalMock->method('calculateTacticalRatings')->willReturn(['espionage' => 100, 'sentry' => 1]);
+
+        $this->service->executeReconnaissance($attacker->id, $defender->id);
+
+        $attacker->refresh();
+        $this->assertEquals(95, $attacker->turns); // 100 - 5 (flat)
+    }
 }

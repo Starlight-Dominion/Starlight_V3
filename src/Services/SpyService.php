@@ -37,7 +37,7 @@ class SpyService
             $spyCount = $attackerSpies->total_quantity;
             $missionCostCredits = (int)($spyCount * 0.8);
             $missionCostCitizens = (int)floor($spyCount / 3);
-            $missionCostTurns = (int)($spyCount * 1.5);
+            $missionCostTurns = 5;
 
             if ($attacker->credits < $missionCostCredits) throw new Exception('Insufficient credits.');
             if ($attacker->citizens < $missionCostCitizens) throw new Exception('Insufficient citizens.');
