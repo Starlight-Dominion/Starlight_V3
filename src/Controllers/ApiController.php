@@ -8,6 +8,7 @@ use sdo\Services\AdvisorService;
 use sdo\Services\ConfigService;
 use sdo\Services\AuthService;
 use sdo\Services\BattlefieldService;
+use sdo\Services\DiscordLinkService;
 use sdo\Services\FoundationService;
 use sdo\Models\DominionManpower;
 use sdo\Models\DominionStructure;
@@ -20,7 +21,8 @@ class ApiController extends BaseController
         ConfigService $configService,
         AuthService $authService,
         private BattlefieldService $battlefieldService,
-        private FoundationService $foundationService
+        private FoundationService $foundationService,
+        private DiscordLinkService $discordLinkService
     ) {
         parent::__construct($gameService, $advisorService, $configService, $authService);
     }
@@ -33,7 +35,7 @@ class ApiController extends BaseController
         $apiKey = $vars['_api_key'] ?? null;
         if (!$apiKey) return null;
 
-        return $this->gameService->getKingdomByUserId((int)$apiKey->user_id);
+        return $this->gameService->getDominionByUserId((int)$apiKey->user_id);
     }
 
     /**
@@ -141,6 +143,33 @@ class ApiController extends BaseController
         return json_encode([
             'success' => true,
             'data' => $this->battlefieldService->getBattlefieldList()
+        ]);
+    }
+
+    /**
+     * GET /api/v1/discord/link-status
+     */
+    public function discordLinkStatus(): string
+    {
+        header('Content-Type: application/json');
+
+        $discordUserID = trim((string)($_GET['discord_user_id'] ?? ''));
+        if ($discordUserID === '') {
+            http_response_code(400);
+            return json_encode([
+                'success' => false,
+                'message' => 'Missing discord_user_id parameter.',
+            ]);
+        }
+
+        $link = $this->discordLinkService->getActiveLinkForDiscordUser($discordUserID);
+        return json_encode([
+            'success' => true,
+            'data' => [
+                'linked' => (bool)$link,
+                'sdo_user_id' => $link ? (string)$link->user_id : null,
+                'linked_at' => $link?->linked_at?->format('Y-m-d H:i:s'),
+            ],
         ]);
     }
 }

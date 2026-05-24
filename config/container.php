@@ -52,6 +52,7 @@ $containerBuilder->addDefinitions([
     CombatRepositoryInterface::class => DI\create(EloquentCombatRepository::class),
     \sdo\Services\ConfigService::class => DI\create(),
     \sdo\Services\ApiService::class => DI\create(),
+    \sdo\Services\DiscordLinkService::class => DI\autowire(),
     \sdo\Services\RateLimitService::class => DI\autowire(),
     \sdo\Infrastructure\ApiAuthMiddleware::class => DI\autowire(),
 ]);

@@ -9,6 +9,7 @@ use sdo\Services\SettingsService;
 use sdo\Services\AuthService;
 use sdo\Services\ConfigService;
 use sdo\Services\ApiService;
+use sdo\Services\DiscordLinkService;
 
 class SettingsController extends BaseController
 {
@@ -18,7 +19,8 @@ class SettingsController extends BaseController
         ConfigService $configService,
         AuthService $authService,
         private SettingsService $settingsService,
-        private ApiService $apiService
+        private ApiService $apiService,
+        private DiscordLinkService $discordLinkService
     ) {
         parent::__construct($gameService, $advisorService, $configService, $authService);
     }
@@ -41,15 +43,28 @@ class SettingsController extends BaseController
             ];
         }
 
+        $activeDiscordLink = $this->discordLinkService->getActiveLinkForUser((int)$_SESSION['user_id']);
+
         return $this->render('settings/index', [
             'title' => 'System Settings',
             'user_profile' => [
                 'avatar' => $dominion->user->avatar_path ?? '',
                 'email' => $dominion->user->email,
                 'stasis_until' => $dominion->user->stasis_until?->format('Y-m-d H:i:s'),
-                'api_status' => $apiStatus
+                'api_status' => $apiStatus,
+                'discord_link' => $activeDiscordLink ? [
+                    'discord_user_id' => $activeDiscordLink->discord_user_id,
+                    'linked_at' => $activeDiscordLink->linked_at?->format('Y-m-d H:i:s'),
+                ] : null,
             ]
         ]);
+    }
+
+    public function createDiscordLinkCode(): string
+    {
+        return $this->jsonResponse(fn() => $this->discordLinkService->createChallengeForUser(
+            (int)$_SESSION['user_id']
+        ));
     }
 
     public function applyForApi(): string

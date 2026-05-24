@@ -69,7 +69,11 @@ switch ($routeInfo[0]) {
 
             try {
                 $middleware = $container->get(ApiAuthMiddleware::class);
-                $apiKey = $middleware->handle();
+                $requiredScope = null;
+                if ($uri === '/api/v1/discord/link-status') {
+                    $requiredScope = 'discord.link-status.read';
+                }
+                $apiKey = $middleware->handle($requiredScope);
                 $vars['_api_key'] = $apiKey;
             } catch (\Exception $e) {
                 http_response_code($e->getCode() ?: 401);
