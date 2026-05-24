@@ -54,6 +54,7 @@ switch ($routeInfo[0]) {
     case Dispatcher::FOUND:
         $handler = $routeInfo[1];
         $vars = $routeInfo[2];
+        $routeMeta = is_array($handler) && isset($handler[2]) && is_array($handler[2]) ? $handler[2] : [];
         
         $startTime = microtime(true);
         $isApi = str_starts_with($uri, '/api/');
@@ -69,10 +70,7 @@ switch ($routeInfo[0]) {
 
             try {
                 $middleware = $container->get(ApiAuthMiddleware::class);
-                $requiredScope = null;
-                if ($uri === '/api/v1/discord/link-status') {
-                    $requiredScope = 'discord.link-status.read';
-                }
+                $requiredScope = $routeMeta['required_scope'] ?? null;
                 $apiKey = $middleware->handle($requiredScope);
                 $vars['_api_key'] = $apiKey;
             } catch (\Exception $e) {

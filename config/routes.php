@@ -94,7 +94,9 @@ return function (RouteCollector $r) {
     $r->addRoute('GET', '/api/v1/sector/manpower', [\sdo\Controllers\ApiController::class, 'sectorManpower']);
     $r->addRoute('GET', '/api/v1/sector/structures', [\sdo\Controllers\ApiController::class, 'sectorStructures']);
     $r->addRoute('GET', '/api/v1/battlefield', [\sdo\Controllers\ApiController::class, 'battlefield']);
-    $r->addRoute('GET', '/api/v1/discord/link-status', [\sdo\Controllers\ApiController::class, 'discordLinkStatus']);
+    $r->addRoute('GET', '/api/v1/discord/link-status', [\sdo\Controllers\ApiController::class, 'discordLinkStatus', [
+        'required_scope' => 'discord.link-status.read',
+    ]]);
 
     // Mines Routes (Miner Assignment/Untraining & Upgrades)
     $r->addRoute('GET', '/structures/mines', [\sdo\Controllers\MinesController::class, 'index']);
