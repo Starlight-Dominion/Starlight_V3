@@ -25,7 +25,7 @@ class SettingsController extends BaseController
         parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
-    public function index(): string
+    public function index(array $vars = []): string
     {
         if (!$this->authService->isLoggedIn($_SESSION)) {
             $this->redirect('/login');
