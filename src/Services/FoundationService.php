@@ -31,6 +31,13 @@ class FoundationService
             $currentLevel = $progress->has($s->id) ? $progress->get($s->id)->level : 0;
             $nextLevel = $currentLevel + 1;
             
+            $currentLevelData = null;
+            if ($currentLevel > 0) {
+                $currentLevelData = StructureLevel::where('structure_id', $s->id)
+                    ->where('level', $currentLevel)
+                    ->first();
+            }
+
             $levelData = StructureLevel::where('structure_id', $s->id)
                 ->where('level', $nextLevel)
                 ->first();
@@ -41,6 +48,7 @@ class FoundationService
                 'description' => $s->description,
                 'current_level' => $currentLevel,
                 'max_level' => $s->max_level,
+                'current_upgrade' => $currentLevelData,
                 'next_upgrade' => $levelData,
                 'mod' => $progress->has($s->id) ? $progress->get($s->id)->mod_slot_1 : null
             ];

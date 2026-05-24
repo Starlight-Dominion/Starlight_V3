@@ -87,6 +87,32 @@
 
                     <p class="text-[11px] text-gray-500 leading-relaxed italic">{s.description}</p>
 
+                    {#if s.current_upgrade}
+                        <div class="flex flex-wrap gap-2 mt-2">
+                            {#if s.current_upgrade.buff_hp > 0}
+                                <span class="bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">+{s.current_upgrade.buff_hp.toLocaleString()} Max HP</span>
+                            {/if}
+                            {#if s.current_upgrade.buff_economy > 0}
+                                <span class="bg-green-500/10 border border-green-500/20 text-green-400 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">+{s.current_upgrade.buff_economy}% Economy</span>
+                            {/if}
+                            {#if s.current_upgrade.buff_citizens_per_tick > 0}
+                                <span class="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">+{s.current_upgrade.buff_citizens_per_tick} Citizens / Tick</span>
+                            {/if}
+                            {#if s.current_upgrade.buff_unit_guards > 0}
+                                <span class="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">+{s.current_upgrade.buff_unit_guards} Guards (Grant)</span>
+                            {/if}
+                            {#if s.current_upgrade.buff_unit_soldiers > 0}
+                                <span class="bg-red-500/10 border border-red-500/20 text-red-400 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">+{s.current_upgrade.buff_unit_soldiers} Soldiers (Grant)</span>
+                            {/if}
+                            {#if s.current_upgrade.buff_unit_spies > 0}
+                                <span class="bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">+{s.current_upgrade.buff_unit_spies} Spies (Grant)</span>
+                            {/if}
+                            {#if s.current_upgrade.buff_unit_sentries > 0}
+                                <span class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase px-2 py-0.5 rounded-full">+{s.current_upgrade.buff_unit_sentries} Sentries (Grant)</span>
+                            {/if}
+                        </div>
+                    {/if}
+
                     {#if s.next_upgrade}
                         <div class="bg-black/40 p-4 rounded-xl border border-white/5 space-y-2">
                             <p class="text-[9px] font-black text-cyan-800 uppercase tracking-widest">Next Evolution</p>

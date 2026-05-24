@@ -135,6 +135,22 @@ class FoundationServiceTest extends TestCase
         $this->assertArrayHasKey('structures', $state);
         $this->assertArrayHasKey('foundation', $state['structures']);
         $this->assertEquals(0, $state['structures']['foundation']['current_level']);
+        $this->assertNull($state['structures']['foundation']['current_upgrade']);
+    }
+
+    public function testStateIncludesCurrentUpgradeData(): void
+    {
+        $dominion = $this->createTestDominion();
+        
+        // Upgrade to Level 1
+        $this->service->upgrade($dominion->id, 1);
+        
+        $state = $this->service->getFoundationState($dominion->id);
+        
+        $foundation = $state['structures']['foundation'];
+        $this->assertEquals(1, $foundation['current_level']);
+        $this->assertNotNull($foundation['current_upgrade']);
+        $this->assertEquals(1500, $foundation['current_upgrade']->buff_hp);
     }
 
     public function testUpgradeFoundationSuccessfully(): void
