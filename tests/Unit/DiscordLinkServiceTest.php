@@ -49,7 +49,7 @@ class DiscordLinkServiceTest extends TestCase
 
         Capsule::schema()->create('discord_account_links', function ($table) {
             $table->increments('id');
-            $table->integer('user_id')->unsigned();
+            $table->integer('user_id')->unsigned()->unique();
             $table->string('discord_user_id', 32)->unique();
             $table->boolean('is_active')->default(true);
             $table->dateTime('linked_at');
@@ -189,5 +189,53 @@ class DiscordLinkServiceTest extends TestCase
         $link = DiscordAccountLink::where('discord_user_id', '7777')->first();
         $this->assertNotNull($link);
         $this->assertFalse((bool)$link->is_active);
+    }
+
+    public function testProcessLinkRequestedReactivatesInactiveLink(): void
+    {
+        $user = User::create([
+            'username' => 'cmdr5',
+            'email' => 'cmdr5@example.com',
+            'password' => 'password123',
+        ]);
+
+        DiscordAccountLink::create([
+            'user_id' => $user->id,
+            'discord_user_id' => '2222',
+            'is_active' => false,
+            'linked_at' => date('Y-m-d H:i:s', time() - 3600),
+            'unlinked_at' => date('Y-m-d H:i:s', time() - 1800),
+        ]);
+
+        $challenge = $this->service->createChallengeForUser((int)$user->id);
+        $requestEnvelope = [
+            'type' => 'action',
+            'source' => 'bot',
+            'schema_version' => 1,
+            'correlation_id' => 'corr-link-reactivate',
+            'occurred_at' => gmdate('Y-m-d\\TH:i:s\\Z'),
+            'payload' => [
+                'action_name' => 'account_link.requested',
+                'discord_user_id' => '2222',
+                'link_code' => $challenge['link_code'],
+            ],
+            'destination_kind' => 'internal',
+            'discord_user_id' => '2222',
+        ];
+
+        $result = $this->service->processActionEnvelope($requestEnvelope);
+
+        $this->assertIsArray($result);
+        $this->assertSame('account_link.completed', $result['payload']['action_name']);
+        $this->assertTrue($result['payload']['linked']);
+
+        $linkRows = DiscordAccountLink::where('user_id', $user->id)->get();
+        $this->assertCount(1, $linkRows);
+
+        $link = $linkRows->first();
+        $this->assertNotNull($link);
+        $this->assertTrue((bool)$link->is_active);
+        $this->assertNull($link->unlinked_at);
+        $this->assertSame('2222', $link->discord_user_id);
     }
 }

@@ -110,29 +110,35 @@ class DiscordLinkService
 
         return Capsule::transaction(function () use ($envelope, $discordUserID, $challenge, $userID): array {
             $existingDiscord = DiscordAccountLink::where('discord_user_id', $discordUserID)
-                ->where('is_active', true)
+                ->lockForUpdate()
                 ->first();
-            if ($existingDiscord && (int)$existingDiscord->user_id !== $userID) {
+            if ($existingDiscord && (bool)$existingDiscord->is_active && (int)$existingDiscord->user_id !== $userID) {
                 return $this->rejectionEnvelope($envelope, 'discord_already_linked', 'This Discord account is already linked to another commander.');
             }
 
             $existingUser = DiscordAccountLink::where('user_id', $userID)
-                ->where('is_active', true)
+                ->lockForUpdate()
                 ->first();
-            if ($existingUser && $existingUser->discord_user_id !== $discordUserID) {
+            if ($existingUser && (bool)$existingUser->is_active && $existingUser->discord_user_id !== $discordUserID) {
                 return $this->rejectionEnvelope($envelope, 'sdo_user_already_linked', 'This commander is already linked to a different Discord account.');
             }
 
             $challenge->consumed_at = date('Y-m-d H:i:s');
             $challenge->save();
 
-            if ($existingUser) {
-                $existingUser->discord_user_id = $discordUserID;
-                $existingUser->linked_at = date('Y-m-d H:i:s');
-                $existingUser->unlinked_at = null;
-                $existingUser->is_active = true;
-                $existingUser->save();
-                $link = $existingUser;
+            if ($existingUser && $existingDiscord && (int)$existingUser->id !== (int)$existingDiscord->id) {
+                // Keep the row keyed by user_id and drop stale discord-only history.
+                $existingDiscord->delete();
+            }
+
+            $link = $existingUser ?? $existingDiscord;
+            if ($link) {
+                $link->user_id = $userID;
+                $link->discord_user_id = $discordUserID;
+                $link->linked_at = date('Y-m-d H:i:s');
+                $link->unlinked_at = null;
+                $link->is_active = true;
+                $link->save();
             } else {
                 $link = DiscordAccountLink::create([
                     'user_id' => $userID,

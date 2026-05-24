@@ -149,7 +149,7 @@ class ApiController extends BaseController
     /**
      * GET /api/v1/discord/link-status
      */
-    public function discordLinkStatus(): string
+    public function discordLinkStatus(array $vars = []): string
     {
         header('Content-Type: application/json');
 
