@@ -18,9 +18,8 @@
     function calculateMax(unit) {
         const byCredits = unit.cost_credits > 0 ? Math.floor(resources.credits / unit.cost_credits) : Infinity;
         const byCitizens = unit.cost_citizens > 0 ? Math.floor(resources.citizens / unit.cost_citizens) : Infinity;
-        const byTurns = unit.cost_turns > 0 ? Math.floor(resources.turns / unit.cost_turns) : Infinity;
         
-        const max = Math.min(byCredits, byCitizens, byTurns);
+        const max = Math.min(byCredits, byCitizens);
         return isFinite(max) ? max : 0;
     }
 
@@ -108,8 +107,7 @@
                     <span class="text-gray-600 uppercase tracking-widest font-bold">Standard Requisition</span>
                     <span class="text-white">
                         <span class="text-cyan-400 font-bold">{unit.cost_credits.toLocaleString()} CP</span> | 
-                        <span class="text-white font-bold">{unit.cost_citizens} CIT</span> | 
-                        <span class="text-gray-400 font-bold">{unit.cost_turns} T</span>
+                        <span class="text-white font-bold">{unit.cost_citizens} CIT</span>
                     </span>
                 </div>
 

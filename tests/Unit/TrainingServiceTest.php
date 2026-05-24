@@ -114,7 +114,7 @@ class TrainingServiceTest extends TestCase
         $dominion->refresh();
         $this->assertEquals(500, $dominion->credits); // 1000 - (100 * 5)
         $this->assertEquals(95, $dominion->citizens);
-        $this->assertEquals(95, $dominion->turns);
+        $this->assertEquals(100, $dominion->turns); // Turn count remains unchanged
 
         $workerUnit = Unit::where('slug', 'soldiers')->first();
         $manpower = DominionManpower::where('dominion_id', $dominion->id)

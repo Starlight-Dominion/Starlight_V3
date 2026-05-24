@@ -30,15 +30,13 @@ class TrainingService
 
             $cost = $unit->cost_credits * $quantity;
             $citizens = $unit->cost_citizens * $quantity;
-            $turns = $unit->cost_turns * $quantity;
 
-            if ($dom->credits < $cost || $dom->citizens < $citizens || $dom->turns < $turns) {
+            if ($dom->credits < $cost || $dom->citizens < $citizens) {
                 throw new Exception("Insufficient resources for mobilization.");
             }
 
             $dom->credits -= $cost;
             $dom->citizens -= $citizens;
-            $dom->turns -= $turns;
             $dom->save();
 
             $exists = DominionManpower::where('dominion_id', $dominionId)
