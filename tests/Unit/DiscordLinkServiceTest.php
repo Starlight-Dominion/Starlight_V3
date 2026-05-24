@@ -238,4 +238,36 @@ class DiscordLinkServiceTest extends TestCase
         $this->assertNull($link->unlinked_at);
         $this->assertSame('2222', $link->discord_user_id);
     }
+
+    public function testProcessLinkRequestedUsesPayloadDiscordUserIdInResponse(): void
+    {
+        $user = User::create([
+            'username' => 'cmdr6',
+            'email' => 'cmdr6@example.com',
+            'password' => 'password123',
+        ]);
+
+        $challenge = $this->service->createChallengeForUser((int)$user->id);
+
+        $requestEnvelope = [
+            'type' => 'action',
+            'source' => 'bot',
+            'schema_version' => 1,
+            'correlation_id' => 'corr-link-payload-only',
+            'occurred_at' => gmdate('Y-m-d\TH:i:s\Z'),
+            'payload' => [
+                'action_name' => 'account_link.requested',
+                'discord_user_id' => '5555',
+                'link_code' => $challenge['link_code'],
+            ],
+            'destination_kind' => 'internal',
+        ];
+
+        $result = $this->service->processActionEnvelope($requestEnvelope);
+
+        $this->assertIsArray($result);
+        $this->assertSame('5555', $result['discord_user_id']);
+        $this->assertSame('account_link.completed', $result['payload']['action_name']);
+        $this->assertTrue($result['payload']['linked']);
+    }
 }

@@ -97,18 +97,19 @@ class DiscordLinkService
             return $this->rejectionEnvelope($envelope, 'missing_fields', 'Missing discord user id or link code.');
         }
 
-        $challenge = DiscordLinkChallenge::where('code_hash', $this->hashCode($linkCode))
-            ->whereNull('consumed_at')
-            ->where('expires_at', '>', date('Y-m-d H:i:s'))
-            ->first();
+        return Capsule::transaction(function () use ($envelope, $discordUserID, $linkCode): array {
+            $challenge = DiscordLinkChallenge::where('code_hash', $this->hashCode($linkCode))
+                ->whereNull('consumed_at')
+                ->where('expires_at', '>', date('Y-m-d H:i:s'))
+                ->lockForUpdate()
+                ->first();
 
-        if (!$challenge) {
-            return $this->rejectionEnvelope($envelope, 'invalid_or_expired_code', 'That link code is invalid or expired.');
-        }
+            if (!$challenge) {
+                return $this->rejectionEnvelope($envelope, 'invalid_or_expired_code', 'That link code is invalid or expired.');
+            }
 
-        $userID = (int)$challenge->user_id;
+            $userID = (int)$challenge->user_id;
 
-        return Capsule::transaction(function () use ($envelope, $discordUserID, $challenge, $userID): array {
             $existingDiscord = DiscordAccountLink::where('discord_user_id', $discordUserID)
                 ->lockForUpdate()
                 ->first();
@@ -247,7 +248,7 @@ class DiscordLinkService
 
     private function resultEnvelope(array $requestEnvelope, string $actionName, string $message, array $extraPayload): array
     {
-        $discordUserID = trim((string)($requestEnvelope['discord_user_id'] ?? ''));
+        $discordUserID = trim((string)($requestEnvelope['discord_user_id'] ?? ($requestEnvelope['payload']['discord_user_id'] ?? '')));
         $payload = array_merge([
             'action_name' => $actionName,
             'message' => $message,
@@ -270,7 +271,7 @@ class DiscordLinkService
 
     private function generateLinkCode(): string
     {
-        return 'SDO-' . strtoupper(bin2hex(random_bytes(4)));
+        return 'SDO-' . strtoupper(bin2hex(random_bytes(8)));
     }
 
     private function hashCode(string $code): string
