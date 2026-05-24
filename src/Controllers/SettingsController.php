@@ -62,6 +62,12 @@ class SettingsController extends BaseController
 
     public function createDiscordLinkCode(): string
     {
+        if (!$this->authService->isLoggedIn($_SESSION)) {
+            header('Content-Type: application/json');
+            http_response_code(401);
+            return json_encode(['success' => false, 'message' => 'Unauthorized.']);
+        }
+
         return $this->jsonResponse(fn() => $this->discordLinkService->createChallengeForUser(
             (int)$_SESSION['user_id']
         ));

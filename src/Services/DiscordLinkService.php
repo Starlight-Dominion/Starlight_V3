@@ -5,16 +5,16 @@ namespace sdo\Services;
 
 use DateInterval;
 use DateTimeImmutable;
+use DateTimeZone;
 use Exception;
 use Illuminate\Database\Capsule\Manager as Capsule;
-use Predis\Client;
 use sdo\Models\DiscordAccountLink;
 use sdo\Models\DiscordLinkChallenge;
 use sdo\Models\User;
 
 class DiscordLinkService
 {
-    public function __construct(private Client $redis)
+    public function __construct()
     {
     }
 
@@ -27,12 +27,12 @@ class DiscordLinkService
 
         $code = $this->generateLinkCode();
         $codeHash = $this->hashCode($code);
-        $expiresAt = (new DateTimeImmutable('now'))->add(new DateInterval('PT10M'));
+        $expiresAt = (new DateTimeImmutable('now', new DateTimeZone('UTC')))->add(new DateInterval('PT10M'));
 
         Capsule::transaction(function () use ($userId, $codeHash, $expiresAt): void {
             DiscordLinkChallenge::where('user_id', $userId)
                 ->whereNull('consumed_at')
-                ->update(['consumed_at' => date('Y-m-d H:i:s')]);
+            ->update(['consumed_at' => gmdate('Y-m-d H:i:s')]);
 
             DiscordLinkChallenge::create([
                 'user_id' => $userId,
@@ -100,7 +100,7 @@ class DiscordLinkService
         return Capsule::transaction(function () use ($envelope, $discordUserID, $linkCode): array {
             $challenge = DiscordLinkChallenge::where('code_hash', $this->hashCode($linkCode))
                 ->whereNull('consumed_at')
-                ->where('expires_at', '>', date('Y-m-d H:i:s'))
+                ->where('expires_at', '>', gmdate('Y-m-d H:i:s'))
                 ->lockForUpdate()
                 ->first();
 
@@ -124,7 +124,7 @@ class DiscordLinkService
                 return $this->rejectionEnvelope($envelope, 'sdo_user_already_linked', 'This commander is already linked to a different Discord account.');
             }
 
-            $challenge->consumed_at = date('Y-m-d H:i:s');
+            $challenge->consumed_at = gmdate('Y-m-d H:i:s');
             $challenge->save();
 
             if ($existingUser && $existingDiscord && (int)$existingUser->id !== (int)$existingDiscord->id) {
@@ -136,7 +136,7 @@ class DiscordLinkService
             if ($link) {
                 $link->user_id = $userID;
                 $link->discord_user_id = $discordUserID;
-                $link->linked_at = date('Y-m-d H:i:s');
+                $link->linked_at = gmdate('Y-m-d H:i:s');
                 $link->unlinked_at = null;
                 $link->is_active = true;
                 $link->save();
@@ -145,7 +145,7 @@ class DiscordLinkService
                     'user_id' => $userID,
                     'discord_user_id' => $discordUserID,
                     'is_active' => true,
-                    'linked_at' => date('Y-m-d H:i:s'),
+                    'linked_at' => gmdate('Y-m-d H:i:s'),
                     'unlinked_at' => null,
                 ]);
             }
@@ -180,7 +180,7 @@ class DiscordLinkService
             }
 
             $link->is_active = false;
-            $link->unlinked_at = date('Y-m-d H:i:s');
+            $link->unlinked_at = gmdate('Y-m-d H:i:s');
             $link->save();
 
             return $this->resultEnvelope(
@@ -248,7 +248,7 @@ class DiscordLinkService
 
     private function resultEnvelope(array $requestEnvelope, string $actionName, string $message, array $extraPayload): array
     {
-        $discordUserID = trim((string)($requestEnvelope['discord_user_id'] ?? ($requestEnvelope['payload']['discord_user_id'] ?? '')));
+        $discordUserID = trim((string)($requestEnvelope['payload']['discord_user_id'] ?? $requestEnvelope['discord_user_id'] ?? ''));
         $payload = array_merge([
             'action_name' => $actionName,
             'message' => $message,

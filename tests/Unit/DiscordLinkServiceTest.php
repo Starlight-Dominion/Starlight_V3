@@ -6,7 +6,6 @@ namespace Tests\Unit;
 
 use Illuminate\Database\Capsule\Manager as Capsule;
 use PHPUnit\Framework\TestCase;
-use Predis\Client;
 use sdo\Models\DiscordAccountLink;
 use sdo\Models\DiscordLinkChallenge;
 use sdo\Models\User;
@@ -31,8 +30,7 @@ class DiscordLinkServiceTest extends TestCase
 
         $this->createTables();
 
-        $redis = $this->createMock(Client::class);
-        $this->service = new DiscordLinkService($redis);
+        $this->service = new DiscordLinkService();
     }
 
     private function createTables(): void

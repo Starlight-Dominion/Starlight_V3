@@ -16,7 +16,6 @@ use sdo\Services\ConfigService;
 use sdo\Services\DiscordLinkService;
 use sdo\Services\FoundationService;
 use sdo\Services\GameService;
-use Predis\Client;
 
 class DiscordLinkApiStatusTest extends TestCase
 {
@@ -43,8 +42,7 @@ class DiscordLinkApiStatusTest extends TestCase
         $authService = $this->createMock(AuthService::class);
         $battlefieldService = $this->createMock(BattlefieldService::class);
         $foundationService = $this->createMock(FoundationService::class);
-        $redis = $this->createMock(Client::class);
-        $discordLinkService = new DiscordLinkService($redis);
+        $discordLinkService = new DiscordLinkService();
 
         $this->controller = new ApiController(
             $gameService,
