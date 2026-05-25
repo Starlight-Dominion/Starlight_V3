@@ -54,11 +54,14 @@ class TickService
                         
                         $citizenGained = $baseCitizens + (int)($dom->total_citizen_buff ?? 0);
 
-                        $dom->increment('credits', $creditsGained, [
-                            'citizens' => $dom->citizens + $citizenGained,
-                            'turns'    => min($dom->turns + $baseTurns, 200),
-                            'last_tick' => $now
-                        ]);
+                        Capsule::table('dominions')
+                            ->where('id', $dom->id)
+                            ->update([
+                                'credits'   => Capsule::raw('credits + ' . (int)$creditsGained),
+                                'citizens'  => Capsule::raw('citizens + ' . (int)$citizenGained),
+                                'turns'     => Capsule::raw('turns + ' . (int)$baseTurns),
+                                'last_tick' => $now
+                            ]);
                     }
                 });
                 echo "Processed " . count($dominions) . " sectors...\n";

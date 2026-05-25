@@ -156,4 +156,23 @@ class TickServiceTest extends TestCase
         $this->service->processGlobalTick();
         $this->assertEquals(0, Dominion::count());
     }
+
+    public function testTurnsCanAccumulateBeyondCap(): void
+    {
+        $user = User::create([
+            'username' => 'capbreaker',
+            'email' => 'cap@example.com',
+            'password' => 'password123',
+        ]);
+
+        $dominion = $user->dominion()->create([
+            'name' => 'Cap Breaker',
+            'turns' => 200,
+        ]);
+
+        $this->service->processGlobalTick();
+
+        $dominion->refresh();
+        $this->assertEquals(204, $dominion->turns);
+    }
 }
