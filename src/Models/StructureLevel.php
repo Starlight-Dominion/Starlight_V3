@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace sdo\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 class StructureLevel extends Model
 {
     protected $table = 'structure_levels';
@@ -32,7 +34,7 @@ class StructureLevel extends Model
         'buff_unit_sentries' => 'integer'
     ];
 
-    public function structure()
+    public function structure(): BelongsTo
     {
         return $this->belongsTo(Structure::class, 'structure_id');
     }
