@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "bash .github/hooks/scripts/check_phinx_migrations_after_changes.sh",
+        "timeout": 1200
+      }
+    ]
+  }
+}
