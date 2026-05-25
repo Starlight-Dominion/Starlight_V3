@@ -11,26 +11,34 @@ class EloquentCombatRepository implements CombatRepositoryInterface
 {
     public function logBattle(array $data): int
     {
+        $outcome = ($data['outcome'] ?? $data['result'] ?? 'defeat') === 'victory' ? 'victory' : 'defeat';
+
         return Capsule::table('battle_logs')->insertGetId([
-            'attacker_kingdom_id' => $data['attacker_id'],
-            'defender_kingdom_id' => $data['defender_id'],
-            'attacker_units' => json_encode($data['attacker_units']),
-            'defender_units' => json_encode($data['defender_units']),
-            'result' => $data['result'],
-            'attacker_loss_percent' => $data['attacker_loss_percent'],
-            'defender_loss_percent' => $data['defender_loss_percent'],
-            'gold_looted' => $data['gold_looted'],
-            'turns_spent' => $data['turns_spent'],
-            'created_at' => date('Y-m-d H:i:s')
+            'attacker_id' => (int)$data['attacker_id'],
+            'defender_id' => (int)$data['defender_id'],
+            'attacker_name' => (string)($data['attacker_name'] ?? 'Unknown Attacker'),
+            'defender_name' => (string)($data['defender_name'] ?? 'Unknown Defender'),
+            'outcome' => $outcome,
+            'credits_stolen' => (int)($data['credits_stolen'] ?? $data['gold_looted'] ?? 0),
+            'turns_used' => (int)($data['turns_used'] ?? $data['turns_spent'] ?? 0),
+            'attacker_damage' => (int)($data['attacker_damage'] ?? 0),
+            'defender_damage' => (int)($data['defender_damage'] ?? 0),
+            'attacker_xp_gained' => (int)($data['attacker_xp_gained'] ?? 0),
+            'defender_xp_gained' => (int)($data['defender_xp_gained'] ?? 0),
+            'guards_lost' => (int)($data['guards_lost'] ?? 0),
+            'attacker_soldiers_lost' => (int)($data['attacker_soldiers_lost'] ?? 0),
+            'structure_damage' => (int)($data['structure_damage'] ?? 0),
+            'loot_factor' => (float)($data['loot_factor'] ?? 1.0),
+            'battle_time' => (string)($data['battle_time'] ?? date('Y-m-d H:i:s'))
         ]);
     }
 
     public function getLogsByKingdom(int $kingdomId, int $limit = 10): array
     {
         return Capsule::table('battle_logs')
-            ->where('attacker_kingdom_id', $kingdomId)
-            ->orWhere('defender_kingdom_id', $kingdomId)
-            ->orderBy('created_at', 'desc')
+            ->where('attacker_id', $kingdomId)
+            ->orWhere('defender_id', $kingdomId)
+            ->orderBy('battle_time', 'desc')
             ->limit($limit)
             ->get()
             ->toArray();
