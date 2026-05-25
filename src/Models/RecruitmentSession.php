@@ -8,16 +8,24 @@ class RecruitmentSession extends Model
     protected $table = 'recruitment_sessions';
 
     public $timestamps = true;
+    public const UPDATED_AT = null;
 
-    protected $casts = [
-        'user_id' => 'integer',
-        'clicks' => 'integer',
-        'completed' => 'boolean',
-        'expires_at' => 'datetime'
+    protected $fillable = [
+        'dominion_id',
+        'clicks_count',
+        'is_active',
+        'completed_at'
     ];
 
-    public function user()
+    protected $casts = [
+        'dominion_id' => 'integer',
+        'clicks_count' => 'integer',
+        'is_active' => 'boolean',
+        'completed_at' => 'datetime'
+    ];
+
+    public function dominion()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(Dominion::class, 'dominion_id');
     }
 }
