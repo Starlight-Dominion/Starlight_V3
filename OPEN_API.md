@@ -158,11 +158,51 @@ curl -X GET "http://localhost:8080/api/v1/battlefield" \
 
 ---
 
+### 6. Discord Link Status
+Check whether a Discord user is currently linked to an SDO account.
+
+Required token scope: `discord.link-status.read` (or wildcard `*` / `discord.*`).
+
+**`GET /api/v1/discord/link-status?discord_user_id=<DISCORD_USER_ID>`**
+
+#### Example Call:
+```bash
+curl -X GET "http://localhost:8080/api/v1/discord/link-status?discord_user_id=123456789012345678" \
+     -H "Authorization: Bearer <TOKEN>"
+```
+
+#### Success Response (Linked):
+```json
+{
+  "success": true,
+  "data": {
+    "linked": true,
+    "sdo_user_id": "42",
+    "linked_at": "2026-05-23 10:30:15"
+  }
+}
+```
+
+#### Success Response (Not Linked):
+```json
+{
+  "success": true,
+  "data": {
+    "linked": false,
+    "sdo_user_id": null,
+    "linked_at": null
+  }
+}
+```
+
+---
+
 ## 📜 Error Codes
 
 | Status | Description |
 | :--- | :--- |
 | `200` | Success. The request was processed successfully. |
+| `403` | Forbidden. API token does not include required scope. |
 | `401` | Unauthorized. Invalid or missing Bearer token. |
 | `429` | Too Many Requests. You have exceeded your rate limit. |
 | `500` | Internal Server Error. Neural link unstable. |

@@ -11,6 +11,7 @@ class ApiKey extends Model
         'user_id',
         'api_token',
         'rate_limit_per_minute',
+        'scopes',
         'is_active'
     ];
 

@@ -356,9 +356,10 @@ class AdminController extends BaseController
 
         $userId = (int)($_POST['user_id'] ?? 0);
         $limit = (int)($_POST['rate_limit'] ?? 60);
+        $scopes = trim((string)($_POST['scopes'] ?? '*'));
 
         try {
-            $key = $this->apiService->issueKey($userId, $limit);
+            $key = $this->apiService->issueKey($userId, $limit, $scopes);
             return json_encode(['success' => true, 'key' => $key]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -374,6 +375,10 @@ class AdminController extends BaseController
         $data = [];
         if (isset($_POST['rate_limit'])) $data['rate_limit_per_minute'] = (int)$_POST['rate_limit'];
         if (isset($_POST['is_active'])) $data['is_active'] = ($_POST['is_active'] === 'true' || $_POST['is_active'] === '1');
+        if (isset($_POST['scopes'])) {
+            $scopes = trim((string)$_POST['scopes']);
+            $data['scopes'] = $scopes !== '' ? $scopes : '*';
+        }
 
         try {
             $this->apiService->updateKey($id, $data);

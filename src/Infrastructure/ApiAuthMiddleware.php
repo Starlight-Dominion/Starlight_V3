@@ -19,7 +19,7 @@ class ApiAuthMiddleware
      * Authenticate the request and check rate limits.
      * Throws exception on failure.
      */
-    public function handle(): ApiKey
+    public function handle(?string $requiredScope = null): ApiKey
     {
         $headers = getallheaders();
         $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
@@ -35,10 +35,49 @@ class ApiAuthMiddleware
             throw new Exception("Unauthorized: Invalid or inactive API token.", 401);
         }
 
+        if (!$this->hasScope($apiKey, $requiredScope)) {
+            throw new Exception("Forbidden: API token is missing required scope.", 403);
+        }
+
         if ($this->rateLimitService->isRateLimited($apiKey->id, $apiKey->rate_limit_per_minute)) {
             throw new Exception("Too Many Requests: Rate limit exceeded.", 429);
         }
 
         return $apiKey;
+    }
+
+    private function hasScope(ApiKey $apiKey, ?string $requiredScope): bool
+    {
+        $requiredScope = trim((string)$requiredScope);
+        if ($requiredScope === '') {
+            return true;
+        }
+
+        $rawScopes = trim((string)($apiKey->scopes ?? '*'));
+        if ($rawScopes === '' || $rawScopes === '*') {
+            return true;
+        }
+
+        $scopes = array_values(array_filter(array_map(
+            static fn(string $scope): string => trim($scope),
+            explode(',', $rawScopes)
+        )));
+
+        foreach ($scopes as $scope) {
+            if ($scope === '*') {
+                return true;
+            }
+            if ($scope === $requiredScope) {
+                return true;
+            }
+            if (str_ends_with($scope, '.*')) {
+                $prefix = substr($scope, 0, -2);
+                if ($prefix !== '' && str_starts_with($requiredScope, $prefix . '.')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

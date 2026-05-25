@@ -138,12 +138,13 @@ class ApiService
     /**
      * Issue a new API key for a user.
      */
-    public function issueKey(int $userId, int $rateLimit = 60): ApiKey
+    public function issueKey(int $userId, int $rateLimit = 60, string $scopes = '*'): ApiKey
     {
         return ApiKey::create([
             'user_id' => $userId,
             'api_token' => bin2hex(random_bytes(32)),
             'rate_limit_per_minute' => $rateLimit,
+            'scopes' => trim($scopes) !== '' ? trim($scopes) : '*',
             'is_active' => true
         ]);
     }

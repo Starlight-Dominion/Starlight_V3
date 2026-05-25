@@ -34,6 +34,8 @@
     });
     let apiStatus = $state(user_profile.api_status || null); // { status: 'pending'|'approved'|'rejected', keys: [] }
     let showKey = $state(false);
+    let discordLink = $state(user_profile.discord_link || null);
+    let discordLinkCode = $state(null);
 
     /**
      * Standard JSON submission for text fields
@@ -59,6 +61,12 @@
             }
             if (data.success && endpoint === '/settings/api/apply') {
                 apiStatus = { status: 'pending', keys: [] };
+            }
+            if (data.success && endpoint === '/settings/discord/link-code') {
+                discordLinkCode = {
+                    code: data.link_code,
+                    expiresAt: data.expires_at
+                };
             }
         } catch (e) {
             message = { success: false, message: "Terminal link lost." };
@@ -240,6 +248,35 @@
                                     disabled={loading}
                                 >
                                     {loading ? 'Transmitting Binary...' : 'Uplink Local Sigil'}
+                                </button>
+                            </div>
+
+                            <div class="bg-black/40 border border-white/5 p-8 rounded-2xl w-full space-y-6">
+                                <div class="space-y-2 text-center md:text-left">
+                                    <h3 class="text-cyan-400 font-bold uppercase text-xs tracking-widest">Discord Link Bridge</h3>
+                                    <p class="text-[9px] text-gray-500 uppercase tracking-widest font-mono">Generate a one-time code and use it with /link in Discord.</p>
+                                </div>
+
+                                {#if discordLink}
+                                    <div class="p-4 rounded-xl bg-cyan-950/20 border border-cyan-700/40 text-[10px] font-black uppercase tracking-widest text-cyan-300">
+                                        Active Link: {discordLink.discord_user_id}
+                                    </div>
+                                {/if}
+
+                                {#if discordLinkCode}
+                                    <div class="p-4 rounded-xl bg-black border border-cyan-500/20 text-center space-y-2">
+                                        <div class="text-[9px] font-black text-gray-600 uppercase tracking-widest">One-Time Link Code</div>
+                                        <div class="font-mono text-cyan-400 text-sm select-all">{discordLinkCode.code}</div>
+                                        <div class="text-[9px] font-black text-gray-600 uppercase tracking-widest">Expires: {discordLinkCode.expiresAt}</div>
+                                    </div>
+                                {/if}
+
+                                <button
+                                    onclick={() => submitRequest('/settings/discord/link-code', {})}
+                                    class="btn-launch w-full py-5 text-sm"
+                                    disabled={loading}
+                                >
+                                    {loading ? 'Generating Code...' : 'Generate Discord Link Code'}
                                 </button>
                             </div>
                         </div>

@@ -94,6 +94,9 @@ return function (RouteCollector $r) {
     $r->addRoute('GET', '/api/v1/sector/manpower', [\sdo\Controllers\ApiController::class, 'sectorManpower']);
     $r->addRoute('GET', '/api/v1/sector/structures', [\sdo\Controllers\ApiController::class, 'sectorStructures']);
     $r->addRoute('GET', '/api/v1/battlefield', [\sdo\Controllers\ApiController::class, 'battlefield']);
+    $r->addRoute('GET', '/api/v1/discord/link-status', [\sdo\Controllers\ApiController::class, 'discordLinkStatus', [
+        'required_scope' => 'discord.link-status.read',
+    ]]);
 
     // Mines Routes (Miner Assignment/Untraining & Upgrades)
     $r->addRoute('GET', '/structures/mines', [\sdo\Controllers\MinesController::class, 'index']);
@@ -116,6 +119,7 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/settings/stasis', [\sdo\Controllers\SettingsController::class, 'toggleStasis']);
     $r->addRoute('POST', '/settings/avatar', [\sdo\Controllers\SettingsController::class, 'updateAvatar']);
     $r->addRoute('POST', '/settings/api/apply', [\sdo\Controllers\SettingsController::class, 'applyForApi']);
+    $r->addRoute('POST', '/settings/discord/link-code', [\sdo\Controllers\SettingsController::class, 'createDiscordLinkCode']);
 
     
 };

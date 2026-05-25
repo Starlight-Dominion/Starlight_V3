@@ -79,6 +79,9 @@ vendor/bin/phinx seed:run -s InitialDataSeeder
 # Process a game tick manually
 php bin/tick-worker.php
 
+# Process Discord link/unlink action requests from Redis streams
+php bin/discord-action-worker.php
+
 # Generate AI bot dominions
 php bin/generate-bots.php
 ```
