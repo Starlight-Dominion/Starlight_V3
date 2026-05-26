@@ -99,7 +99,7 @@ class GameService
     private function sumStructureLevelBuff(int $dominionId, string $column): float
     {
         if (!in_array($column, self::ALLOWED_STRUCTURE_LEVEL_BUFF_COLUMNS, true)) {
-            throw new InvalidArgumentException("Unsupported structure level buff column: {$column}");
+            throw new InvalidArgumentException('Invalid structure level buff column specified.');
         }
 
         return (float)DominionStructure::join('structure_levels', function($join) {
