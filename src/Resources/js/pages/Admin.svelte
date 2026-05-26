@@ -147,6 +147,7 @@
         formData.append('xp', kingdom.xp);
         formData.append('turns', kingdom.turns);
         formData.append('citizens', kingdom.citizens);
+        formData.append('is_admin', kingdom.user.is_admin ? 1 : 0);
         formData.append('_csrf', game.csrf);
         try {
             await fetch('/admin/update-kingdom', { method: 'POST', body: formData });
@@ -472,7 +473,7 @@
                                     SECTOR {kingdom.id}
                                 </div>
                                 <div class="flex justify-between items-center relative z-10">
-                                    <div class="flex-grow max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="flex-grow max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div class="space-y-2">
                                             <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">Dominion Designation</span>
                                             <input type="text" bind:value={kingdom.name} class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-2xl font-title font-black text-white uppercase tracking-tight focus:border-cyan-500 outline-none" />
@@ -480,6 +481,13 @@
                                         <div class="space-y-2">
                                             <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">Commander Handle</span>
                                             <input type="text" bind:value={kingdom.user.username} class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-sm font-black text-gray-500 uppercase tracking-[2px] focus:border-cyan-500 outline-none" />
+                                        </div>
+                                        <div class="space-y-2">
+                                            <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">Clearance Level</span>
+                                            <div class="flex items-center gap-3 bg-black/60 border border-white/10 rounded-xl px-4 py-3 h-[48px]">
+                                                <input type="checkbox" bind:checked={kingdom.user.is_admin} class="w-4 h-4 rounded border-gray-800 text-cyan-600 focus:ring-cyan-500 bg-black/40" />
+                                                <span class="text-[10px] font-black uppercase {kingdom.user.is_admin ? 'text-red-500' : 'text-gray-600'}">{kingdom.user.is_admin ? 'Administrator' : 'Standard'}</span>
+                                            </div>
                                         </div>
                                     </div>
                                     <button onclick={() => saveKingdom(kingdom)} class="bg-cyan-600 text-white px-8 py-4 rounded-xl font-title font-black text-[10px] uppercase tracking-widest hover:bg-cyan-400 transition-all disabled:opacity-50 shadow-[0_0_10px_rgba(6,182,212,0.3)]" disabled={savingId === kingdom.id}>

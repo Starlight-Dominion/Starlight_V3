@@ -117,8 +117,10 @@ class AuthService
     {
         if (!$user) return false;
         
-        $hardcodedAdmin = $_ENV['ADMIN_USERNAME'] ?? null;
-        if ($hardcodedAdmin && $user->username === $hardcodedAdmin) {
+        $hardcodedAdmins = explode(',', $_ENV['ADMIN_USERNAME'] ?? '');
+        $trimmedAdmins = array_map('trim', $hardcodedAdmins);
+        
+        if (in_array($user->username, $trimmedAdmins, true)) {
             return true;
         }
 
