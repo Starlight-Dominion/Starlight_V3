@@ -23,6 +23,11 @@
         "phpunit/phpunit": "^11.0",
         "mockery/mockery": "^1.6"
     },
+    "scripts": {
+        "test": "php vendor/bin/phpunit --configuration phpunit.xml",
+        "migrate": "php vendor/bin/phinx migrate -e development",
+        "migrate:status": "php vendor/bin/phinx status -e development"
+    },
     "config": {
         "optimize-autoloader": true,
         "sort-packages": true,
