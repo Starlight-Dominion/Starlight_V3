@@ -76,6 +76,7 @@ class AdminController extends BaseController
 
         try {
             $res = $this->adminService->updateDominionStats($id, $data);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_DOMINION', "Modified sector ID {$id}", $data);
             return json_encode(['success' => $res]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -101,6 +102,7 @@ class AdminController extends BaseController
 
         try {
             $res = $this->adminService->updateUnit($id, $data);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_UNIT', "Modified unit ID {$id} ({$data['slug']})", $data);
             return json_encode(['success' => $res]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -185,6 +187,7 @@ class AdminController extends BaseController
 
         try {
             $res = $this->adminService->updateStructure($id, $data);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_STRUCTURE', "Modified structure ID {$id}", $data);
             return json_encode(['success' => $res]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -430,13 +433,60 @@ class AdminController extends BaseController
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }
+public function impersonate(): string
+{
+    header('Content-Type: application/json');
+    $this->checkAdmin();
 
-    public function getApiLogs(): string
+    $id = (int)($_POST['id'] ?? 0);
+    $targetUser = \sdo\Models\User::find($id);
+
+    if (!$targetUser) {
+        return json_encode(['success' => false, 'message' => 'Identity not found.']);
+    }
+
+    if ($this->authService->isAdmin($targetUser)) {
+        return json_encode(['success' => false, 'message' => 'Neural recursion prohibited: cannot impersonate other administrators.']);
+    }
+
+    $_SESSION['impersonator_id'] = $_SESSION['user_id'];
+    $_SESSION['user_id'] = $targetUser->id;
+    $_SESSION['username'] = $targetUser->username;
+
+    $this->adminService->logAdminAction((int)$_SESSION['impersonator_id'], 'IMPERSONATE', "Started impersonation of commander {$targetUser->username} (ID {$id})");
+
+    return json_encode(['success' => true]);
+}
+
+public function stopImpersonating(): void
+{
+    if (isset($_SESSION['impersonator_id'])) {
+        $admin = \sdo\Models\User::find((int)$_SESSION['impersonator_id']);
+        if ($admin) {
+            $_SESSION['user_id'] = $admin->id;
+            $_SESSION['username'] = $admin->username;
+            $this->adminService->logAdminAction($admin->id, 'STOP_IMPERSONATE', "Terminated active impersonation.");
+        }
+        unset($_SESSION['impersonator_id']);
+    }
+
+    $this->redirect('/admin');
+}
+
+public function getApiLogs(): string
+...
     {
         header('Content-Type: application/json');
         $this->checkAdmin();
 
         return json_encode(['success' => true, 'logs' => $this->apiService->getRecentLogs()]);
+    }
+
+    public function getAuditLogs(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+        return json_encode(['success' => true, 'logs' => $this->adminService->getAuditLogs()]);
     }
 
     public function getSettings(): string
@@ -457,6 +507,7 @@ class AdminController extends BaseController
 
         try {
             $this->configService->set($key, $value);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_SETTING', "Modified setting {$key}", ['value' => $value]);
             return json_encode(['success' => true]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);

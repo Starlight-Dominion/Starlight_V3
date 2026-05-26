@@ -52,6 +52,7 @@
         { id: 'structures', name: 'Structural Engineering', icon: '🏛' },
         { id: 'players', name: 'Sovereign Oversight', icon: '👁' },
         { id: 'api', name: 'Neural API Gate', icon: '📡' },
+        { id: 'audit', name: 'Audit Trail', icon: '🕵️' },
         { id: 'docs', name: 'Documentation', icon: '📝' },
         { id: 'logs', name: 'Battle Records', icon: '📜' }
     ];
@@ -59,6 +60,7 @@
     let apiKeys = $state([]);
     let apiLogs = $state([]);
     let apiApps = $state([]);
+    let auditLogs = $state([]);
     let apiTab = $state('keys'); // 'keys', 'apps', 'logs'
 
     async function fetchSettings() {
@@ -132,6 +134,15 @@
         } catch (e) { console.error("Failed to fetch API data"); } finally { loading = false; }
     }
 
+    async function fetchAuditLogs() {
+        loading = true;
+        try {
+            const res = await fetch('/admin/audit-logs');
+            const data = await res.json();
+            auditLogs = data.logs;
+        } catch (e) { console.error("Failed to fetch audit logs"); } finally { loading = false; }
+    }
+
     $effect(() => {
         if (activeModule === 'mechanics' || activeModule === 'doctrine' || activeModule === 'docs') fetchSettings();
         if (activeModule === 'units') fetchUnits();
@@ -140,6 +151,7 @@
         if (activeModule === 'logs') fetchBattleLogs();
         if (activeModule === 'players') fetchAllKingdoms();
         if (activeModule === 'api') fetchApiData();
+        if (activeModule === 'audit') fetchAuditLogs();
     });
 
     async function handleSearch() {
@@ -174,6 +186,7 @@
         formData.append('turns', kingdom.turns);
         formData.append('citizens', kingdom.citizens);
         formData.append('is_admin', kingdom.user.is_admin ? 1 : 0);
+        formData.append('stasis_until', kingdom.user.stasis_until || '');
         formData.append('_csrf', game.csrf);
         
         await adminPost('/admin/update-kingdom', formData);
@@ -353,6 +366,17 @@
         if (res) fetchArmoryItems();
     }
 
+    async function impersonateCommander(id) {
+        if (!confirm("Caution: You are about to initiate a neural link with this commander's perspective. Proceed?")) return;
+        const formData = new FormData();
+        formData.append('id', id);
+        formData.append('_csrf', game.csrf);
+        const res = await adminPost('/admin/impersonate', formData);
+        if (res) {
+            window.location.href = '/dashboard';
+        }
+    }
+
     const currentStructure = $derived(structures.find(s => s.details.id === activeStructureId) || null);
 </script>
 
@@ -390,29 +414,72 @@
 
         <main class="lg:col-span-3 space-y-8">
             {#if activeModule === 'overview'}
-                <div in:fade class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl space-y-4">
-                        <h3 class="text-[10px] font-black text-gray-600 uppercase tracking-[4px]">System Status</h3>
-                        <div class="space-y-2 font-mono">
-                            <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Database</span><span class="text-[10px] font-black text-cyan-400 uppercase">Connected</span></div>
-                            <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Heartbeat</span><span class="text-[10px] font-black text-cyan-400 uppercase">Synchronized</span></div>
-                            <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Redis Cache</span><span class="text-[10px] font-black text-cyan-400 uppercase">Active</span></div>
+                <div in:fade class="space-y-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl relative overflow-hidden group">
+                            <span class="text-[8px] font-black text-gray-600 uppercase tracking-[4px] block mb-2">Total Sovereigns</span>
+                            <span class="text-4xl font-title font-black text-white">{stats.total_users || 0}</span>
+                            <div class="absolute -bottom-4 -right-4 text-white/5 text-6xl font-black italic select-none group-hover:text-cyan-500/10 transition-colors">USR</div>
+                        </div>
+                        <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl relative overflow-hidden group">
+                            <span class="text-[8px] font-black text-gray-600 uppercase tracking-[4px] block mb-2">Active Sectors</span>
+                            <span class="text-4xl font-title font-black text-white">{stats.total_kingdoms || 0}</span>
+                            <div class="absolute -bottom-4 -right-4 text-white/5 text-6xl font-black italic select-none group-hover:text-red-500/10 transition-colors">DOM</div>
+                        </div>
+                        <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl relative overflow-hidden group">
+                            <span class="text-[8px] font-black text-gray-600 uppercase tracking-[4px] block mb-2">Total Wealth</span>
+                            <span class="text-4xl font-title font-black text-emerald-500">{((stats.total_credits || 0) / 1000000).toFixed(1)}M</span>
+                            <div class="absolute -bottom-4 -right-4 text-white/5 text-6xl font-black italic select-none group-hover:text-emerald-500/10 transition-colors">CP</div>
+                        </div>
+                        <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl relative overflow-hidden group">
+                            <span class="text-[8px] font-black text-gray-600 uppercase tracking-[4px] block mb-2">Total Population</span>
+                            <span class="text-4xl font-title font-black text-cyan-400">{((stats.total_citizens || 0) / 1000).toFixed(1)}K</span>
+                            <div class="absolute -bottom-4 -right-4 text-white/5 text-6xl font-black italic select-none group-hover:text-cyan-400/10 transition-colors">POP</div>
                         </div>
                     </div>
-                    <div class="bg-red-950/10 border border-red-900/20 p-8 rounded-3xl space-y-4">
-                        <h3 class="text-[10px] font-black text-red-500 uppercase tracking-[4px]">Global Warning</h3>
-                        <p class="text-gray-400 text-[10px] leading-relaxed italic">Changes made within this terminal affect the live production database immediately. Unauthorized modifications constitute sector-level treason.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl space-y-4">
+                            <h3 class="text-[10px] font-black text-gray-600 uppercase tracking-[4px]">System Status</h3>
+                            <div class="space-y-2 font-mono">
+                                <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Database</span><span class="text-[10px] font-black text-cyan-400 uppercase">Connected</span></div>
+                                <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Heartbeat</span><span class="text-[10px] font-black text-cyan-400 uppercase">Synchronized</span></div>
+                                <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Total Manpower</span><span class="text-[10px] font-black text-white uppercase">{((stats.total_manpower || 0) / 1000).toFixed(1)}K Units</span></div>
+                            </div>
+                        </div>
+                        <div class="bg-red-950/10 border border-red-900/20 p-8 rounded-3xl space-y-4">
+                            <h3 class="text-[10px] font-black text-red-500 uppercase tracking-[4px]">Global Warning</h3>
+                            <p class="text-gray-400 text-[10px] leading-relaxed italic">Changes made within this terminal affect the live production database immediately. Unauthorized modifications constitute sector-level treason.</p>
+                        </div>
                     </div>
                 </div>
 
             {:else if activeModule === 'mechanics'}
-                <div in:fade class="space-y-6">
+                <div in:fade class="space-y-8">
+                    <!-- Comms Relay -->
+                    <div class="bg-red-950/20 border border-red-900/30 rounded-3xl overflow-hidden shadow-2xl">
+                        <header class="bg-red-900/20 px-8 py-5 border-b border-red-900/30 flex justify-between items-center">
+                            <h2 class="text-[10px] font-black text-red-500 uppercase tracking-[4px]">Sector Comms Relay (Global Broadcast)</h2>
+                        </header>
+                        <div class="p-8 space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+                                <div class="md:col-span-3">
+                                    <span class="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-2">Announcement / Maintenance Signal</span>
+                                    <input type="text" bind:value={gameSettings.find(s => s.setting_key === 'global_broadcast').setting_value} class="w-full bg-black/60 border border-red-900/30 rounded-xl px-6 py-4 text-red-400 font-mono text-sm focus:border-red-500 outline-none" placeholder="Enter global transmission..." />
+                                </div>
+                                <div class="md:col-span-1 text-right">
+                                    <button onclick={() => saveSetting(gameSettings.find(s => s.setting_key === 'global_broadcast'))} class="w-full md:w-auto px-8 py-4 bg-red-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-[0_0_15px_rgba(153,27,27,0.3)]">Transmit</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
                         <header class="bg-cyan-950/20 px-8 py-4 border-b border-cyan-500/10 flex justify-between items-center">
                             <h2 class="text-[10px] font-black text-cyan-500 uppercase tracking-[4px]">Global Balance Parameters</h2>
                         </header>
                         <div class="p-8 space-y-6">
-                            {#each gameSettings.filter(s => !s.setting_key.startsWith('battle_')) as setting}
+                            {#each gameSettings.filter(s => !s.setting_key.startsWith('battle_') && s.setting_key !== 'global_broadcast') as setting}
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center border-b border-white/5 pb-6 last:border-0 last:pb-0">
                                     <div class="md:col-span-1">
                                         <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{setting.setting_key.replace(/_/g, ' ')}</span>
@@ -472,7 +539,7 @@
                                     SECTOR {kingdom.id}
                                 </div>
                                 <div class="flex justify-between items-center relative z-10">
-                                    <div class="flex-grow max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div class="flex-grow max-w-5xl grid grid-cols-1 md:grid-cols-4 gap-6">
                                         <div class="space-y-2">
                                             <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">Dominion Designation</span>
                                             <input type="text" bind:value={kingdom.name} class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-2xl font-title font-black text-white uppercase tracking-tight focus:border-cyan-500 outline-none" />
@@ -488,18 +555,25 @@
                                                 <span class="text-[10px] font-black uppercase {kingdom.user.is_admin ? 'text-red-500' : 'text-gray-600'}">{kingdom.user.is_admin ? 'Administrator' : 'Standard'}</span>
                                             </div>
                                         </div>
+                                        <div class="space-y-2">
+                                            <span class="block text-[8px] font-black text-red-900 uppercase tracking-widest">Stasis Sanction (Until)</span>
+                                            <input type="datetime-local" bind:value={kingdom.user.stasis_until} class="w-full bg-black/60 border border-red-900/20 rounded-xl px-4 py-3 text-[10px] font-mono text-red-500 uppercase focus:border-red-500 outline-none" />
+                                        </div>
                                     </div>
                                     <button onclick={() => saveKingdom(kingdom)} class="bg-cyan-600 text-white px-8 py-4 rounded-xl font-title font-black text-[10px] uppercase tracking-widest hover:bg-cyan-400 transition-all disabled:opacity-50 shadow-[0_0_10px_rgba(6,182,212,0.3)]" disabled={savingId === kingdom.id}>
                                         {savingId === kingdom.id ? 'UPLOADING...' : 'SAVE DIRECTIVES'}
                                     </button>
                                 </div>
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-white/5 relative z-10">
+                                <div class="grid grid-cols-2 md:grid-cols-5 gap-6 pt-6 border-t border-white/5 relative z-10 items-center">
                                     {#each ['credits', 'xp', 'turns', 'citizens'] as field}
                                         <div class="space-y-2">
                                             <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">{field}</span>
                                             <input type="number" bind:value={kingdom[field]} class="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-3 text-sm font-mono text-cyan-400 focus:border-cyan-500" />
                                         </div>
                                     {/each}
+                                    <div class="pt-4">
+                                        <button onclick={() => impersonateCommander(kingdom.user.id)} class="w-full bg-red-950/40 border border-red-900/50 text-red-500 py-3 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all">Impersonate</button>
+                                    </div>
                                 </div>
                             </div>
                         {/each}
@@ -900,6 +974,41 @@
                             </div>
                         </div>
                     {/if}
+                </div>
+
+            {:else if activeModule === 'audit'}
+                <div in:fade class="space-y-6">
+                    <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse font-mono">
+                                <thead>
+                                    <tr class="bg-cyan-950/20 border-b border-white/5 text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                                        <th class="px-8 py-5 text-red-500">ID</th>
+                                        <th class="px-8 py-5">ADMIN ID</th>
+                                        <th class="px-8 py-5">OPERATION</th>
+                                        <th class="px-8 py-5">LOG DIRECTIVE (DESCRIPTION)</th>
+                                        <th class="px-8 py-5 text-right">TIMESTAMP</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    {#each auditLogs as log}
+                                        <tr class="group hover:bg-white/[0.02] transition-colors border-b border-white/5 last:border-0">
+                                            <td class="px-8 py-6 text-red-900 text-xs font-black">#{log.id}</td>
+                                            <td class="px-8 py-6 text-gray-400 text-xs font-black">CMD_{log.dominion_id}</td>
+                                            <td class="px-8 py-6 text-white text-xs font-black uppercase tracking-tighter">{log.action.replace('ADMIN_', '')}</td>
+                                            <td class="px-8 py-6">
+                                                <span class="text-xs text-cyan-400 font-black">{log.description}</span>
+                                                {#if log.metadata}
+                                                    <span class="block text-[8px] text-gray-700 mt-1 uppercase truncate max-w-md">{JSON.stringify(log.metadata)}</span>
+                                                {/if}
+                                            </td>
+                                            <td class="px-8 py-6 text-right text-[10px] text-gray-600 font-black uppercase tracking-widest">{log.created_at}</td>
+                                        </tr>
+                                    {/each}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
             {:else if activeModule === 'docs'}

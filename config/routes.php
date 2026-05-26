@@ -72,6 +72,9 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/admin/add-armory-item', [\sdo\Controllers\AdminController::class, 'addArmoryItem']);
     $r->addRoute('POST', '/admin/delete-armory-item', [\sdo\Controllers\AdminController::class, 'deleteArmoryItem']);
     $r->addRoute('GET', '/admin/battle-logs', [\sdo\Controllers\AdminController::class, 'getBattleLogs']);
+    $r->addRoute('GET', '/admin/audit-logs', [\sdo\Controllers\AdminController::class, 'getAuditLogs']);
+    $r->addRoute('POST', '/admin/impersonate', [\sdo\Controllers\AdminController::class, 'impersonate']);
+    $r->addRoute('GET', '/admin/stop-impersonating', [\sdo\Controllers\AdminController::class, 'stopImpersonating']);
     
     // API Management
     $r->addRoute('GET', '/admin/api/keys', [\sdo\Controllers\AdminController::class, 'getApiKeys']);

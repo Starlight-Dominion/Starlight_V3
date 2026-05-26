@@ -72,6 +72,26 @@
     <div class="absolute inset-0 bg-gradient-to-b from-[#030712]/60 via-[#030712]/50 to-[#030712]/90 z-0 pointer-events-none"></div>
 
     <div class="flex flex-col flex-grow z-10">
+        {#if game.is_impersonating}
+            <div class="bg-red-600 text-white py-2 px-6 text-center border-b border-black/20 relative z-[100] shadow-xl">
+                <p class="text-[9px] font-black uppercase tracking-[3px] flex items-center justify-center gap-4">
+                    <span class="animate-pulse text-xl">⚠️</span>
+                    Neural Link Active: Impersonating Commander {game.user?.username}
+                    <a href="/admin/stop-impersonating" class="bg-white text-red-600 px-4 py-1 rounded font-black hover:bg-gray-200 transition-colors ml-4">Terminate Link</a>
+                </p>
+            </div>
+        {/if}
+
+        {#if game.global_broadcast && game.global_broadcast.trim() !== ''}
+            <div class="bg-red-900/90 text-white py-3 px-6 text-center border-b border-white/10 backdrop-blur-md relative z-50">
+                <p class="text-[10px] font-black uppercase tracking-[5px] flex items-center justify-center gap-4">
+                    <span class="w-2 h-2 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span>
+                    {game.global_broadcast}
+                    <span class="w-2 h-2 bg-white rounded-full animate-pulse shadow-[0_0_10px_white]"></span>
+                </p>
+            </div>
+        {/if}
+
         {#if game.user && !isPublicView}
             <ResourceHeader />
             <main class="flex-grow w-full max-w-7xl mx-auto px-6 py-8">

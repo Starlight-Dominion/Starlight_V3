@@ -22,10 +22,16 @@ class AdminService
     {
         $playerCount = User::count();
         $kingdomCount = Dominion::count();
+        $totalCredits = (float)Dominion::sum('credits');
+        $totalCitizens = (float)Dominion::sum('citizens');
+        $totalManpower = (float)\sdo\Models\DominionManpower::sum('total_quantity');
         
         return [
             'total_users' => $playerCount,
             'total_kingdoms' => $kingdomCount,
+            'total_credits' => $totalCredits,
+            'total_citizens' => $totalCitizens,
+            'total_manpower' => $totalManpower,
             'server_time' => (new \DateTime('now', new \DateTimeZone('America/New_York')))->format('H:i:s T')
         ];
     }
@@ -56,7 +62,7 @@ class AdminService
         $dominion = Dominion::with('user')->findOrFail($dominionId);
         
         $allowedDominion = ['credits', 'xp', 'turns', 'citizens', 'name'];
-        $allowedUser = ['username', 'is_admin'];
+        $allowedUser = ['username', 'is_admin', 'stasis_until'];
         
         foreach ($stats as $field => $value) {
             if (in_array($field, $allowedDominion)) {
@@ -65,6 +71,10 @@ class AdminService
                 // Cast is_admin to boolean
                 if ($field === 'is_admin') {
                     $value = (bool)$value;
+                }
+                // Handle stasis_until clearing
+                if ($field === 'stasis_until' && (empty($value) || $value === 'null')) {
+                    $value = null;
                 }
                 $dominion->user->$field = $value;
             }
@@ -84,10 +94,7 @@ class AdminService
         $unit = Unit::findOrFail($id);
         
         // Defensive check: only update columns that actually exist in the units table
-        static $unitColumns = null;
-        if ($unitColumns === null) {
-            $unitColumns = Capsule::schema()->getColumnListing('units');
-        }
+        $unitColumns = Capsule::schema()->getColumnListing('units');
 
         $filteredData = array_filter($data, fn($key) => in_array($key, $unitColumns), ARRAY_FILTER_USE_KEY);
 
@@ -159,10 +166,7 @@ class AdminService
         $item = ArmoryItem::findOrFail($id);
 
         // Defensive check: only update columns that actually exist
-        static $armoryColumns = null;
-        if ($armoryColumns === null) {
-            $armoryColumns = Capsule::schema()->getColumnListing('armory_items');
-        }
+        $armoryColumns = Capsule::schema()->getColumnListing('armory_items');
 
         $filteredData = array_filter($data, fn($key) => in_array($key, $armoryColumns), ARRAY_FILTER_USE_KEY);
 
@@ -190,7 +194,7 @@ class AdminService
         return ArmoryCategory::all()->toArray();
     }
 
-    // --- Logs Oversight ---
+    // --- Audit Trail ---\n    public function logAdminAction(int $adminId, string $action, string $description, array $metadata = []): void\n    {\n        \sdo\Models\GameLog::create([\n            'dominion_id' => $adminId,\n            'action' => 'ADMIN_' . strtoupper($action),\n            'description' => $description,\n            'metadata' => $metadata\n        ]);\n    }\n\n    public function getAuditLogs(int $limit = 100): array\n    {\n        return \sdo\Models\GameLog::where('action', 'LIKE', 'ADMIN_%')\n            ->orderBy('id', 'desc')\n            ->limit($limit)\n            ->get()\n            ->toArray();\n    }\n\n    // --- Logs Oversight ---
     public function getRecentBattleLogs(int $limit = 50): array
     {
         return BattleLog::orderBy('battle_time', 'desc')

@@ -72,6 +72,14 @@ class AdminServiceTest extends TestCase
             $table->integer('production_credits')->default(0);
             $table->timestamps();
         });
+
+        Capsule::schema()->create('dominion_manpower', function ($table) {
+            $table->increments('id');
+            $table->integer('dominion_id');
+            $table->integer('unit_id');
+            $table->integer('total_quantity')->default(0);
+            $table->timestamps();
+        });
     }
 
     public function testGetSystemStats(): void
