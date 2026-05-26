@@ -120,7 +120,8 @@ class AdminController extends BaseController
             'cost_citizens' => 1,
             'cost_turns' => 1,
             'power_offense' => 1,
-            'power_defense' => 1
+            'power_defense' => 1,
+            'production_credits' => 0
         ];
 
         try {
