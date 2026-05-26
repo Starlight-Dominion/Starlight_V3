@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace sdo\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
 class Dominion extends Model
 {
     protected $table = 'dominions';
@@ -38,22 +41,22 @@ class Dominion extends Model
         'last_tick' => 'datetime'
     ];
 
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function race()
+    public function race(): BelongsTo
     {
         return $this->belongsTo(Race::class, 'race_id');
     }
 
-    public function structures()
+    public function structures(): HasMany
     {
         return $this->hasMany(DominionStructure::class, 'dominion_id');
     }
 
-    public function manpower()
+    public function manpower(): HasMany
     {
         return $this->hasMany(DominionManpower::class, 'dominion_id');
     }

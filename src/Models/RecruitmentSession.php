@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace sdo\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 class RecruitmentSession extends Model
 {
     protected $table = 'recruitment_sessions';
@@ -24,7 +26,7 @@ class RecruitmentSession extends Model
         'completed_at' => 'datetime'
     ];
 
-    public function dominion()
+    public function dominion(): BelongsTo
     {
         return $this->belongsTo(Dominion::class, 'dominion_id');
     }
