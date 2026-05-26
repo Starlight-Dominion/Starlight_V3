@@ -40,6 +40,10 @@ export default defineConfig({
     ? undefined
     : {
         command: 'php -S 127.0.0.1:8080 -t public public/index.php',
+        env: {
+          ...process.env,
+          APP_ENV: 'production',
+        },
         url: `${baseURL}/login`,
         timeout: 120_000,
         reuseExistingServer: !process.env.CI,
