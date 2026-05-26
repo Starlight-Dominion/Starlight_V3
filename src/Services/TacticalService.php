@@ -27,10 +27,14 @@ class TacticalService
 
         $soldiers = (int)($manpower['soldiers'] ?? 0);
         $guards = (int)($manpower['guards'] ?? 0);
+        $spies = (int)($manpower['spies'] ?? 0);
+        $sentries = (int)($manpower['sentries'] ?? 0);
 
         // Attribute Multipliers (1% per point)
         $strengthMult = 1 + ($dom->strength_points * 0.01);
         $constitutionMult = 1 + ($dom->constitution_points * 0.01);
+        $dexterityMult = 1 + ($dom->dexterity_points * 0.01);
+        $charismaMult = 1 + ($dom->charisma_points * 0.01);
 
         // 1:1 Equipping Logic
         $atkArmoryBonus = $this->getArmoryBonus($dominionId, 'soldiers', $soldiers, 'attack_bonus');
@@ -51,10 +55,14 @@ class TacticalService
         // Legacy Formula
         $rawAttack = (($soldiers * self::AVG_UNIT_POWER * $strengthMult) + $atkArmoryBonus) * $offenseUpgradeMult;
         $rawDefense = (($guards * self::AVG_UNIT_POWER * $constitutionMult) + $defArmoryBonus) * $defenseUpgradeMult;
+        $rawEspionage = $spies * self::AVG_UNIT_POWER * $dexterityMult;
+        $rawSentry = $sentries * self::AVG_UNIT_POWER * $charismaMult;
 
         return [
             'offense' => (int)$rawAttack,
             'defense' => (int)$rawDefense,
+            'espionage' => (int)$rawEspionage,
+            'sentry' => (int)$rawSentry,
             'army' => $manpower->toArray()
         ];
     }
@@ -101,7 +109,12 @@ class TacticalService
             ])->toArray();
 
         return [
-            'ratings' => ['offense' => $res['offense'], 'defense' => $res['defense']],
+            'ratings' => [
+                'offense' => $res['offense'],
+                'defense' => $res['defense'],
+                'espionage' => $res['espionage'],
+                'sentry' => $res['sentry']
+            ],
             'army' => $res['army'],
             'manpower' => $manpowerDetails,
             'foundation' => ['hp' => $dom->foundation_hp, 'max_hp' => $dom->foundation_max_hp]
