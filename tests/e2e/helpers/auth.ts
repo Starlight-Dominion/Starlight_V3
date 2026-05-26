@@ -21,21 +21,21 @@ export function makeCommanderCredentials(prefix = 'e2e'): CommanderCredentials {
 export async function registerCommander(page: Page, creds: CommanderCredentials): Promise<void> {
   await page.goto('/register');
 
-  await page.getByTestId('register-email').fill(creds.email);
-  await page.getByTestId('register-username').fill(creds.username);
-  await page.getByTestId('register-dominion-name').fill(creds.dominionName);
-  await page.getByTestId('register-race').selectOption('Human');
-  await page.getByTestId('register-password').fill(creds.password);
-  await page.getByTestId('register-password-confirmation').fill(creds.password);
-  await page.getByTestId('register-submit').click();
+  await page.getByLabel(/comms frequency/i).fill(creds.email);
+  await page.getByLabel(/identity handle/i).fill(creds.username);
+  await page.getByLabel(/dominion designation/i).fill(creds.dominionName);
+  await page.getByLabel(/evolutionary strain/i).selectOption('Human');
+  await page.getByLabel(/^cipher$/i).fill(creds.password);
+  await page.getByLabel(/verify/i).fill(creds.password);
+  await page.getByRole('button', { name: /establish sovereignty/i }).click();
 
   await expect(page).toHaveURL(/\/login\?success=1$/);
 }
 
 export async function loginCommander(page: Page, creds: CommanderCredentials): Promise<void> {
-  await page.getByTestId('login-username').fill(creds.username);
-  await page.getByTestId('login-password').fill(creds.password);
-  await page.getByTestId('login-submit').click();
+  await page.getByLabel(/commander identity/i).fill(creds.username);
+  await page.getByLabel(/encryption key/i).fill(creds.password);
+  await page.getByRole('button', { name: /authorize access/i }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
 }

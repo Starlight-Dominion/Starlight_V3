@@ -67,23 +67,23 @@
                 </div>
             {/if}
 
-            <form onsubmit={handleRegister} class="space-y-4" data-testid="register-form">
+            <form onsubmit={handleRegister} class="space-y-4">
                 <div class="space-y-1">
-                    <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Comms Frequency (Email)</label>
-                    <input type="email" name="email" data-testid="register-email" bind:value={formData.email} class="input-terminal" required />
+                    <label for="register-email" class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Comms Frequency (Email)</label>
+                    <input id="register-email" type="email" name="email" bind:value={formData.email} class="input-terminal" required />
                 </div>
                 <div class="space-y-1">
-                    <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Identity Handle</label>
-                    <input type="text" name="username" data-testid="register-username" bind:value={formData.username} class="input-terminal" required />
+                    <label for="register-username" class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Identity Handle</label>
+                    <input id="register-username" type="text" name="username" bind:value={formData.username} class="input-terminal" required />
                 </div>
                 <div class="space-y-1">
-                    <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Dominion Designation</label>
-                    <input type="text" name="dominion_name" data-testid="register-dominion-name" bind:value={formData.dominion_name} class="input-terminal" required />
+                    <label for="register-dominion-name" class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Dominion Designation</label>
+                    <input id="register-dominion-name" type="text" name="dominion_name" bind:value={formData.dominion_name} class="input-terminal" required />
                 </div>
                 <div class="space-y-1">
-                    <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Evolutionary Strain</label>
+                    <label for="register-race" class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Evolutionary Strain</label>
                     <div class="relative">
-                        <select name="race" data-testid="register-race" bind:value={formData.race} class="input-terminal appearance-none cursor-pointer">
+                        <select id="register-race" name="race" bind:value={formData.race} class="input-terminal appearance-none cursor-pointer">
                             {#each raceOptions as r}
                                 <option value={r}>{r}</option>
                             {/each}
@@ -94,16 +94,16 @@
 
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-1">
-                        <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Cipher</label>
-                        <input type="password" name="password" data-testid="register-password" bind:value={formData.password} class="input-terminal" required />
+                        <label for="register-password" class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Cipher</label>
+                        <input id="register-password" type="password" name="password" bind:value={formData.password} class="input-terminal" required />
                     </div>
                     <div class="space-y-1">
-                        <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Verify</label>
-                        <input type="password" name="password_confirmation" data-testid="register-password-confirmation" bind:value={formData.password_confirmation} class="input-terminal" required />
+                        <label for="register-password-confirmation" class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Verify</label>
+                        <input id="register-password-confirmation" type="password" name="password_confirmation" bind:value={formData.password_confirmation} class="input-terminal" required />
                     </div>
                 </div>
 
-                <button type="submit" data-testid="register-submit" class="w-full bg-cyan-700/50 hover:bg-cyan-600 border border-cyan-500/50 text-white font-title font-black py-5 mt-4 rounded-xl uppercase tracking-[4px] transition-all disabled:opacity-50" disabled={loading}>
+                <button type="submit" class="w-full bg-cyan-700/50 hover:bg-cyan-600 border border-cyan-500/50 text-white font-title font-black py-5 mt-4 rounded-xl uppercase tracking-[4px] transition-all disabled:opacity-50" disabled={loading}>
                     {loading ? 'Processing...' : 'Establish Sovereignty'}
                 </button>
             </form>
