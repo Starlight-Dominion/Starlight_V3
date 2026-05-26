@@ -5,12 +5,18 @@ namespace sdo\Services;
 
 use DateTime;
 use DateTimeZone;
+use InvalidArgumentException;
 use sdo\Models\Dominion;
+use sdo\Models\DominionStructure;
 use sdo\Services\ConfigService;
-use Illuminate\Database\Capsule\Manager as Capsule;
 
 class GameService
 {
+    private const ALLOWED_STRUCTURE_LEVEL_BUFF_COLUMNS = [
+        'buff_citizens_per_tick',
+        'buff_economy',
+    ];
+
     public const TIMEZONE = 'America/New_York';
     public const BASE_INCOME = 100;
 
@@ -88,13 +94,8 @@ class GameService
     public function getTotalCitizenGrowth(int $dominionId): int
     {
         $baseCitizens = (int)$this->configService->get('baseline_citizens_per_tick', 50);
-        
-        $totalBuff = (int)\sdo\Models\DominionStructure::join('structure_levels', function($join) {
-                $join->on('dominion_structures.structure_id', '=', 'structure_levels.structure_id')
-                     ->on('dominion_structures.level', '=', 'structure_levels.level');
-            })
-            ->where('dominion_structures.dominion_id', $dominionId)
-            ->sum('structure_levels.buff_citizens_per_tick');
+
+        $totalBuff = (int)$this->sumStructureLevelBuff($dominionId, 'buff_citizens_per_tick');
 
         return $baseCitizens + $totalBuff;
     }
@@ -104,13 +105,22 @@ class GameService
      */
     public function getEconomyMultiplier(int $dominionId): float
     {
-        $totalBuff = (float)\sdo\Models\DominionStructure::join('structure_levels', function($join) {
-                $join->on('dominion_structures.structure_id', '=', 'structure_levels.structure_id')
-                     ->on('dominion_structures.level', '=', 'structure_levels.level');
-            })
-            ->where('dominion_structures.dominion_id', $dominionId)
-            ->sum('structure_levels.buff_economy');
+        $totalBuff = $this->sumStructureLevelBuff($dominionId, 'buff_economy');
 
         return 1 + ($totalBuff / 100);
+    }
+
+    private function sumStructureLevelBuff(int $dominionId, string $column): float
+    {
+        if (!in_array($column, self::ALLOWED_STRUCTURE_LEVEL_BUFF_COLUMNS, true)) {
+            throw new InvalidArgumentException('Invalid structure level buff column specified.');
+        }
+
+        return (float)DominionStructure::join('structure_levels', function($join) {
+                $join->on('dominion_structures.structure_id', '=', 'structure_levels.structure_id')
+                    ->on('dominion_structures.level', '=', 'structure_levels.level');
+            })
+            ->where('dominion_structures.dominion_id', $dominionId)
+            ->sum("structure_levels.$column");
     }
 }
