@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use sdo\Models\Dominion;
 use sdo\Models\DominionStructure;
 use sdo\Services\ConfigService;
+use Illuminate\Database\Capsule\Manager as Capsule;
 
 class GameService
 {
