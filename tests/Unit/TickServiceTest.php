@@ -77,6 +77,19 @@ class TickServiceTest extends TestCase
             $table->primary(['dominion_id', 'structure_id']);
         });
 
+        Capsule::schema()->create('units', function ($table) {
+            $table->increments('id');
+            $table->string('slug')->unique();
+            $table->integer('production_credits')->default(0);
+        });
+
+        Capsule::schema()->create('dominion_manpower', function ($table) {
+            $table->integer('dominion_id')->unsigned();
+            $table->integer('unit_id')->unsigned();
+            $table->integer('total_quantity')->default(0);
+            $table->primary(['dominion_id', 'unit_id']);
+        });
+
         $this->configMock = $this->createMock(ConfigService::class);
         $this->configMock->method('get')->willReturnMap([
             ['baseline_citizens_per_tick', 50, 50],
@@ -137,6 +150,31 @@ class TickServiceTest extends TestCase
         // Citizens: 50 + 25 = 75
         $this->assertEquals(120, $dominion->credits);
         $this->assertEquals(75, $dominion->citizens);
+    }
+
+    public function testProcessGlobalTickWithUnitProduction(): void
+    {
+        $dominion = $this->createTestDominion();
+        
+        $workerUnit = \sdo\Models\Unit::create([
+            'slug' => 'workers',
+            'production_credits' => 10
+        ]);
+
+        \sdo\Models\DominionManpower::create([
+            'dominion_id' => $dominion->id,
+            'unit_id' => $workerUnit->id,
+            'total_quantity' => 5
+        ]);
+
+        $this->service->processGlobalTick();
+
+        $dominion->refresh();
+
+        // Baseline: 100
+        // Unit Prod: 5 * 10 = 50
+        // Total: 150
+        $this->assertEquals(150, $dominion->credits);
     }
 
     public function testProcessGlobalTickBatchesCorrectly(): void
