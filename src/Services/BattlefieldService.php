@@ -29,6 +29,7 @@ class BattlefieldService
 
         return Dominion::with('user')
             ->orderBy('credits', 'desc')
+            ->orderBy('id', 'asc')
             ->limit($limit)
             ->get()
             ->map(fn($d) => [
