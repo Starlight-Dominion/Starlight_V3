@@ -30,7 +30,7 @@
                 report = data;
                 const saved = JSON.parse(localStorage.getItem('shadow_intel') || '{}');
                 saved[selectedTarget] = {
-                    gold: data.intel_gained.gold,
+                    credits: data.intel_gained.credits,
                     total_army: data.intel_gained.army.total,
                     ts: Date.now()
                 };
@@ -76,11 +76,11 @@
         <div class="lg:col-span-2 bg-[#0f0f0f] border border-[#2a231e] rounded-3xl p-8 relative overflow-hidden">
             {#if report}
                 <div in:fade class="space-y-6">
-                    <h2 class="text-[#3f6b2f] text-[10px] font-black uppercase tracking-[4px]">Report: {report.intel_gained.kingdom_name}</h2>
+                    <h2 class="text-[#3f6b2f] text-[10px] font-black uppercase tracking-[4px]">Report: {report.intel_gained.name}</h2>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="bg-black/40 p-4 rounded-xl border border-[#2a231e] text-center">
                             <span class="text-[8px] text-gray-600 uppercase block">Treasury</span>
-                            <span class="text-white font-mono font-bold">{report.intel_gained.gold.toLocaleString()} GP</span>
+                            <span class="text-white font-mono font-bold">{report.intel_gained.credits.toLocaleString()} CP</span>
                         </div>
                         <div class="bg-black/40 p-4 rounded-xl border border-[#2a231e] text-center">
                             <span class="text-[8px] text-gray-600 uppercase block">Total Army</span>

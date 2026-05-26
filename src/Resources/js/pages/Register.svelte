@@ -8,7 +8,7 @@
     let formData = $state({
         username: '',
         email: '',
-        kingdom_name: '',
+        dominion_name: '',
         race: 'Human',
         password: '',
         password_confirmation: ''
@@ -78,7 +78,7 @@
                 </div>
                 <div class="space-y-1">
                     <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Dominion Designation</label>
-                    <input type="text" bind:value={formData.kingdom_name} class="input-terminal" required />
+                    <input type="text" bind:value={formData.dominion_name} class="input-terminal" required />
                 </div>
                 <div class="space-y-1">
                     <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Evolutionary Strain</label>

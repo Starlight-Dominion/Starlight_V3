@@ -16,7 +16,7 @@
         email: '',
         password: '',
         password_confirmation: '',
-        kingdom_name: '',
+        dominion_name: '',
         race: 'Human'
     });
 
@@ -32,7 +32,7 @@
 
         if (authTab === 'register') {
             submission.append('email', formData.email);
-            submission.append('kingdom_name', formData.kingdom_name);
+            submission.append('dominion_name', formData.dominion_name);
             submission.append('password_confirmation', formData.password_confirmation);
             submission.append('race', formData.race);
         }
@@ -131,7 +131,7 @@
                         {:else}
                             <input type="email" bind:value={formData.email} class="input-terminal" placeholder="RELAY@STARNET.IO" required />
                             <input type="text" bind:value={formData.username} class="input-terminal" placeholder="COMMANDER_NAME" required />
-                            <input type="text" bind:value={formData.kingdom_name} class="input-terminal" placeholder="SECTOR_NAME" required />
+                            <input type="text" bind:value={formData.dominion_name} class="input-terminal" placeholder="SECTOR_NAME" required />
                             <select bind:value={formData.race} class="input-terminal appearance-none cursor-pointer">
                                 {#each raceOptions as race}<option value={race}>{race}</option>{/each}
                             </select>
