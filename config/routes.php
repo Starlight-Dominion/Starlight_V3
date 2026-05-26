@@ -25,9 +25,7 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/structures/foundation/upgrade', [\sdo\Controllers\FoundationController::class, 'upgrade']);
     $r->addRoute('POST', '/structures/foundation/purchase-upgrade', [\sdo\Controllers\FoundationController::class, 'purchaseUpgrade']);
     $r->addRoute('GET', '/structures/armory', [\sdo\Controllers\ArmoryController::class, 'index']);
-    $r->addRoute('GET', '/structures/stable', [\sdo\Controllers\StableController::class, 'index']);
-    $r->addRoute('POST', '/structures/stable/stable-unit', [\sdo\Controllers\StableController::class, 'stableUnit']);
-    $r->addRoute('POST', '/structures/stable/upgrade', [\sdo\Controllers\StableController::class, 'upgrade']);
+
     $r->addRoute('GET', '/structures/upgrades', [\sdo\Controllers\UpgradesController::class, 'index']);
     $r->addRoute('POST', '/structures/upgrades/housing', [\sdo\Controllers\UpgradesController::class, 'upgradeHousing']);
     $r->addRoute('POST', '/structures/upgrades/mercenary-market', [\sdo\Controllers\UpgradesController::class, 'upgradeMercenaryMarket']);
@@ -38,8 +36,7 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/spy/reconnaissance/init', [\sdo\Controllers\SpyController::class, 'initReconnaissance']);
     $r->addRoute('POST', '/spy/reconnaissance/execute', [\sdo\Controllers\SpyController::class, 'executeReconnaissance']);
     $r->addRoute('GET', '/combat/army', [\sdo\Controllers\ArmoryController::class, 'index']);
-    $r->addRoute('GET', '/clan/home', [\sdo\Controllers\ClanController::class, 'home']);
-    $r->addRoute('GET', '/clan/bank', [\sdo\Controllers\ClanController::class, 'bank']);
+
 
     // Bank Routes
     $r->addRoute('GET', '/bank', [\sdo\Controllers\BankController::class, 'index']);
