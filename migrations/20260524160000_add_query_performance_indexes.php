@@ -5,12 +5,17 @@ use Phinx\Migration\AbstractMigration;
 
 final class AddQueryPerformanceIndexes extends AbstractMigration
 {
+    private const BATTLE_LOGS_INDEX = 'idx_battle_logs_attacker_defender_time';
+    private const BANK_TRANSACTIONS_INDEX = 'idx_bank_transactions_kingdom_created';
+    private const GAME_LOGS_INDEX = 'idx_game_logs_dominion_created';
+    private const API_LOGS_INDEX = 'idx_api_logs_api_key_created';
+
     public function up(): void
     {
         if ($this->hasTable('battle_logs')) {
             $battleLogs = $this->table('battle_logs');
             if (!$battleLogs->hasIndex(['attacker_id', 'defender_id', 'battle_time'])) {
-                $battleLogs->addIndex(['attacker_id', 'defender_id', 'battle_time']);
+                $battleLogs->addIndex(['attacker_id', 'defender_id', 'battle_time'], ['name' => self::BATTLE_LOGS_INDEX]);
             }
             $battleLogs->update();
         }
@@ -18,7 +23,7 @@ final class AddQueryPerformanceIndexes extends AbstractMigration
         if ($this->hasTable('bank_transactions')) {
             $bankTransactions = $this->table('bank_transactions');
             if (!$bankTransactions->hasIndex(['kingdom_id', 'created_at'])) {
-                $bankTransactions->addIndex(['kingdom_id', 'created_at']);
+                $bankTransactions->addIndex(['kingdom_id', 'created_at'], ['name' => self::BANK_TRANSACTIONS_INDEX]);
             }
             $bankTransactions->update();
         }
@@ -26,7 +31,7 @@ final class AddQueryPerformanceIndexes extends AbstractMigration
         if ($this->hasTable('game_logs')) {
             $gameLogs = $this->table('game_logs');
             if (!$gameLogs->hasIndex(['dominion_id', 'created_at'])) {
-                $gameLogs->addIndex(['dominion_id', 'created_at']);
+                $gameLogs->addIndex(['dominion_id', 'created_at'], ['name' => self::GAME_LOGS_INDEX]);
             }
             $gameLogs->update();
         }
@@ -34,7 +39,7 @@ final class AddQueryPerformanceIndexes extends AbstractMigration
         if ($this->hasTable('api_logs')) {
             $apiLogs = $this->table('api_logs');
             if (!$apiLogs->hasIndex(['api_key_id', 'created_at'])) {
-                $apiLogs->addIndex(['api_key_id', 'created_at']);
+                $apiLogs->addIndex(['api_key_id', 'created_at'], ['name' => self::API_LOGS_INDEX]);
             }
             $apiLogs->update();
         }
@@ -43,35 +48,19 @@ final class AddQueryPerformanceIndexes extends AbstractMigration
     public function down(): void
     {
         if ($this->hasTable('api_logs')) {
-            $apiLogs = $this->table('api_logs');
-            if ($apiLogs->hasIndex(['api_key_id', 'created_at'])) {
-                $apiLogs->removeIndex(['api_key_id', 'created_at']);
-            }
-            $apiLogs->update();
+            $this->execute(sprintf('DROP INDEX IF EXISTS %s ON api_logs', self::API_LOGS_INDEX));
         }
 
         if ($this->hasTable('game_logs')) {
-            $gameLogs = $this->table('game_logs');
-            if ($gameLogs->hasIndex(['dominion_id', 'created_at'])) {
-                $gameLogs->removeIndex(['dominion_id', 'created_at']);
-            }
-            $gameLogs->update();
+            $this->execute(sprintf('DROP INDEX IF EXISTS %s ON game_logs', self::GAME_LOGS_INDEX));
         }
 
         if ($this->hasTable('bank_transactions')) {
-            $bankTransactions = $this->table('bank_transactions');
-            if ($bankTransactions->hasIndex(['kingdom_id', 'created_at'])) {
-                $bankTransactions->removeIndex(['kingdom_id', 'created_at']);
-            }
-            $bankTransactions->update();
+            $this->execute(sprintf('DROP INDEX IF EXISTS %s ON bank_transactions', self::BANK_TRANSACTIONS_INDEX));
         }
 
         if ($this->hasTable('battle_logs')) {
-            $battleLogs = $this->table('battle_logs');
-            if ($battleLogs->hasIndex(['attacker_id', 'defender_id', 'battle_time'])) {
-                $battleLogs->removeIndex(['attacker_id', 'defender_id', 'battle_time']);
-            }
-            $battleLogs->update();
+            $this->execute(sprintf('DROP INDEX IF EXISTS %s ON battle_logs', self::BATTLE_LOGS_INDEX));
         }
     }
 }
