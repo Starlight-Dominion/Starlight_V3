@@ -21,19 +21,21 @@ class ArmoryService
     public function getArmoryData(int $domId): array
     {
         $dom = Dominion::findOrFail($domId);
-        
+
         $unitTypes = ArmoryUnitType::all();
-        $categories = ArmoryCategory::all();
+        $categoriesByUnitType = ArmoryCategory::all()->groupBy('unit_type_id');
+        $itemsByCategory = ArmoryItem::all()->groupBy('category_id');
         $inventory = DominionArmoryItem::where('kingdom_id', $domId)
             ->get()
             ->keyBy('item_id');
 
+        $manpowerBySlug = DominionManpower::join('units', 'dominion_manpower.unit_id', '=', 'units.id')
+            ->where('dominion_manpower.dominion_id', $domId)
+            ->pluck('dominion_manpower.total_quantity', 'units.slug');
+
         $loadouts = [];
         foreach ($unitTypes as $uType) {
-            $count = DominionManpower::join('units', 'dominion_manpower.unit_id', '=', 'units.id')
-                ->where('dominion_manpower.dominion_id', $domId)
-                ->where('units.slug', $uType->slug)
-                ->value('total_quantity') ?? 0;
+            $count = $manpowerBySlug[$uType->slug] ?? 0;
 
             $loadouts[$uType->slug] = [
                 'title' => $uType->title,
@@ -41,10 +43,9 @@ class ArmoryService
                 'categories' => []
             ];
 
-            $typeCats = $categories->where('unit_type_id', $uType->id);
+            $typeCats = $categoriesByUnitType[$uType->id] ?? collect();
             foreach ($typeCats as $cat) {
-                $items = ArmoryItem::where('category_id', $cat->id)
-                    ->get()
+                $items = ($itemsByCategory[$cat->id] ?? collect())
                     ->map(function($item) use ($inventory, $dom) {
                         $invItem = $inventory[$item->id] ?? null;
                         $item->owned_quantity = $invItem ? $invItem->quantity : 0;
