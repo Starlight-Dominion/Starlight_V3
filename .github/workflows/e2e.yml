@@ -124,10 +124,10 @@ jobs:
           php vendor/bin/phinx seed:run -e development -s ArmorySeeder
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium firefox webkit
+        run: npm run test:e2e:install
 
       - name: Run Playwright E2E tests
-        run: npm run test:e2e
+        run: npm run test:e2e:ci
 
       - name: Upload Playwright report
         if: always()
