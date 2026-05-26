@@ -103,23 +103,11 @@ npm run test:e2e
 
 ### E2E Preparation
 ```bash
-# Start dependencies
-docker-compose up -d db redis
-
-# Prepare schema and baseline game data
-php vendor/bin/phinx migrate -e development
-php vendor/bin/phinx seed:run -e development -s InitialDataSeeder
-php vendor/bin/phinx seed:run -e development -s ArmorySeeder
-
-# Build frontend assets and run E2E tests
+# Build frontend assets on the host
 npm run build
-npm run test:e2e
-```
 
-### E2E with Docker App Server (Host PHP < 8.4)
-```bash
 # Run app and dependencies in containers
-docker-compose up -d app db redis
+docker compose up -d app db redis
 
 # Prepare schema + baseline data inside PHP 8.4 app container
 docker compose exec -T app php vendor/bin/phinx migrate -e development
