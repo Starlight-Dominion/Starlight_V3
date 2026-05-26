@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { expect, type Page } from '@playwright/test';
 
 export type CommanderCredentials = {
@@ -9,11 +11,12 @@ export type CommanderCredentials = {
 
 export function makeCommanderCredentials(prefix = 'e2e'): CommanderCredentials {
   const stamp = Date.now();
+  const uniqueSuffix = `${stamp}_${randomUUID().slice(0, 8)}`;
 
   return {
-    username: `${prefix}_commander_${stamp}`,
-    email: `${prefix}_${stamp}@example.test`,
-    dominionName: `${prefix.toUpperCase()} Dominion ${stamp}`,
+    username: `${prefix}_commander_${uniqueSuffix}`,
+    email: `${prefix}_${uniqueSuffix}@example.test`,
+    dominionName: `${prefix.toUpperCase()} Dominion ${uniqueSuffix}`,
     password: 'E2Epass123!',
   };
 }
