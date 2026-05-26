@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace sdo\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
 class DominionStructure extends Model
 {
     protected $table = 'dominion_structures';
@@ -18,12 +21,12 @@ class DominionStructure extends Model
         'level' => 'integer'
     ];
 
-    public function dominion()
+    public function dominion(): BelongsTo
     {
         return $this->belongsTo(Dominion::class, 'dominion_id');
     }
 
-    public function structure()
+    public function structure(): BelongsTo
     {
         return $this->belongsTo(Structure::class, 'structure_id');
     }
@@ -31,7 +34,7 @@ class DominionStructure extends Model
     /**
      * Get the specific level data for this dominion's structure.
      */
-    public function levelData()
+    public function levelData(): HasOne
     {
         return $this->hasOne(StructureLevel::class, 'structure_id', 'structure_id')
             ->where('level', $this->level);
