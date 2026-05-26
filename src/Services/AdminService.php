@@ -56,12 +56,16 @@ class AdminService
         $dominion = Dominion::with('user')->findOrFail($dominionId);
         
         $allowedDominion = ['credits', 'xp', 'turns', 'citizens', 'name'];
-        $allowedUser = ['username'];
+        $allowedUser = ['username', 'is_admin'];
         
         foreach ($stats as $field => $value) {
             if (in_array($field, $allowedDominion)) {
                 $dominion->$field = $value;
             } elseif (in_array($field, $allowedUser) && $dominion->user) {
+                // Cast is_admin to boolean
+                if ($field === 'is_admin') {
+                    $value = (bool)$value;
+                }
                 $dominion->user->$field = $value;
             }
         }
@@ -78,7 +82,16 @@ class AdminService
     public function updateUnit(int $id, array $data): bool
     {
         $unit = Unit::findOrFail($id);
-        return $unit->update($data);
+        
+        // Defensive check: only update columns that actually exist in the units table
+        static $unitColumns = null;
+        if ($unitColumns === null) {
+            $unitColumns = Capsule::schema()->getColumnListing('units');
+        }
+
+        $filteredData = array_filter($data, fn($key) => in_array($key, $unitColumns), ARRAY_FILTER_USE_KEY);
+
+        return $unit->update($filteredData);
     }
 
     public function addUnit(array $data): int
@@ -144,7 +157,16 @@ class AdminService
     public function updateArmoryItem(int $id, array $data): bool
     {
         $item = ArmoryItem::findOrFail($id);
-        return $item->update($data);
+
+        // Defensive check: only update columns that actually exist
+        static $armoryColumns = null;
+        if ($armoryColumns === null) {
+            $armoryColumns = Capsule::schema()->getColumnListing('armory_items');
+        }
+
+        $filteredData = array_filter($data, fn($key) => in_array($key, $armoryColumns), ARRAY_FILTER_USE_KEY);
+
+        return $item->update($filteredData);
     }
 
     public function addArmoryItem(array $data): int

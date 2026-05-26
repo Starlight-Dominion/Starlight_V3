@@ -96,11 +96,11 @@ class AdminController extends BaseController
         $this->checkAdmin();
 
         $id = (int)($_POST['id'] ?? 0);
-        $field = (string)($_POST['field'] ?? '');
-        $value = $_POST['value']; // Can be string or int
+        $data = $_POST;
+        unset($data['id'], $data['_csrf']);
 
         try {
-            $res = $this->adminService->updateUnit($id, [$field => $value]);
+            $res = $this->adminService->updateUnit($id, $data);
             return json_encode(['success' => $res]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -116,11 +116,13 @@ class AdminController extends BaseController
             'name' => 'New Unit Class',
             'slug' => 'new_unit_' . time(),
             'description' => 'Awaiting combat doctrine.',
-            'cost_gold' => 1000,
+            'cost_credits' => 1000,
             'cost_citizens' => 1,
             'cost_turns' => 1,
             'power_offense' => 1,
             'power_defense' => 1,
+            'power_spy_offense' => 0,
+            'power_spy_defense' => 0,
             'production_credits' => 0
         ];
 
@@ -287,11 +289,11 @@ class AdminController extends BaseController
         $this->checkAdmin();
 
         $id = (int)($_POST['id'] ?? 0);
-        $field = (string)($_POST['field'] ?? '');
-        $value = $_POST['value'];
+        $data = $_POST;
+        unset($data['id'], $data['_csrf']);
 
         try {
-            $res = $this->adminService->updateArmoryItem($id, [$field => $value]);
+            $res = $this->adminService->updateArmoryItem($id, $data);
             return json_encode(['success' => $res]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);

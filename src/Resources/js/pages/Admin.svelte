@@ -16,6 +16,32 @@
     let activeStructureId = $state(null);
     let loading = $state(false);
     let savingId = $state(null);
+    let notifications = $state([]);
+
+    function notify(message, type = 'success') {
+        const id = Math.random();
+        notifications = [...notifications, { id, message, type }];
+        setTimeout(() => {
+            notifications = notifications.filter(n => n.id !== id);
+        }, 5000);
+    }
+
+    async function adminPost(endpoint, formData) {
+        try {
+            const res = await fetch(endpoint, { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                notify("Directives Committed Successfully");
+                return true;
+            } else {
+                notify(data.message || "Directive Failure", "error");
+                return false;
+            }
+        } catch (e) {
+            notify("Neural Link Failure", "error");
+            return false;
+        }
+    }
 
     const modules = [
         { id: 'overview', name: 'Command Overview', icon: '◈' },
@@ -132,9 +158,9 @@
         formData.append('key', setting.setting_key);
         formData.append('value', setting.setting_value);
         formData.append('_csrf', game.csrf);
-        try {
-            await fetch('/admin/update-setting', { method: 'POST', body: formData });
-        } catch (e) { console.error("Update failed"); } finally { savingId = null; }
+        
+        await adminPost('/admin/update-setting', formData);
+        savingId = null;
     }
 
     async function saveKingdom(kingdom) {
@@ -149,39 +175,39 @@
         formData.append('citizens', kingdom.citizens);
         formData.append('is_admin', kingdom.user.is_admin ? 1 : 0);
         formData.append('_csrf', game.csrf);
-        try {
-            await fetch('/admin/update-kingdom', { method: 'POST', body: formData });
-        } catch (e) { console.error("Update failed"); } finally { savingId = null; }
+        
+        await adminPost('/admin/update-kingdom', formData);
+        savingId = null;
     }
 
     async function saveUnit(unit) {
         savingId = unit.id;
         const formData = new FormData();
         formData.append('id', unit.id);
-        formData.append('name', unit.name);
-        formData.append('slug', unit.slug);
-        formData.append('cost_credits', unit.cost_credits);
-        formData.append('cost_citizens', unit.cost_citizens);
-        formData.append('cost_turns', unit.cost_turns);
-        formData.append('power_offense', unit.power_offense);
-        formData.append('power_defense', unit.power_defense);
-        formData.append('foundation_level_req', unit.foundation_level_req);
+        formData.append('name', unit.name || '');
+        formData.append('slug', unit.slug || '');
+        formData.append('cost_credits', unit.cost_credits || 0);
+        formData.append('cost_citizens', unit.cost_citizens || 0);
+        formData.append('cost_turns', unit.cost_turns || 0);
+        formData.append('power_offense', unit.power_offense || 0);
+        formData.append('power_defense', unit.power_defense || 0);
+        formData.append('power_spy_offense', unit.power_spy_offense || 0);
+        formData.append('power_spy_defense', unit.power_spy_defense || 0);
+        formData.append('production_credits', unit.production_credits || 0);
+        formData.append('foundation_level_req', unit.foundation_level_req || 0);
         formData.append('requirement_slug', unit.requirement_slug || '');
-        formData.append('description', unit.description);
+        formData.append('description', unit.description || '');
         formData.append('_csrf', game.csrf);
-        try {
-            await fetch('/admin/update-unit', { method: 'POST', body: formData });
-        } catch (e) { console.error("Unit update failed"); } finally { savingId = null; }
+        
+        await adminPost('/admin/update-unit', formData);
+        savingId = null;
     }
 
     async function addUnit() {
         const formData = new FormData();
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/add-unit', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchUnits();
-        } catch (e) { console.error("Failed to add unit"); }
+        const res = await adminPost('/admin/add-unit', formData);
+        if (res) fetchUnits();
     }
 
     async function deleteUnit(id) {
@@ -189,11 +215,8 @@
         const formData = new FormData();
         formData.append('id', id);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/delete-unit', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchUnits();
-        } catch (e) { console.error("Failed to delete unit"); }
+        const res = await adminPost('/admin/delete-unit', formData);
+        if (res) fetchUnits();
     }
 
     async function saveStructureDetails(s) {
@@ -205,17 +228,16 @@
         formData.append('max_level', s.max_level);
         formData.append('description', s.description);
         formData.append('_csrf', game.csrf);
-        try { await fetch('/admin/update-structure', { method: 'POST', body: formData }); } catch (e) { console.error("Structure update failed"); } finally { savingId = null; }
+        
+        await adminPost('/admin/update-structure', formData);
+        savingId = null;
     }
 
     async function addStructure() {
         const formData = new FormData();
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/add-structure', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchStructures();
-        } catch (e) { console.error("Failed to add structure"); }
+        const res = await adminPost('/admin/add-structure', formData);
+        if (res) fetchStructures();
     }
 
     async function deleteStructure(id) {
@@ -223,14 +245,8 @@
         const formData = new FormData();
         formData.append('id', id);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/delete-structure', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) {
-                activeStructureId = null;
-                fetchStructures();
-            }
-        } catch (e) { console.error("Failed to delete structure"); }
+        const res = await adminPost('/admin/delete-structure', formData);
+        if (res) fetchStructures();
     }
 
     // --- API Gate Functions ---
@@ -239,11 +255,8 @@
         formData.append('user_id', userId);
         formData.append('rate_limit', 60);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/api/issue', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchApiData();
-        } catch (e) { console.error("Failed to issue key"); }
+        const res = await adminPost('/admin/api/issue', formData);
+        if (res) fetchApiData();
     }
 
     async function updateApiKey(key) {
@@ -251,11 +264,10 @@
         const formData = new FormData();
         formData.append('id', key.id);
         formData.append('rate_limit', key.rate_limit_per_minute);
-        formData.append('is_active', key.is_active);
+        formData.append('is_active', key.is_active ? 1 : 0);
         formData.append('_csrf', game.csrf);
-        try {
-            await fetch('/admin/api/update', { method: 'POST', body: formData });
-        } catch (e) { console.error("Update failed"); } finally { savingId = null; }
+        await adminPost('/admin/api/update', formData);
+        savingId = null;
     }
 
     async function deleteApiKey(id) {
@@ -263,10 +275,8 @@
         const formData = new FormData();
         formData.append('id', id);
         formData.append('_csrf', game.csrf);
-        try {
-            await fetch('/admin/api/delete', { method: 'POST', body: formData });
-            fetchApiData();
-        } catch (e) { console.error("Revocation failed"); }
+        const res = await adminPost('/admin/api/delete', formData);
+        if (res) fetchApiData();
     }
 
     async function processApp(app, action) {
@@ -277,11 +287,9 @@
         formData.append('rate_limit', app._new_limit || 60);
         formData.append('notes', app.admin_notes || '');
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/api/process-app', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchApiData();
-        } catch (e) { console.error("Processing failed"); } finally { savingId = null; }
+        const res = await adminPost('/admin/api/process-app', formData);
+        if (res) fetchApiData();
+        savingId = null;
     }
 
     async function saveStructureLevel(sId, row) {
@@ -293,7 +301,9 @@
             if (k !== 'structure_id' && k !== 'level') formData.append(k, v || 0);
         });
         formData.append('_csrf', game.csrf);
-        try { await fetch('/admin/update-structure-level', { method: 'POST', body: formData }); } catch (e) { console.error("Level update failed"); } finally { savingId = null; }
+        
+        await adminPost('/admin/update-structure-level', formData);
+        savingId = null;
     }
 
     async function addStructureLevel(sId) {
@@ -304,30 +314,25 @@
         formData.append('structure_id', sId);
         formData.append('level', nextLvl);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/add-structure-level', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchStructures();
-        } catch (e) { console.error("Failed to add level"); }
+        const res = await adminPost('/admin/add-structure-level', formData);
+        if (res) fetchStructures();
     }
 
     async function saveArmoryItem(item) {
         savingId = item.id;
         const formData = new FormData();
         formData.append('id', item.id);
-        formData.append('field', 'all'); // Special flag for multiple fields if needed, but we'll use individual
-        
-        const fields = ['name', 'slug', 'attack_bonus', 'defense_bonus', 'cost', 'requirement_slug', 'armory_level_req'];
-        fields.forEach(f => {
-            const fd = new FormData();
-            fd.append('id', item.id);
-            fd.append('field', f);
-            fd.append('value', item[f]);
-            fd.append('_csrf', game.csrf);
-            fetch('/admin/update-armory-item', { method: 'POST', body: fd });
-        });
-        
-        setTimeout(() => savingId = null, 500);
+        formData.append('name', item.name);
+        formData.append('slug', item.slug);
+        formData.append('attack_bonus', item.attack_bonus);
+        formData.append('defense_bonus', item.defense_bonus);
+        formData.append('cost', item.cost);
+        formData.append('requirement_slug', item.requirement_slug || '');
+        formData.append('armory_level_req', item.armory_level_req);
+        formData.append('_csrf', game.csrf);
+
+        await adminPost('/admin/update-armory-item', formData);
+        savingId = null;
     }
 
     async function addArmoryItem(unitType, categoryId) {
@@ -335,11 +340,8 @@
         formData.append('unit_type', unitType);
         formData.append('category_id', categoryId);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/add-armory-item', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchArmoryItems();
-        } catch (e) { console.error("Failed to add item"); }
+        const res = await adminPost('/admin/add-armory-item', formData);
+        if (res) fetchArmoryItems();
     }
 
     async function deleteArmoryItem(id) {
@@ -347,11 +349,8 @@
         const formData = new FormData();
         formData.append('id', id);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/delete-armory-item', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchArmoryItems();
-        } catch (e) { console.error("Failed to delete item"); }
+        const res = await adminPost('/admin/delete-armory-item', formData);
+        if (res) fetchArmoryItems();
     }
 
     const currentStructure = $derived(structures.find(s => s.details.id === activeStructureId) || null);
@@ -617,14 +616,14 @@
                                     </div>
                                 </div>
 
-                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-16 pt-10 border-t border-white/5 font-mono">
+                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-10 border-t border-white/5 font-mono">
                                     <div class="space-y-6">
                                         <h4 class="text-[10px] font-black text-gray-600 uppercase tracking-[5px]">Requisition (Cost)</h4>
                                         <div class="grid grid-cols-3 gap-6">
                                             {#each ['cost_credits', 'cost_citizens', 'cost_turns'] as field}
                                                 <div class="space-y-2">
                                                     <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">{field.split('_')[1]}</span>
-                                                    <input type="number" bind:value={unit[field]} class="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-3 text-xs font-mono text-cyan-400" />
+                                                    <input type="number" bind:value={unit[field]} class="w-full bg-black/60 border border-white/10 rounded-lg px-1 py-3 text-center text-sm font-mono text-cyan-400" />
                                                 </div>
                                             {/each}
                                         </div>
@@ -632,18 +631,26 @@
 
                                     <div class="space-y-6">
                                         <h4 class="text-[10px] font-black text-gray-600 uppercase tracking-[5px]">Tactical Yield</h4>
-                                        <div class="grid grid-cols-3 gap-6">
+                                        <div class="grid grid-cols-3 gap-4">
                                             <div class="space-y-2">
                                                 <span class="block text-[8px] font-black text-red-900 uppercase tracking-widest text-shadow-glow-red">Offense</span>
-                                                <input type="number" bind:value={unit.power_offense} class="w-full bg-black/60 border border-red-900/20 rounded-lg px-4 py-3 text-xs font-mono text-red-500" />
+                                                <input type="number" bind:value={unit.power_offense} class="w-full bg-black/60 border border-red-900/20 rounded-lg px-1 py-3 text-center text-sm font-mono text-red-500" />
                                             </div>
                                             <div class="space-y-2">
                                                 <span class="block text-[8px] font-black text-cyan-900 uppercase tracking-widest text-shadow-glow">Defense</span>
-                                                <input type="number" bind:value={unit.power_defense} class="w-full bg-black/60 border border-cyan-900/20 rounded-lg px-4 py-3 text-xs font-mono text-cyan-400" />
+                                                <input type="number" bind:value={unit.power_defense} class="w-full bg-black/60 border border-cyan-900/20 rounded-lg px-1 py-3 text-center text-sm font-mono text-cyan-400" />
                                             </div>
                                             <div class="space-y-2">
                                                 <span class="block text-[8px] font-black text-emerald-900 uppercase tracking-widest">Prod (CP)</span>
-                                                <input type="number" bind:value={unit.production_credits} class="w-full bg-black/60 border border-emerald-900/20 rounded-lg px-4 py-3 text-xs font-mono text-emerald-500" />
+                                                <input type="number" bind:value={unit.production_credits} class="w-full bg-black/60 border border-emerald-900/20 rounded-lg px-1 py-3 text-center text-sm font-mono text-emerald-500" />
+                                            </div>
+                                            <div class="space-y-2">
+                                                <span class="block text-[8px] font-black text-purple-900 uppercase tracking-widest">Spy ATK</span>
+                                                <input type="number" bind:value={unit.power_spy_offense} class="w-full bg-black/60 border border-purple-900/20 rounded-lg px-1 py-3 text-center text-sm font-mono text-purple-500" />
+                                            </div>
+                                            <div class="space-y-2">
+                                                <span class="block text-[8px] font-black text-indigo-900 uppercase tracking-widest">Spy DEF</span>
+                                                <input type="number" bind:value={unit.power_spy_defense} class="w-full bg-black/60 border border-indigo-900/20 rounded-lg px-1 py-3 text-center text-sm font-mono text-indigo-400" />
                                             </div>
                                         </div>
                                     </div>
@@ -652,7 +659,7 @@
                                         <h4 class="text-[10px] font-black text-gray-600 uppercase tracking-[5px]">Tech Prereq</h4>
                                         <div class="space-y-2">
                                              <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Foundation Rank</span>
-                                             <input type="number" bind:value={unit.foundation_level_req} class="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-3 text-xs font-mono text-white" />
+                                             <input type="number" bind:value={unit.foundation_level_req} class="w-full bg-black/60 border border-white/10 rounded-lg px-1 py-3 text-center text-sm font-mono text-white" />
                                         </div>
                                     </div>
                                 </div>
@@ -957,5 +964,13 @@
                 </div>
             {/if}
         </main>
+    </div>
+
+    <div class="fixed bottom-8 right-8 z-[200] space-y-4 pointer-events-none">
+        {#each notifications as n (n.id)}
+            <div in:slide out:fade class="pointer-events-auto px-8 py-4 rounded-xl border font-title font-black text-[10px] uppercase tracking-widest shadow-2xl backdrop-blur-md {n.type === 'success' ? 'bg-cyan-900/40 border-cyan-500 text-cyan-400' : 'bg-red-900/40 border-red-500 text-red-400'}">
+                {n.message}
+            </div>
+        {/each}
     </div>
 </div>
