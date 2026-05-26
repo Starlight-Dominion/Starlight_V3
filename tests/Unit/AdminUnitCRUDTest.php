@@ -32,6 +32,7 @@ class AdminUnitCRUDTest extends TestCase
             $table->integer('cost_turns');
             $table->integer('power_offense');
             $table->integer('power_defense');
+            $table->integer('production_credits')->default(0);
             $table->string('requirement_slug')->nullable();
             $table->integer('foundation_level_req')->default(0);
         });

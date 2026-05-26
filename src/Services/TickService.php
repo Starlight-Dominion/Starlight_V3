@@ -26,7 +26,9 @@ class TickService
         $baseCredits = (int)$this->configService->get('baseline_credits_per_tick', 100);
         $baseTurns = GameService::BASE_TURNS_PER_TICK;
 
-        Dominion::query()
+        $hasProductionColumn = Capsule::schema()->hasColumn('units', 'production_credits');
+
+        $query = Dominion::query()
             ->select(['dominions.*'])
             ->selectSub(function ($query) {
                 $query->selectRaw('SUM(sl.buff_economy)')
@@ -41,16 +43,27 @@ class TickService
                 $query->selectRaw('SUM(sl.buff_citizens_per_tick)')
                     ->from('dominion_structures as ds')
                     ->join('structure_levels as sl', function ($join) {
-                        $join->on('ds.structure_id', '=', 'sl.structure_id')
+                        $join->on('ds.structure_id', '=', 'structure_levels.structure_id')
                              ->on('ds.level', '=', 'sl.level');
                     })
                     ->whereColumn('ds.dominion_id', 'dominions.id');
-            }, 'total_citizen_buff')
-            ->chunkById(self::BATCH_SIZE, function ($dominions) use ($baseCitizens, $baseCredits, $baseTurns, $now) {
+            }, 'total_citizen_buff');
+
+        if ($hasProductionColumn) {
+            $query->selectSub(function ($query) {
+                $query->selectRaw('SUM(dm.total_quantity * u.production_credits)')
+                    ->from('dominion_manpower as dm')
+                    ->join('units as u', 'dm.unit_id', '=', 'u.id')
+                    ->whereColumn('dm.dominion_id', 'dominions.id');
+            }, 'total_unit_production');
+        }
+
+        $query->chunkById(self::BATCH_SIZE, function ($dominions) use ($baseCitizens, $baseCredits, $baseTurns, $now) {
                 Capsule::transaction(function () use ($dominions, $baseCitizens, $baseCredits, $baseTurns, $now) {
                     foreach ($dominions as $dom) {
                         $multiplier = 1 + ((float)($dom->total_economy_buff ?? 0) / 100);
-                        $creditsGained = (int)floor($baseCredits * $multiplier);
+                        $basePlusUnit = $baseCredits + (int)($dom->total_unit_production ?? 0);
+                        $creditsGained = (int)floor($basePlusUnit * $multiplier);
                         
                         $citizenGained = $baseCitizens + (int)($dom->total_citizen_buff ?? 0);
 
