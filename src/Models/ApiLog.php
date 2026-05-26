@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace sdo\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 class ApiLog extends Model
 {
     protected $table = 'api_logs';
@@ -19,7 +21,7 @@ class ApiLog extends Model
         'created_at'
     ];
 
-    public function apiKey()
+    public function apiKey(): BelongsTo
     {
         return $this->belongsTo(ApiKey::class, 'api_key_id');
     }

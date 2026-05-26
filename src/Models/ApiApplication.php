@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace sdo\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 class ApiApplication extends Model
 {
     protected $table = 'api_applications';
@@ -13,7 +15,7 @@ class ApiApplication extends Model
         'user_id' => 'integer'
     ];
 
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
     }
