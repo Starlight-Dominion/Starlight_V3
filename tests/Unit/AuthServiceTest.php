@@ -82,6 +82,7 @@ class AuthServiceTest extends TestCase
             $table->increments('id');
             $table->string('slug')->unique();
             $table->string('name');
+            $table->integer('production_credits')->default(0);
         });
 
         Capsule::schema()->create('structures', function ($table) {

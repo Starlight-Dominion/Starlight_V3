@@ -63,9 +63,23 @@ class GameService
     public function getTotalIncome(int $dominionId): int
     {
         $baseCredits = (int)$this->configService->get('baseline_credits_per_tick', 100);
+        
+        // Defensive check: Verify column exists before querying
+        static $hasProductionColumn = null;
+        if ($hasProductionColumn === null) {
+            $hasProductionColumn = Capsule::schema()->hasColumn('units', 'production_credits');
+        }
+
+        $unitProduction = 0;
+        if ($hasProductionColumn) {
+            $unitProduction = (int)\sdo\Models\DominionManpower::join('units', 'dominion_manpower.unit_id', '=', 'units.id')
+                ->where('dominion_manpower.dominion_id', $dominionId)
+                ->sum(Capsule::raw('dominion_manpower.total_quantity * units.production_credits'));
+        }
+
         $multiplier = $this->getEconomyMultiplier($dominionId);
         
-        return (int)floor($baseCredits * $multiplier);
+        return (int)floor(($baseCredits + $unitProduction) * $multiplier);
     }
 
     /**
