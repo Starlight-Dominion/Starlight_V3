@@ -93,6 +93,29 @@ vendor/bin/phpunit
 
 # Run MVC integrity checks
 bash tests/Architecture/test_mvc_integrity.sh
+
+# Install Playwright browsers
+npm run test:e2e:install
+
+# Run E2E suite (requires DB, Redis, migrations, and seed data)
+npm run test:e2e
+```
+
+### E2E Preparation
+```bash
+# Build frontend assets on the host
+npm run build
+
+# Run app and dependencies in containers
+docker compose up -d app db redis
+
+# Prepare schema + baseline data inside PHP 8.4 app container
+docker compose exec -T app php vendor/bin/phinx migrate -e development
+docker compose exec -T app php vendor/bin/phinx seed:run -e development -s InitialDataSeeder
+docker compose exec -T app php vendor/bin/phinx seed:run -e development -s ArmorySeeder
+
+# Run Playwright against the already-running containerized app
+PLAYWRIGHT_USE_EXTERNAL_SERVER=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080 npm run test:e2e
 ```
 
 ---
