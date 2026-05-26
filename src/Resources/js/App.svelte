@@ -60,6 +60,7 @@
     });
 
     const isPublicView = $derived(['home', 'pages/about', 'pages/rules', 'pages/terms', 'pages/contact', 'auth/login', 'auth/register'].includes(game.component));
+    const isAdminView = $derived(game.component === 'admin/index');
 
     const bgUrl = "/images/backgroundMain.avif";
 </script>
@@ -74,12 +75,16 @@
         {#if game.user && !isPublicView}
             <ResourceHeader />
             <main class="flex-grow w-full max-w-7xl mx-auto px-6 py-8">
-                <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                    <TacticalSidebar />
-                    <section class="lg:col-span-3">
-                        <ActiveComponent {...game.props} />
-                    </section>
-                </div>
+                {#if isAdminView}
+                    <ActiveComponent {...game.props} />
+                {:else}
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                        <TacticalSidebar />
+                        <section class="lg:col-span-3">
+                            <ActiveComponent {...game.props} />
+                        </section>
+                    </div>
+                {/if}
             </main>
         {:else}
             <PublicNav />
