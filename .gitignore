@@ -6,7 +6,7 @@
 /.phpunit.cache/
 /.php-cs-fixer.cache
 /legacy_files/
-
+.phpunit.result.cache
 
 # macOS
 .DS_Store
