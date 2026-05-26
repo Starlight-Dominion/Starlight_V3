@@ -14,6 +14,8 @@ use DateTime;
 
 class BattlefieldService
 {
+    private const DEFAULT_BATTLEFIELD_LIST_LIMIT = 200;
+
     public function __construct(
         private TacticalService $tacticalService,
         private LogService $logService,
@@ -22,8 +24,13 @@ class BattlefieldService
 
     public function getBattlefieldList(): array
     {
+        $configuredLimit = (int)$this->configService->get('battlefield_list_limit', self::DEFAULT_BATTLEFIELD_LIST_LIMIT);
+        $limit = max(1, min(1000, $configuredLimit));
+
         return Dominion::with('user')
             ->orderBy('credits', 'desc')
+            ->orderBy('id', 'asc')
+            ->limit($limit)
             ->get()
             ->map(fn($d) => [
                 'kingdom_id' => $d->id,
