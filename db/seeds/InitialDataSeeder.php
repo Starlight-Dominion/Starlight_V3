@@ -25,7 +25,7 @@ class InitialDataSeeder extends AbstractSeed {
             ['slug' => 'soldiers', 'name' => 'Soldiers', 'description' => 'Standard Infantry.', 'cost_credits' => 100, 'cost_citizens' => 1, 'cost_turns' => 2, 'power_offense' => 10, 'power_defense' => 10],
             ['slug' => 'spies', 'name' => 'Espionage Agents', 'description' => 'Intel gathered.', 'cost_credits' => 500, 'cost_citizens' => 1, 'cost_turns' => 5, 'power_offense' => 1, 'power_defense' => 1],
             ['slug' => 'sentries', 'name' => 'Detection Sentries', 'description' => 'Sentry link.', 'cost_credits' => 250, 'cost_citizens' => 1, 'cost_turns' => 3, 'power_offense' => 2, 'power_defense' => 25],
-            ['slug' => 'workers', 'name' => 'Utility Workers', 'description' => 'Resource extraction and construction.', 'cost_credits' => 25, 'cost_citizens' => 1, 'cost_turns' => 1, 'power_offense' => 1, 'power_defense' => 2],
+            ['slug' => 'workers', 'name' => 'Utility Workers', 'description' => 'Resource extraction and construction.', 'cost_credits' => 25, 'cost_citizens' => 1, 'cost_turns' => 1, 'power_offense' => 1, 'power_defense' => 2, 'production_credits' => 25],
         ])->saveData();
 
         // Structures

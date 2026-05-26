@@ -73,6 +73,7 @@ class TrainingServiceTest extends TestCase
             $table->integer('cost_turns');
             $table->integer('power_offense');
             $table->integer('power_defense');
+            $table->integer('production_credits')->default(0);
         });
 
         Capsule::schema()->create('dominion_manpower', function ($table) {

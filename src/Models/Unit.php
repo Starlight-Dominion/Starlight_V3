@@ -14,6 +14,7 @@ class Unit extends Model
         'cost_citizens' => 'integer',
         'cost_turns' => 'integer',
         'power_offense' => 'integer',
-        'power_defense' => 'integer'
+        'power_defense' => 'integer',
+        'production_credits' => 'integer'
     ];
 }
