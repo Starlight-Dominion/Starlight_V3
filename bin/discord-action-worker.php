@@ -36,12 +36,17 @@ function actionWorker(Client $redis, DiscordLinkService $discordLinkService): vo
 
     while (true) {
         try {
-            $response = $redis->xread([$actionStream => $lastID], 10, 0);
+            $response = $redis->xread(10, 0, [$actionStream], $lastID);
             if (!$response || !isset($response[$actionStream])) {
                 continue;
             }
 
             foreach ($response[$actionStream] as $entryID => $fields) {
+                if (is_array($fields) && isset($fields[0], $fields[1]) && is_scalar($fields[0]) && is_array($fields[1])) {
+                    $entryID = (string)$fields[0];
+                    $fields = normalizeStreamFields($fields[1]);
+                }
+
                 $lastID = $entryID;
                 $raw = $fields['data'] ?? null;
                 if (!is_string($raw)) {
@@ -57,7 +62,11 @@ function actionWorker(Client $redis, DiscordLinkService $discordLinkService): vo
 
                 $resultEnvelope = $discordLinkService->processActionEnvelope($decoded);
                 if (is_array($resultEnvelope)) {
-                    $redis->xadd($eventStream, '*', ['data' => json_encode($resultEnvelope, JSON_UNESCAPED_SLASHES)]);
+                    $payload = json_encode($resultEnvelope, JSON_UNESCAPED_SLASHES);
+                    if ($payload !== false) {
+                        // Use raw XADD to avoid client method-signature differences between Predis versions.
+                        $redis->executeRaw(['XADD', $eventStream, '*', 'data', $payload]);
+                    }
                 }
 
                 $redis->set($checkpointKey, $lastID);
@@ -67,4 +76,32 @@ function actionWorker(Client $redis, DiscordLinkService $discordLinkService): vo
             usleep(500000);
         }
     }
+}
+
+/**
+ * Predis may return XREAD fields as an alternating flat list or as an associative map.
+ * Normalize both representations into key/value form used by the worker.
+ *
+ * @param array<int|string, mixed> $rawFields
+ * @return array<string, mixed>
+ */
+function normalizeStreamFields(array $rawFields): array
+{
+    if (!array_is_list($rawFields)) {
+        /** @var array<string, mixed> $rawFields */
+        return $rawFields;
+    }
+
+    $normalized = [];
+    $count = count($rawFields);
+    for ($i = 0; $i + 1 < $count; $i += 2) {
+        $field = $rawFields[$i];
+        if (!is_string($field) || $field === '') {
+            continue;
+        }
+
+        $normalized[$field] = $rawFields[$i + 1];
+    }
+
+    return $normalized;
 }
