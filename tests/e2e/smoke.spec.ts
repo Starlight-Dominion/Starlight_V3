@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { makeCommanderCredentials, registerAndLoginCommander } from './helpers/auth';
 
 test.describe('smoke', () => {
   test('landing page boots home component', async ({ page }) => {
@@ -39,29 +40,8 @@ test.describe('smoke', () => {
   });
 
   test('new commander can register and reach dashboard', async ({ page }) => {
-    const stamp = Date.now();
-    const username = `e2e_commander_${stamp}`;
-    const email = `e2e_${stamp}@example.test`;
-    const dominion = `E2E Dominion ${stamp}`;
-    const password = 'E2Epass123!';
-
-    await page.goto('/register');
-
-    await page.locator('input[type="email"]').fill(email);
-    await page.locator('input[type="text"]').first().fill(username);
-    await page.locator('input[type="text"]').nth(1).fill(dominion);
-    await page.locator('select').selectOption('Human');
-    await page.locator('input[type="password"]').first().fill(password);
-    await page.locator('input[type="password"]').nth(1).fill(password);
-    await page.getByRole('button', { name: /establish sovereignty/i }).click();
-
-    await expect(page).toHaveURL(/\/login\?success=1$/);
-
-    await page.locator('input[type="text"]').fill(username);
-    await page.locator('input[type="password"]').fill(password);
-    await page.getByRole('button', { name: /authorize access/i }).click();
-
-    await expect(page).toHaveURL(/\/dashboard$/);
+    const creds = makeCommanderCredentials();
+    await registerAndLoginCommander(page, creds);
 
     const initialState = await page.evaluate(() => {
       return (window as { __INITIAL_STATE__?: Record<string, unknown> }).__INITIAL_STATE__;
