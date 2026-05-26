@@ -118,6 +118,11 @@ jobs:
       - name: Run migrations
         run: php vendor/bin/phinx migrate -e development
 
+      - name: Seed baseline game data
+        run: |
+          php vendor/bin/phinx seed:run -e development -s InitialDataSeeder
+          php vendor/bin/phinx seed:run -e development -s ArmorySeeder
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox webkit
 
