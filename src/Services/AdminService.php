@@ -57,30 +57,76 @@ class AdminService
             ->toArray();
     }
 
+    public function getKingdomFullProfile(int $dominionId): array
+    {
+        $dominion = Dominion::with(['user', 'manpower.unit', 'structures.structure', 'race'])
+            ->findOrFail($dominionId);
+
+        // Get armory items separately since relationship name in model is non-standard or missing
+        $armory = \sdo\Models\DominionArmoryItem::with('item')
+            ->where('kingdom_id', $dominionId)
+            ->get()
+            ->toArray();
+
+        return [
+            'dominion' => $dominion->toArray(),
+            'armory' => $armory,
+            // Provide all available units/structures for "granting" new assets
+            'all_units' => Unit::all()->toArray(),
+            'all_structures' => Structure::all()->toArray(),
+            'all_armory' => ArmoryItem::all()->toArray()
+        ];
+    }
+
     public function updateDominionStats(int $dominionId, array $stats): bool
     {
         $dominion = Dominion::with('user')->findOrFail($dominionId);
         
-        $allowedDominion = ['credits', 'xp', 'turns', 'citizens', 'name'];
-        $allowedUser = ['username', 'is_admin', 'stasis_until'];
+        $domColumns = Capsule::schema()->getColumnListing('dominions');
+        $userColumns = Capsule::schema()->getColumnListing('users');
         
         foreach ($stats as $field => $value) {
-            if (in_array($field, $allowedDominion)) {
+            if (in_array($field, $domColumns)) {
                 $dominion->$field = $value;
-            } elseif (in_array($field, $allowedUser) && $dominion->user) {
-                // Cast is_admin to boolean
-                if ($field === 'is_admin') {
+            } elseif (in_array($field, $userColumns) && $dominion->user) {
+                if ($field === 'is_admin' || $field === 'is_bot') {
                     $value = (bool)$value;
                 }
-                // Handle stasis_until clearing
                 if ($field === 'stasis_until' && (empty($value) || $value === 'null')) {
                     $value = null;
+                }
+                if ($field === 'password' && !empty($value)) {
+                    $value = password_hash($value, PASSWORD_DEFAULT);
                 }
                 $dominion->user->$field = $value;
             }
         }
 
         return $dominion->push();
+    }
+
+    public function updateKingdomManpower(int $dominionId, int $unitId, int $total, int $stabled): bool
+    {
+        return \sdo\Models\DominionManpower::updateOrCreate(
+            ['dominion_id' => $dominionId, 'unit_id' => $unitId],
+            ['total_quantity' => $total, 'stabled_quantity' => $stabled]
+        )->exists;
+    }
+
+    public function updateKingdomStructure(int $dominionId, int $structureId, int $level): bool
+    {
+        return \sdo\Models\DominionStructure::updateOrCreate(
+            ['dominion_id' => $dominionId, 'structure_id' => $structureId],
+            ['level' => $level]
+        )->exists;
+    }
+
+    public function updateKingdomArmory(int $dominionId, int $itemId, int $quantity, bool $equipped): bool
+    {
+        return \sdo\Models\DominionArmoryItem::updateOrCreate(
+            ['kingdom_id' => $dominionId, 'item_id' => $itemId],
+            ['quantity' => $quantity, 'is_equipped' => $equipped]
+        )->exists;
     }
 
     // --- Units Management ---

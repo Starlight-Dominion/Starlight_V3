@@ -83,6 +83,76 @@ class AdminController extends BaseController
         }
     }
 
+    public function getKingdomProfile(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        $id = (int)($_GET['id'] ?? 0);
+        try {
+            $profile = $this->adminService->getKingdomFullProfile($id);
+            return json_encode(['success' => true, 'profile' => $profile]);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function updateKingdomManpower(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        $domId = (int)($_POST['dominion_id'] ?? 0);
+        $unitId = (int)($_POST['unit_id'] ?? 0);
+        $total = (int)($_POST['total_quantity'] ?? 0);
+        $stabled = (int)($_POST['stabled_quantity'] ?? 0);
+
+        try {
+            $res = $this->adminService->updateKingdomManpower($domId, $unitId, $total, $stabled);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_MANPOWER', "Modified manpower for sector {$domId}, unit {$unitId}", ['total' => $total, 'stabled' => $stabled]);
+            return json_encode(['success' => $res]);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function updateKingdomStructure(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        $domId = (int)($_POST['dominion_id'] ?? 0);
+        $structureId = (int)($_POST['structure_id'] ?? 0);
+        $level = (int)($_POST['level'] ?? 0);
+
+        try {
+            $res = $this->adminService->updateKingdomStructure($domId, $structureId, $level);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_KINGDOM_STRUCTURE', "Modified structure level for sector {$domId}, structure {$structureId}", ['level' => $level]);
+            return json_encode(['success' => $res]);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function updateKingdomArmory(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        $domId = (int)($_POST['dominion_id'] ?? 0);
+        $itemId = (int)($_POST['item_id'] ?? 0);
+        $quantity = (int)($_POST['quantity'] ?? 0);
+        $equipped = (bool)($_POST['is_equipped'] ?? false);
+
+        try {
+            $res = $this->adminService->updateKingdomArmory($domId, $itemId, $quantity, $equipped);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_KINGDOM_ARMORY', "Modified armory for sector {$domId}, item {$itemId}", ['quantity' => $quantity, 'equipped' => $equipped]);
+            return json_encode(['success' => $res]);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     public function getUnits(): string
     {
         header('Content-Type: application/json');

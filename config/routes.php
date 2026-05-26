@@ -56,7 +56,11 @@ return function (RouteCollector $r) {
     $r->addRoute('GET', '/admin', [\sdo\Controllers\AdminController::class, 'index']);
     $r->addRoute('GET', '/admin/search', [\sdo\Controllers\AdminController::class, 'searchDominions']);
     $r->addRoute('GET', '/admin/kingdoms', [\sdo\Controllers\AdminController::class, 'getAllDominions']);
+    $r->addRoute('GET', '/admin/kingdom/profile', [\sdo\Controllers\AdminController::class, 'getKingdomProfile']);
     $r->addRoute('POST', '/admin/update-kingdom', [\sdo\Controllers\AdminController::class, 'updateDominion']);
+    $r->addRoute('POST', '/admin/update-kingdom-manpower', [\sdo\Controllers\AdminController::class, 'updateKingdomManpower']);
+    $r->addRoute('POST', '/admin/update-kingdom-structure', [\sdo\Controllers\AdminController::class, 'updateKingdomStructure']);
+    $r->addRoute('POST', '/admin/update-kingdom-armory', [\sdo\Controllers\AdminController::class, 'updateKingdomArmory']);
     $r->addRoute('GET', '/admin/units', [\sdo\Controllers\AdminController::class, 'getUnits']);
     $r->addRoute('POST', '/admin/update-unit', [\sdo\Controllers\AdminController::class, 'updateUnit']);
     $r->addRoute('POST', '/admin/add-unit', [\sdo\Controllers\AdminController::class, 'addUnit']);
