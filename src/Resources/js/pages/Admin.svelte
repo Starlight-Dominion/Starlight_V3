@@ -73,6 +73,11 @@
     let selectedArmoryItem = $state(null);
     let armoryInspectorTab = $state('identity'); // 'identity', 'combat', 'reqs'
 
+    // Unit Inspector State
+    let showUnitInspector = $state(false);
+    let selectedUnit = $state(null);
+    let unitInspectorTab = $state('identity'); // 'identity', 'costs', 'yield', 'reqs'
+
     async function fetchKingdomProfile(id) {
         loading = true;
         try {
@@ -434,6 +439,12 @@
         showArmoryInspector = true;
     }
 
+    function openUnitInspector(unit) {
+        selectedUnit = unit;
+        unitInspectorTab = 'identity';
+        showUnitInspector = true;
+    }
+
     async function addArmoryItem(unitType, categoryId) {
         const formData = new FormData();
         formData.append('unit_type', unitType);
@@ -690,80 +701,36 @@
                         <button onclick={addUnit} class="bg-white text-black font-title font-black text-[10px] px-8 py-3 rounded-xl hover:bg-cyan-500 transition-all uppercase tracking-widest">Enlist New Class</button>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         {#each units as unit}
-                            <div class="bg-dark-translucent border border-white/5 p-10 rounded-3xl space-y-10 relative group hover:border-red-900/20 transition-all">
-                                <div class="flex justify-between items-start">
-                                    <div class="flex items-center gap-8">
-                                        <div class="w-20 h-20 bg-red-950/20 border border-red-900/30 rounded-2xl flex items-center justify-center text-red-600 text-3xl font-black shadow-[inset_0_0_20px_rgba(153,27,27,0.1)]">
+                            <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl flex flex-col justify-between group hover:border-red-900/30 transition-all relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none font-title font-black text-white italic text-4xl uppercase">
+                                    {unit.slug.substring(0,3)}
+                                </div>
+                                <div class="space-y-6 relative z-10">
+                                    <div class="flex items-center gap-6">
+                                        <div class="w-16 h-16 bg-red-950/20 border border-red-900/30 rounded-2xl flex items-center justify-center text-red-600 text-2xl font-black">
                                             {unit.slug.charAt(0).toUpperCase()}
                                         </div>
-                                        <div class="flex-grow">
-                                            <input type="text" bind:value={unit.name} class="bg-transparent border-none text-3xl font-title font-black text-white uppercase focus:ring-0 p-0 w-full tracking-wider" />
-                                            <div class="flex items-center gap-6 mt-2">
-                                                <p class="text-[10px] font-black text-gray-700 uppercase tracking-[3px]">Protocol ID: {unit.slug}</p>
-                                                <input type="text" bind:value={unit.slug} class="bg-black/60 border border-white/10 rounded px-3 py-1 text-[10px] font-mono text-gray-500 w-48 focus:border-red-900" />
-                                            </div>
+                                        <div>
+                                            <h4 class="text-xl font-title font-black text-white uppercase tracking-tight leading-none">{unit.name}</h4>
+                                            <p class="text-[9px] font-bold text-gray-600 uppercase tracking-[3px] mt-2 italic">{unit.slug}</p>
                                         </div>
                                     </div>
-                                    <div class="flex gap-3">
-                                        <button onclick={() => saveUnit(unit)} class="bg-red-900/20 border border-red-900/50 text-red-500 px-8 py-4 rounded-xl font-title font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all disabled:opacity-50" disabled={savingId === unit.id}>
-                                            {savingId === unit.id ? 'COMMITTING...' : 'UPDATE DOCTRINE'}
-                                        </button>
-                                        <button onclick={() => deleteUnit(unit.id)} class="text-red-900 hover:text-red-500 p-4 transition-colors">✕</button>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-10 border-t border-white/5 font-mono">
-                                    <div class="space-y-6">
-                                        <h4 class="text-[10px] font-black text-gray-600 uppercase tracking-[5px]">Requisition (Cost)</h4>
-                                        <div class="grid grid-cols-3 gap-6">
-                                            {#each ['cost_credits', 'cost_citizens', 'cost_turns'] as field}
-                                                <div class="space-y-2">
-                                                    <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">{field.split('_')[1]}</span>
-                                                    <input type="number" bind:value={unit[field]} class="w-full bg-black/60 border border-white/10 rounded-lg px-1 py-3 text-center text-sm font-mono text-cyan-400" />
-                                                </div>
-                                            {/each}
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="bg-black/40 border border-white/5 p-4 rounded-xl">
+                                            <span class="block text-[7px] font-black text-red-900 uppercase tracking-widest mb-1">ATK Power</span>
+                                            <span class="text-xl font-title font-black text-red-500">{unit.power_offense}</span>
                                         </div>
-                                    </div>
-
-                                    <div class="space-y-6">
-                                        <h4 class="text-[10px] font-black text-gray-600 uppercase tracking-[5px]">Tactical Yield</h4>
-                                        <div class="grid grid-cols-3 gap-4">
-                                            <div class="space-y-2">
-                                                <span class="block text-[8px] font-black text-red-900 uppercase tracking-widest text-shadow-glow-red">Offense</span>
-                                                <input type="number" bind:value={unit.power_offense} class="w-full bg-black/60 border border-red-900/20 rounded-lg px-1 py-3 text-center text-sm font-mono text-red-500" />
-                                            </div>
-                                            <div class="space-y-2">
-                                                <span class="block text-[8px] font-black text-cyan-900 uppercase tracking-widest text-shadow-glow">Defense</span>
-                                                <input type="number" bind:value={unit.power_defense} class="w-full bg-black/60 border border-cyan-900/20 rounded-lg px-1 py-3 text-center text-sm font-mono text-cyan-400" />
-                                            </div>
-                                            <div class="space-y-2">
-                                                <span class="block text-[8px] font-black text-emerald-900 uppercase tracking-widest">Prod (CP)</span>
-                                                <input type="number" bind:value={unit.production_credits} class="w-full bg-black/60 border border-emerald-900/20 rounded-lg px-1 py-3 text-center text-sm font-mono text-emerald-500" />
-                                            </div>
-                                            <div class="space-y-2">
-                                                <span class="block text-[8px] font-black text-purple-900 uppercase tracking-widest">Spy ATK</span>
-                                                <input type="number" bind:value={unit.power_spy_offense} class="w-full bg-black/60 border border-purple-900/20 rounded-lg px-1 py-3 text-center text-sm font-mono text-purple-500" />
-                                            </div>
-                                            <div class="space-y-2">
-                                                <span class="block text-[8px] font-black text-indigo-900 uppercase tracking-widest">Spy DEF</span>
-                                                <input type="number" bind:value={unit.power_spy_defense} class="w-full bg-black/60 border border-indigo-900/20 rounded-lg px-1 py-3 text-center text-sm font-mono text-indigo-400" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="space-y-6">
-                                        <h4 class="text-[10px] font-black text-gray-600 uppercase tracking-[5px]">Tech Prereq</h4>
-                                        <div class="space-y-2">
-                                             <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Foundation Rank</span>
-                                             <input type="number" bind:value={unit.foundation_level_req} class="w-full bg-black/60 border border-white/10 rounded-lg px-1 py-3 text-center text-sm font-mono text-white" />
+                                        <div class="bg-black/40 border border-white/5 p-4 rounded-xl">
+                                            <span class="block text-[7px] font-black text-cyan-900 uppercase tracking-widest mb-1">DEF Power</span>
+                                            <span class="text-xl font-title font-black text-cyan-400">{unit.power_defense}</span>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="space-y-3">
-                                    <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">Division Dossier (Description)</span>
-                                    <textarea bind:value={unit.description} class="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-[11px] text-gray-400 focus:border-red-900 focus:outline-none min-h-[100px] leading-relaxed italic"></textarea>
+                                <div class="flex items-center gap-3 mt-8 relative z-10">
+                                    <button onclick={() => deleteUnit(unit.id)} class="w-12 h-12 rounded-xl bg-red-950/20 text-red-500 border border-red-900/30 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all">✕</button>
+                                    <button onclick={() => openUnitInspector(unit)} class="flex-grow py-4 bg-red-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-[0_0_20px_rgba(127,29,29,0.2)]">Tactical Calibration</button>
                                 </div>
                             </div>
                         {/each}
@@ -1413,6 +1380,131 @@
                                 <select bind:value={selectedArmoryItem.requirement_slug} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-amber-500 outline-none uppercase text-xs font-black">
                                     <option value="">NO PREVIOUS ASSET REQUIRED</option>
                                     {#each armoryItems.filter(i => i.id !== selectedArmoryItem.id && i.unit_type === selectedArmoryItem.unit_type) as p}
+                                        <option value={p.slug}>{p.name.toUpperCase()} (ID: {p.id})</option>
+                                    {/each}
+                                </select>
+                            </div>
+                        </div>
+                    {/if}
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Unit Inspector Modal -->
+    {#if showUnitInspector && selectedUnit}
+        <div in:fade out:fade class="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-12">
+            <div class="absolute inset-0 bg-black/90 backdrop-blur-xl" onclick={() => showUnitInspector = false}></div>
+            <div class="relative w-full max-w-5xl h-full max-h-[85vh] bg-[#050505] border border-white/10 rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden flex flex-col">
+                <!-- Header -->
+                <header class="p-8 md:px-12 md:py-10 border-b border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div class="flex items-center gap-8">
+                        <div class="w-20 h-20 bg-red-950/20 border border-red-900/30 rounded-2xl flex items-center justify-center text-red-600 font-title font-black text-3xl">
+                            {selectedUnit.slug.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <h2 class="text-3xl font-title font-black text-white uppercase tracking-tighter leading-none">{selectedUnit.name}</h2>
+                            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-[4px] mt-2">TACTICAL CALIBRATION // ID: {selectedUnit.id}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <button onclick={() => saveUnit(selectedUnit)} class="px-8 py-4 bg-red-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-[0_0_30px_rgba(153,27,27,0.3)]" disabled={savingId === selectedUnit.id}>
+                            {savingId === selectedUnit.id ? 'UPLOADING...' : 'COMMIT DOCTRINE'}
+                        </button>
+                        <button onclick={() => showUnitInspector = false} class="w-16 h-16 rounded-full bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-red-500 hover:border-red-500 transition-all font-black text-2xl">×</button>
+                    </div>
+                </header>
+
+                <!-- Tabs Navigation -->
+                <nav class="flex border-b border-white/5 bg-white/[0.02]">
+                    {#each [
+                        { id: 'identity', name: 'Core Identity' },
+                        { id: 'costs', name: 'Requisition Costs' },
+                        { id: 'yield', name: 'Tactical Yield' },
+                        { id: 'reqs', name: 'Prerequisites' }
+                    ] as tab}
+                        <button 
+                            onclick={() => unitInspectorTab = tab.id}
+                            class="px-10 py-6 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 {unitInspectorTab === tab.id ? 'text-red-500 border-red-500 bg-red-500/5' : 'text-gray-600 border-transparent hover:text-gray-400'}"
+                        >
+                            {tab.name}
+                        </button>
+                    {/each}
+                </nav>
+
+                <!-- Content Area -->
+                <div class="flex-grow overflow-y-auto p-12 custom-scrollbar">
+                    {#if unitInspectorTab === 'identity'}
+                        <div in:fade class="space-y-8">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Division Designation (Name)</span>
+                                    <input type="text" bind:value={selectedUnit.name} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-red-900 outline-none" />
+                                </div>
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Protocol ID (Slug)</span>
+                                    <input type="text" bind:value={selectedUnit.slug} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-red-900 outline-none" />
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Division Dossier (Description)</span>
+                                <textarea bind:value={selectedUnit.description} rows="6" class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-gray-400 font-mono text-sm focus:border-red-900 outline-none resize-none leading-relaxed" placeholder="Enter combat role and lore..."></textarea>
+                            </div>
+                        </div>
+                    {:else if unitInspectorTab === 'costs'}
+                        <div in:fade class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div class="space-y-2">
+                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Requisition (Credits)</span>
+                                <input type="number" bind:value={selectedUnit.cost_credits} class="w-full bg-black/40 border border-white/10 rounded-xl px-8 py-6 text-cyan-400 font-title font-black text-3xl focus:border-cyan-500 outline-none text-center" />
+                            </div>
+                            <div class="space-y-2">
+                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Manpower (Citizens)</span>
+                                <input type="number" bind:value={selectedUnit.cost_citizens} class="w-full bg-black/40 border border-white/10 rounded-xl px-8 py-6 text-white font-title font-black text-3xl focus:border-red-500 outline-none text-center" />
+                            </div>
+                            <div class="space-y-2">
+                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Energy Drain (Turns)</span>
+                                <input type="number" bind:value={selectedUnit.cost_turns} class="w-full bg-black/40 border border-white/10 rounded-xl px-8 py-6 text-white font-title font-black text-3xl focus:border-red-500 outline-none text-center" />
+                            </div>
+                        </div>
+                    {:else if unitInspectorTab === 'yield'}
+                        <div in:fade class="space-y-12">
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-8">
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-red-900 uppercase tracking-widest">Offensive Power</span>
+                                    <input type="number" bind:value={selectedUnit.power_offense} class="w-full bg-black/40 border border-red-900/20 rounded-xl px-6 py-4 text-red-500 font-title font-black text-2xl focus:border-red-500 outline-none text-center" />
+                                </div>
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-cyan-900 uppercase tracking-widest">Defensive Power</span>
+                                    <input type="number" bind:value={selectedUnit.power_defense} class="w-full bg-black/40 border border-cyan-900/20 rounded-xl px-6 py-4 text-cyan-500 font-title font-black text-2xl focus:border-cyan-500 outline-none text-center" />
+                                </div>
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-emerald-900 uppercase tracking-widest">Production Yield (CP)</span>
+                                    <input type="number" bind:value={selectedUnit.production_credits} class="w-full bg-black/40 border border-emerald-900/20 rounded-xl px-6 py-4 text-emerald-500 font-title font-black text-2xl focus:border-emerald-500 outline-none text-center" />
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-8 border-t border-white/5 pt-12">
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-purple-900 uppercase tracking-widest">Infiltration (Spy ATK)</span>
+                                    <input type="number" bind:value={selectedUnit.power_spy_offense} class="w-full bg-black/40 border border-purple-900/20 rounded-xl px-6 py-4 text-purple-500 font-title font-black text-2xl focus:border-purple-500 outline-none text-center" />
+                                </div>
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-indigo-900 uppercase tracking-widest">Surveillance (Spy DEF)</span>
+                                    <input type="number" bind:value={selectedUnit.power_spy_defense} class="w-full bg-black/40 border border-indigo-900/20 rounded-xl px-6 py-4 text-indigo-400 font-title font-black text-2xl focus:border-indigo-500 outline-none text-center" />
+                                </div>
+                            </div>
+                        </div>
+                    {:else if unitInspectorTab === 'reqs'}
+                        <div in:fade class="space-y-8">
+                            <div class="space-y-2">
+                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Required Foundation Rank</span>
+                                <input type="number" bind:value={selectedUnit.foundation_level_req} class="w-full bg-black/40 border border-white/10 rounded-xl px-8 py-6 text-white font-title font-black text-3xl focus:border-red-900 outline-none text-center" />
+                                <p class="text-[8px] text-gray-600 italic uppercase mt-2 text-center">Minimum command center rank needed to enlist this class.</p>
+                            </div>
+                            <div class="space-y-2 pt-8 border-t border-white/5">
+                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Prerequisite Combat Class (Dependency)</span>
+                                <select bind:value={selectedUnit.requirement_slug} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-red-900 outline-none uppercase text-xs font-black">
+                                    <option value="">NO PREVIOUS CLASS REQUIRED</option>
+                                    {#each units.filter(u => u.id !== selectedUnit.id) as p}
                                         <option value={p.slug}>{p.name.toUpperCase()} (ID: {p.id})</option>
                                     {/each}
                                 </select>

@@ -200,6 +200,7 @@ class AdminController extends BaseController
 
         try {
             $id = $this->adminService->addUnit($data);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'ADD_UNIT', "Enlisted new unit class ID {$id}", $data);
             return json_encode(['success' => true, 'id' => $id]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -215,6 +216,7 @@ class AdminController extends BaseController
 
         try {
             $res = $this->adminService->deleteUnit($id);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'DELETE_UNIT', "Decommissioned unit class ID {$id}");
             return json_encode(['success' => $res]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
