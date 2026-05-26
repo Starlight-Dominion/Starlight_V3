@@ -5,12 +5,18 @@ namespace sdo\Services;
 
 use DateTime;
 use DateTimeZone;
+use InvalidArgumentException;
 use sdo\Models\Dominion;
 use sdo\Models\DominionStructure;
 use sdo\Services\ConfigService;
 
 class GameService
 {
+    private const ALLOWED_STRUCTURE_LEVEL_BUFF_COLUMNS = [
+        'buff_citizens_per_tick',
+        'buff_economy',
+    ];
+
     public const TIMEZONE = 'America/New_York';
     public const BASE_INCOME = 100;
 
@@ -92,6 +98,10 @@ class GameService
 
     private function sumStructureLevelBuff(int $dominionId, string $column): float
     {
+        if (!in_array($column, self::ALLOWED_STRUCTURE_LEVEL_BUFF_COLUMNS, true)) {
+            throw new InvalidArgumentException("Unsupported structure level buff column: {$column}");
+        }
+
         return (float)DominionStructure::join('structure_levels', function($join) {
                 $join->on('dominion_structures.structure_id', '=', 'structure_levels.structure_id')
                     ->on('dominion_structures.level', '=', 'structure_levels.level');
