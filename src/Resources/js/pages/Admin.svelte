@@ -624,7 +624,7 @@
 
                                     <div class="space-y-6">
                                         <h4 class="text-[10px] font-black text-gray-600 uppercase tracking-[5px]">Tactical Yield</h4>
-                                        <div class="grid grid-cols-2 gap-6">
+                                        <div class="grid grid-cols-3 gap-6">
                                             <div class="space-y-2">
                                                 <span class="block text-[8px] font-black text-red-900 uppercase tracking-widest text-shadow-glow-red">Offense</span>
                                                 <input type="number" bind:value={unit.power_offense} class="w-full bg-black/60 border border-red-900/20 rounded-lg px-4 py-3 text-xs font-mono text-red-500" />
@@ -632,6 +632,10 @@
                                             <div class="space-y-2">
                                                 <span class="block text-[8px] font-black text-cyan-900 uppercase tracking-widest text-shadow-glow">Defense</span>
                                                 <input type="number" bind:value={unit.power_defense} class="w-full bg-black/60 border border-cyan-900/20 rounded-lg px-4 py-3 text-xs font-mono text-cyan-400" />
+                                            </div>
+                                            <div class="space-y-2">
+                                                <span class="block text-[8px] font-black text-emerald-900 uppercase tracking-widest">Prod (CP)</span>
+                                                <input type="number" bind:value={unit.production_credits} class="w-full bg-black/60 border border-emerald-900/20 rounded-lg px-4 py-3 text-xs font-mono text-emerald-500" />
                                             </div>
                                         </div>
                                     </div>

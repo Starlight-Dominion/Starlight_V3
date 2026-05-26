@@ -92,6 +92,7 @@ class ArmoryDynamicTest extends TestCase
         Capsule::schema()->create('units', function ($table) {
             $table->increments('id');
             $table->string('slug');
+            $table->integer('production_credits')->default(0);
         });
 
         Capsule::schema()->create('dominion_manpower', function ($table) {
