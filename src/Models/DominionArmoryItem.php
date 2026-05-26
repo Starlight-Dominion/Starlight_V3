@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace sdo\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 class DominionArmoryItem extends Model
 {
     protected $table = 'kingdom_armory_items';
@@ -19,12 +21,12 @@ class DominionArmoryItem extends Model
         'is_equipped' => 'boolean'
     ];
 
-    public function item()
+    public function item(): BelongsTo
     {
         return $this->belongsTo(ArmoryItem::class, 'item_id');
     }
 
-    public function dominion()
+    public function dominion(): BelongsTo
     {
         return $this->belongsTo(Dominion::class, 'kingdom_id');
     }

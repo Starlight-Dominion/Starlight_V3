@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace sdo\Models;
 
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
 class Structure extends Model
 {
     protected $table = 'structures';
@@ -13,7 +15,7 @@ class Structure extends Model
         'max_level' => 'integer'
     ];
 
-    public function levels()
+    public function levels(): HasMany
     {
         return $this->hasMany(StructureLevel::class, 'structure_id');
     }

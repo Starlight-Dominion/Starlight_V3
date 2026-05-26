@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace sdo\Models;
 
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
 class User extends Model
 {
     protected $table = 'users';
@@ -20,7 +22,7 @@ class User extends Model
         'handle_last_changed' => 'datetime'
     ];
 
-    public function dominion()
+    public function dominion(): HasOne
     {
         return $this->hasOne(Dominion::class, 'user_id');
     }

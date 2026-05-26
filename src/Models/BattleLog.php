@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace sdo\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
 class BattleLog extends Model
 {
     protected $table = 'battle_logs';
@@ -25,12 +27,12 @@ class BattleLog extends Model
         'battle_time' => 'datetime'
     ];
 
-    public function attacker()
+    public function attacker(): BelongsTo
     {
         return $this->belongsTo(Dominion::class, 'attacker_id');
     }
 
-    public function defender()
+    public function defender(): BelongsTo
     {
         return $this->belongsTo(Dominion::class, 'defender_id');
     }
