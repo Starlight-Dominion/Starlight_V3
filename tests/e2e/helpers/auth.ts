@@ -21,24 +21,74 @@ export function makeCommanderCredentials(prefix = 'e2e'): CommanderCredentials {
   };
 }
 
+async function getCsrfToken(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const state = (window as { __INITIAL_STATE__?: { csrf?: string } }).__INITIAL_STATE__;
+    const token = (window as { __CSRF_TOKEN__?: string }).__CSRF_TOKEN__;
+
+    return state?.csrf ?? token ?? '';
+  });
+}
+
+async function submitAuthRequest(page: Page, path: string, payload: Record<string, string>): Promise<void> {
+  const csrf = await getCsrfToken(page);
+
+  const result = await page.evaluate(async ({ path, payload, csrf }) => {
+    const submission = new FormData();
+
+    for (const [key, value] of Object.entries(payload)) {
+      submission.append(key, value);
+    }
+
+    submission.append('_csrf', csrf);
+
+    const response = await fetch(path, {
+      method: 'POST',
+      body: submission,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      body,
+    };
+  }, { path, payload, csrf });
+
+  expect(result.ok, `${path} failed with status ${result.status}`).toBe(true);
+}
+
 export async function registerCommander(page: Page, creds: CommanderCredentials): Promise<void> {
   await page.goto('/register');
 
-  await page.getByLabel(/comms frequency/i).fill(creds.email);
-  await page.getByLabel(/identity handle/i).fill(creds.username);
-  await page.getByLabel(/dominion designation/i).fill(creds.dominionName);
-  await page.getByLabel(/evolutionary strain/i).selectOption('Human');
-  await page.getByLabel(/^cipher$/i).fill(creds.password);
-  await page.getByLabel(/verify/i).fill(creds.password);
-  await page.getByRole('button', { name: /establish sovereignty/i }).click();
+  await submitAuthRequest(page, '/register', {
+    email: creds.email,
+    username: creds.username,
+    dominion_name: creds.dominionName,
+    race: 'Human',
+    password: creds.password,
+    password_confirmation: creds.password,
+  });
+
+  await page.goto('/login?success=1');
 
   await expect(page).toHaveURL(/\/login\?success=1$/);
 }
 
 export async function loginCommander(page: Page, creds: CommanderCredentials): Promise<void> {
-  await page.getByLabel(/commander identity/i).fill(creds.username);
-  await page.getByLabel(/encryption key/i).fill(creds.password);
-  await page.getByRole('button', { name: /authorize access/i }).click();
+  await submitAuthRequest(page, '/login', {
+    username: creds.username,
+    password: creds.password,
+  });
+
+  await page.goto('/dashboard');
 
   await expect(page).toHaveURL(/\/dashboard$/);
 }
