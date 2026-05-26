@@ -214,4 +214,62 @@ class BattlefieldServiceTest extends TestCase
 
         $this->battlefieldService->executeAttack($attacker->id, $attacker->id, 5);
     }
+
+    public function testGetBattlefieldListAppliesConfiguredLimitAndDeterministicTiebreaker(): void
+    {
+        $user = new User(['username' => 'Commander']);
+        $user->save();
+
+        $first = new Dominion(['user_id' => $user->id, 'name' => 'Alpha', 'credits' => 1000, 'xp' => 100]);
+        $first->save();
+
+        $second = new Dominion(['user_id' => $user->id, 'name' => 'Beta', 'credits' => 1000, 'xp' => 100]);
+        $second->save();
+
+        $third = new Dominion(['user_id' => $user->id, 'name' => 'Gamma', 'credits' => 900, 'xp' => 100]);
+        $third->save();
+
+        $this->configService->shouldReceive('get')
+            ->with('battlefield_list_limit', 200)
+            ->once()
+            ->andReturn(2);
+
+        $list = $this->battlefieldService->getBattlefieldList();
+
+        $this->assertCount(2, $list);
+        $this->assertSame($first->id, $list[0]['kingdom_id']);
+        $this->assertSame($second->id, $list[1]['kingdom_id']);
+    }
+
+    public function testGetBattlefieldListClampsOutOfRangeConfiguredLimit(): void
+    {
+        $user = new User(['username' => 'Commander']);
+        $user->save();
+
+        for ($i = 0; $i < 1005; $i++) {
+            $dominion = new Dominion([
+                'user_id' => $user->id,
+                'name' => 'Dominion ' . $i,
+                'credits' => 2000 - $i,
+                'xp' => 100
+            ]);
+            $dominion->save();
+        }
+
+        $this->configService->shouldReceive('get')
+            ->with('battlefield_list_limit', 200)
+            ->once()
+            ->andReturn(0);
+
+        $minClampedList = $this->battlefieldService->getBattlefieldList();
+        $this->assertCount(1, $minClampedList);
+
+        $this->configService->shouldReceive('get')
+            ->with('battlefield_list_limit', 200)
+            ->once()
+            ->andReturn(5000);
+
+        $maxClampedList = $this->battlefieldService->getBattlefieldList();
+        $this->assertCount(1000, $maxClampedList);
+    }
 }
