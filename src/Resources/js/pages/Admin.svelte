@@ -68,6 +68,11 @@
     let inspectorData = $state(null);
     let inspectorTab = $state('identity'); // 'identity', 'stats', 'military', 'structures', 'armory'
 
+    // Armory Inspector State
+    let showArmoryInspector = $state(false);
+    let selectedArmoryItem = $state(null);
+    let armoryInspectorTab = $state('identity'); // 'identity', 'combat', 'reqs'
+
     async function fetchKingdomProfile(id) {
         loading = true;
         try {
@@ -409,15 +414,24 @@
         formData.append('id', item.id);
         formData.append('name', item.name);
         formData.append('slug', item.slug);
+        formData.append('category_id', item.category_id);
+        formData.append('unit_type', item.unit_type);
         formData.append('attack_bonus', item.attack_bonus);
         formData.append('defense_bonus', item.defense_bonus);
         formData.append('cost', item.cost);
         formData.append('requirement_slug', item.requirement_slug || '');
         formData.append('armory_level_req', item.armory_level_req);
+        formData.append('notes', item.notes || '');
         formData.append('_csrf', game.csrf);
 
         await adminPost('/admin/update-armory-item', formData);
         savingId = null;
+    }
+
+    function openArmoryInspector(item) {
+        selectedArmoryItem = item;
+        armoryInspectorTab = 'identity';
+        showArmoryInspector = true;
     }
 
     async function addArmoryItem(unitType, categoryId) {
@@ -639,66 +653,29 @@
                             </div>
 
                             {#each categories.filter(c => c.unit_type_id === uType.id) as cat}
-                                <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-xl">
-                                    <div class="bg-cyan-950/10 px-8 py-5 flex justify-between items-center border-b border-white/5">
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-center px-4">
                                         <h4 class="text-[10px] font-black text-cyan-500 uppercase tracking-[4px]">{cat.name}</h4>
-                                        <button onclick={() => addArmoryItem(uType.slug, cat.id)} class="text-[9px] font-black text-gray-500 uppercase hover:text-cyan-400 transition-colors tracking-widest">+ NEW ASSET</button>
+                                        <button onclick={() => addArmoryItem(uType.slug, cat.id)} class="text-[9px] font-black text-gray-700 uppercase hover:text-cyan-400 transition-colors tracking-widest">+ NEW ASSET</button>
                                     </div>
-                                    <div class="overflow-x-auto">
-                                        <table class="w-full text-left border-collapse font-mono">
-                                            <thead>
-                                                <tr class="bg-black/40 text-[9px] font-black text-gray-600 uppercase tracking-[2px]">
-                                                    <th class="px-8 py-4">Item Identity</th>
-                                                    <th class="px-8 py-4">Stat Modification</th>
-                                                    <th class="px-8 py-4">Requisition (CP)</th>
-                                                    <th class="px-8 py-4">Prerequisites</th>
-                                                    <th class="px-8 py-4"></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="divide-y divide-white/5">
-                                                {#each armoryItems.filter(i => i.category_id === cat.id) as item}
-                                                    <tr class="group hover:bg-white/[0.02] transition-colors">
-                                                        <td class="px-8 py-6">
-                                                            <input type="text" bind:value={item.name} class="bg-transparent border-none p-0 text-white text-sm font-black uppercase w-full focus:ring-0" />
-                                                            <input type="text" bind:value={item.slug} class="bg-transparent border-none p-0 text-[9px] text-gray-700 uppercase font-mono w-full focus:ring-0 mt-1" />
-                                                        </td>
-                                                        <td class="px-8 py-6">
-                                                            <div class="flex gap-4">
-                                                                <div class="flex flex-col gap-1">
-                                                                    <span class="text-[7px] text-red-900 uppercase font-black">ATK</span>
-                                                                    <input type="number" bind:value={item.attack_bonus} class="bg-black/60 border border-white/10 px-3 py-1.5 text-red-500 text-xs font-mono w-20 rounded focus:border-red-900" />
-                                                                </div>
-                                                                <div class="flex flex-col gap-1">
-                                                                    <span class="text-[7px] text-cyan-900 uppercase font-black">DEF</span>
-                                                                    <input type="number" bind:value={item.defense_bonus} class="bg-black/60 border border-white/10 px-3 py-1.5 text-cyan-500 text-xs font-mono w-20 rounded focus:border-cyan-900" />
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="px-8 py-6">
-                                                            <input type="number" bind:value={item.cost} class="bg-black/40 border border-white/5 px-4 py-2 text-cyan-400 text-sm font-black w-32 rounded focus:border-cyan-500" />
-                                                        </td>
-                                                        <td class="px-8 py-6">
-                                                            <div class="flex flex-col gap-2">
-                                                                <select bind:value={item.requirement_slug} class="bg-black/60 border border-white/10 text-[10px] text-gray-500 rounded px-3 py-2 focus:outline-none uppercase font-black tracking-tighter">
-                                                                    <option value="">NO PREREQ</option>
-                                                                    {#each armoryItems.filter(i => i.id !== item.id && i.unit_type === item.unit_type) as p}
-                                                                        <option value={p.slug}>{p.name.toUpperCase()}</option>
-                                                                    {/each}
-                                                                </select>
-                                                                <div class="flex items-center gap-2">
-                                                                    <span class="text-[7px] text-gray-600 uppercase font-black">RANK REQ:</span>
-                                                                    <input type="number" bind:value={item.armory_level_req} class="bg-black/60 border border-white/10 px-2 py-1 text-white text-[10px] font-mono w-12 rounded" />
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="px-8 py-6 text-right space-x-4">
-                                                            <button onclick={() => saveArmoryItem(item)} class="text-cyan-500 font-black uppercase text-[10px] tracking-widest opacity-30 group-hover:opacity-100 hover:text-cyan-400 transition-all">{savingId === item.id ? '...' : 'COMMIT'}</button>
-                                                            <button onclick={() => deleteArmoryItem(item.id)} class="text-red-900 hover:text-red-500 opacity-20 group-hover:opacity-100 transition-all text-xs">✕</button>
-                                                        </td>
-                                                    </tr>
-                                                {/each}
-                                            </tbody>
-                                        </table>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                        {#each armoryItems.filter(i => i.category_id === cat.id) as item}
+                                            <div class="bg-dark-translucent border border-white/5 p-6 rounded-2xl flex justify-between items-center group hover:border-amber-500/30 transition-all">
+                                                <div class="flex items-center gap-6">
+                                                    <div class="w-12 h-12 bg-amber-950/20 rounded-lg flex items-center justify-center border border-amber-500/10 text-amber-500 font-black">
+                                                        {item.slug.substring(0,2).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <h4 class="text-xs font-black text-white uppercase tracking-tight">{item.name}</h4>
+                                                        <p class="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{item.cost.toLocaleString()} CP</p>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-3">
+                                                    <button onclick={() => deleteArmoryItem(item.id)} class="w-10 h-10 rounded-lg bg-red-950/20 text-red-500 border border-red-900/30 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all">✕</button>
+                                                    <button onclick={() => openArmoryInspector(item)} class="px-5 py-3 bg-amber-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-400 transition-all shadow-[0_0_15px_rgba(217,119,6,0.2)]">Calibrate Asset</button>
+                                                </div>
+                                            </div>
+                                        {/each}
                                     </div>
                                 </div>
                             {/each}
@@ -1324,6 +1301,122 @@
                                     </div>
                                 </div>
                             {/each}
+                        </div>
+                    {/if}
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Armory Inspector Modal -->
+    {#if showArmoryInspector && selectedArmoryItem}
+        <div in:fade out:fade class="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-12">
+            <div class="absolute inset-0 bg-black/90 backdrop-blur-xl" onclick={() => showArmoryInspector = false}></div>
+            <div class="relative w-full max-w-4xl h-full max-h-[80vh] bg-[#050505] border border-white/10 rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden flex flex-col">
+                <!-- Header -->
+                <header class="p-8 md:px-12 md:py-10 border-b border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div class="flex items-center gap-8">
+                        <div class="w-20 h-20 bg-amber-950/20 rounded-lg flex items-center justify-center border border-amber-500/20 text-amber-500 font-title font-black text-3xl">
+                            {selectedArmoryItem.slug.substring(0,2).toUpperCase()}
+                        </div>
+                        <div>
+                            <h2 class="text-3xl font-title font-black text-white uppercase tracking-tighter leading-none">{selectedArmoryItem.name}</h2>
+                            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-[4px] mt-2">ARMAMENT CALIBRATION // ID: {selectedArmoryItem.id}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <button onclick={() => saveArmoryItem(selectedArmoryItem)} class="px-8 py-4 bg-amber-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-400 transition-all shadow-[0_0_30px_rgba(217,119,6,0.3)]" disabled={savingId === selectedArmoryItem.id}>
+                            {savingId === selectedArmoryItem.id ? 'CALIBRATING...' : 'COMMIT ASSET'}
+                        </button>
+                        <button onclick={() => showArmoryInspector = false} class="w-16 h-16 rounded-full bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-red-500 hover:border-red-500 transition-all font-black text-2xl">×</button>
+                    </div>
+                </header>
+
+                <!-- Tabs Navigation -->
+                <nav class="flex border-b border-white/5 bg-white/[0.02]">
+                    {#each [
+                        { id: 'identity', name: 'Core Identity' },
+                        { id: 'combat', name: 'Combat Calibration' },
+                        { id: 'reqs', name: 'Prerequisites' }
+                    ] as tab}
+                        <button 
+                            onclick={() => armoryInspectorTab = tab.id}
+                            class="px-10 py-6 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 {armoryInspectorTab === tab.id ? 'text-amber-400 border-amber-500 bg-amber-500/5' : 'text-gray-600 border-transparent hover:text-gray-400'}"
+                        >
+                            {tab.name}
+                        </button>
+                    {/each}
+                </nav>
+
+                <!-- Content Area -->
+                <div class="flex-grow overflow-y-auto p-12 custom-scrollbar">
+                    {#if armoryInspectorTab === 'identity'}
+                        <div in:fade class="space-y-8">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Asset Designation (Name)</span>
+                                    <input type="text" bind:value={selectedArmoryItem.name} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-amber-500 outline-none" />
+                                </div>
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Protocol Slug</span>
+                                    <input type="text" bind:value={selectedArmoryItem.slug} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-amber-500 outline-none" />
+                                </div>
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Unit Compatibility Type</span>
+                                    <select bind:value={selectedArmoryItem.unit_type} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-amber-500 outline-none uppercase text-xs font-black">
+                                        {#each unitTypes as u}
+                                            <option value={u.slug}>{u.name.toUpperCase()}</option>
+                                        {/each}
+                                    </select>
+                                </div>
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Asset Category</span>
+                                    <select bind:value={selectedArmoryItem.category_id} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-amber-500 outline-none uppercase text-xs font-black">
+                                        {#each categories as cat}
+                                            <option value={cat.id}>{cat.name.toUpperCase()}</option>
+                                        {/each}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Administrative Notes</span>
+                                <textarea bind:value={selectedArmoryItem.notes} rows="4" class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-gray-400 font-mono text-sm focus:border-amber-500 outline-none resize-none" placeholder="Enter developer context or asset history..."></textarea>
+                            </div>
+                        </div>
+                    {:else if armoryInspectorTab === 'combat'}
+                        <div in:fade class="grid grid-cols-1 md:grid-cols-2 gap-12">
+                            <div class="space-y-2">
+                                <span class="block text-[9px] font-black text-red-900 uppercase tracking-widest mb-1">Offensive Power (ATK Bonus)</span>
+                                <input type="number" bind:value={selectedArmoryItem.attack_bonus} class="w-full bg-black/40 border border-red-900/20 rounded-xl px-8 py-6 text-red-500 font-title font-black text-3xl focus:border-red-500 outline-none text-center" />
+                                <p class="text-[8px] text-gray-600 italic uppercase mt-2">Additive bonus applied to every unit in this item's class.</p>
+                            </div>
+                            <div class="space-y-2">
+                                <span class="block text-[9px] font-black text-cyan-900 uppercase tracking-widest mb-1">Defensive Power (DEF Bonus)</span>
+                                <input type="number" bind:value={selectedArmoryItem.defense_bonus} class="w-full bg-black/40 border border-cyan-900/20 rounded-xl px-8 py-6 text-cyan-500 font-title font-black text-3xl focus:border-cyan-500 outline-none text-center" />
+                                <p class="text-[8px] text-gray-600 italic uppercase mt-2">Armor rating improvement for sector-wide defense.</p>
+                            </div>
+                        </div>
+                    {:else if armoryInspectorTab === 'reqs'}
+                        <div in:fade class="space-y-8">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Requisition Cost (Credits)</span>
+                                    <input type="number" bind:value={selectedArmoryItem.cost} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-cyan-400 font-mono text-lg focus:border-cyan-500 outline-none" />
+                                </div>
+                                <div class="space-y-2">
+                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Min. Armory Rank Requirement</span>
+                                    <input type="number" bind:value={selectedArmoryItem.armory_level_req} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono text-lg focus:border-amber-500 outline-none" />
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Prerequisite Schematic (Requirement Slug)</span>
+                                <select bind:value={selectedArmoryItem.requirement_slug} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-amber-500 outline-none uppercase text-xs font-black">
+                                    <option value="">NO PREVIOUS ASSET REQUIRED</option>
+                                    {#each armoryItems.filter(i => i.id !== selectedArmoryItem.id && i.unit_type === selectedArmoryItem.unit_type) as p}
+                                        <option value={p.slug}>{p.name.toUpperCase()} (ID: {p.id})</option>
+                                    {/each}
+                                </select>
+                            </div>
                         </div>
                     {/if}
                 </div>

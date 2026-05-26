@@ -367,6 +367,7 @@ class AdminController extends BaseController
 
         try {
             $res = $this->adminService->updateArmoryItem($id, $data);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_ARMORY_ITEM', "Calibrated armory asset ID {$id}", $data);
             return json_encode(['success' => $res]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -388,6 +389,7 @@ class AdminController extends BaseController
 
         try {
             $id = $this->adminService->addArmoryItem($data);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'ADD_ARMORY_ITEM', "Enlisted new armory asset ID {$id}", $data);
             return json_encode(['success' => true, 'id' => $id]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -403,6 +405,7 @@ class AdminController extends BaseController
 
         try {
             $res = $this->adminService->deleteArmoryItem($id);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'DELETE_ARMORY_ITEM', "Decommissioned armory asset ID {$id}");
             return json_encode(['success' => $res]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
