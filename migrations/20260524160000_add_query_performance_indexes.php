@@ -48,19 +48,19 @@ final class AddQueryPerformanceIndexes extends AbstractMigration
     public function down(): void
     {
         if ($this->hasTable('api_logs')) {
-            $this->execute('DROP INDEX IF EXISTS `idx_api_logs_api_key_created` ON `api_logs`');
+            $this->execute('ALTER TABLE `api_logs` DROP INDEX IF EXISTS `idx_api_logs_api_key_created`');
         }
 
         if ($this->hasTable('game_logs')) {
-            $this->execute('DROP INDEX IF EXISTS `idx_game_logs_dominion_created` ON `game_logs`');
+            $this->execute('ALTER TABLE `game_logs` DROP INDEX IF EXISTS `idx_game_logs_dominion_created`');
         }
 
         if ($this->hasTable('bank_transactions')) {
-            $this->execute('DROP INDEX IF EXISTS `idx_bank_transactions_kingdom_created` ON `bank_transactions`');
+            $this->execute('ALTER TABLE `bank_transactions` DROP INDEX IF EXISTS `idx_bank_transactions_kingdom_created`');
         }
 
         if ($this->hasTable('battle_logs')) {
-            $this->execute('DROP INDEX IF EXISTS `idx_battle_logs_attacker_defender_time` ON `battle_logs`');
+            $this->execute('ALTER TABLE `battle_logs` DROP INDEX IF EXISTS `idx_battle_logs_attacker_defender_time`');
         }
     }
 }
