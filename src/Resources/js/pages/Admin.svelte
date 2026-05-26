@@ -462,15 +462,17 @@
                             <h2 class="text-[10px] font-black text-red-500 uppercase tracking-[4px]">Sector Comms Relay (Global Broadcast)</h2>
                         </header>
                         <div class="p-8 space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
-                                <div class="md:col-span-3">
-                                    <span class="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-2">Announcement / Maintenance Signal</span>
-                                    <input type="text" bind:value={gameSettings.find(s => s.setting_key === 'global_broadcast').setting_value} class="w-full bg-black/60 border border-red-900/30 rounded-xl px-6 py-4 text-red-400 font-mono text-sm focus:border-red-500 outline-none" placeholder="Enter global transmission..." />
+                            {#each gameSettings.filter(s => s.setting_key === 'global_broadcast') as broadcast}
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+                                    <div class="md:col-span-3">
+                                        <span class="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-2">Announcement / Maintenance Signal</span>
+                                        <input type="text" bind:value={broadcast.setting_value} class="w-full bg-black/60 border border-red-900/30 rounded-xl px-6 py-4 text-red-400 font-mono text-sm focus:border-red-500 outline-none" placeholder="Enter global transmission..." />
+                                    </div>
+                                    <div class="md:col-span-1 text-right">
+                                        <button onclick={() => saveSetting(broadcast)} class="w-full md:w-auto px-8 py-4 bg-red-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-[0_0_15px_rgba(153,27,27,0.3)]">Transmit</button>
+                                    </div>
                                 </div>
-                                <div class="md:col-span-1 text-right">
-                                    <button onclick={() => saveSetting(gameSettings.find(s => s.setting_key === 'global_broadcast'))} class="w-full md:w-auto px-8 py-4 bg-red-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-[0_0_15px_rgba(153,27,27,0.3)]">Transmit</button>
-                                </div>
-                            </div>
+                            {/each}
                         </div>
                     </div>
 

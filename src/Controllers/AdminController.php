@@ -433,48 +433,47 @@ class AdminController extends BaseController
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }
-public function impersonate(): string
-{
-    header('Content-Type: application/json');
-    $this->checkAdmin();
+    public function impersonate(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
 
-    $id = (int)($_POST['id'] ?? 0);
-    $targetUser = \sdo\Models\User::find($id);
+        $id = (int)($_POST['id'] ?? 0);
+        $targetUser = \sdo\Models\User::find($id);
 
-    if (!$targetUser) {
-        return json_encode(['success' => false, 'message' => 'Identity not found.']);
-    }
-
-    if ($this->authService->isAdmin($targetUser)) {
-        return json_encode(['success' => false, 'message' => 'Neural recursion prohibited: cannot impersonate other administrators.']);
-    }
-
-    $_SESSION['impersonator_id'] = $_SESSION['user_id'];
-    $_SESSION['user_id'] = $targetUser->id;
-    $_SESSION['username'] = $targetUser->username;
-
-    $this->adminService->logAdminAction((int)$_SESSION['impersonator_id'], 'IMPERSONATE', "Started impersonation of commander {$targetUser->username} (ID {$id})");
-
-    return json_encode(['success' => true]);
-}
-
-public function stopImpersonating(): void
-{
-    if (isset($_SESSION['impersonator_id'])) {
-        $admin = \sdo\Models\User::find((int)$_SESSION['impersonator_id']);
-        if ($admin) {
-            $_SESSION['user_id'] = $admin->id;
-            $_SESSION['username'] = $admin->username;
-            $this->adminService->logAdminAction($admin->id, 'STOP_IMPERSONATE', "Terminated active impersonation.");
+        if (!$targetUser) {
+            return json_encode(['success' => false, 'message' => 'Identity not found.']);
         }
-        unset($_SESSION['impersonator_id']);
+
+        if ($this->authService->isAdmin($targetUser)) {
+            return json_encode(['success' => false, 'message' => 'Neural recursion prohibited: cannot impersonate other administrators.']);
+        }
+
+        $_SESSION['impersonator_id'] = $_SESSION['user_id'];
+        $_SESSION['user_id'] = $targetUser->id;
+        $_SESSION['username'] = $targetUser->username;
+
+        $this->adminService->logAdminAction((int)$_SESSION['impersonator_id'], 'IMPERSONATE', "Started impersonation of commander {$targetUser->username} (ID {$id})");
+
+        return json_encode(['success' => true]);
     }
 
-    $this->redirect('/admin');
-}
+    public function stopImpersonating(): void
+    {
+        if (isset($_SESSION['impersonator_id'])) {
+            $admin = \sdo\Models\User::find((int)$_SESSION['impersonator_id']);
+            if ($admin) {
+                $_SESSION['user_id'] = $admin->id;
+                $_SESSION['username'] = $admin->username;
+                $this->adminService->logAdminAction($admin->id, 'STOP_IMPERSONATE', "Terminated active impersonation.");
+            }
+            unset($_SESSION['impersonator_id']);
+        }
 
-public function getApiLogs(): string
-...
+        $this->redirect('/admin');
+    }
+
+    public function getApiLogs(): string
     {
         header('Content-Type: application/json');
         $this->checkAdmin();
