@@ -1,7 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:8080';
 const useExternalServer = process.env.PLAYWRIGHT_USE_EXTERNAL_SERVER === '1';
+const defaultBaseURL = 'http://127.0.0.1:8080';
+const configuredBaseURL = process.env.PLAYWRIGHT_BASE_URL ?? defaultBaseURL;
+
+if (!useExternalServer && configuredBaseURL !== defaultBaseURL) {
+  throw new Error(
+    'PLAYWRIGHT_BASE_URL is only supported with PLAYWRIGHT_USE_EXTERNAL_SERVER=1. ' +
+      'The built-in Playwright server always binds to http://127.0.0.1:8080.'
+  );
+}
+
+const baseURL = useExternalServer ? configuredBaseURL : defaultBaseURL;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -39,10 +49,11 @@ export default defineConfig({
   webServer: useExternalServer
     ? undefined
     : {
-        command: 'php -S 127.0.0.1:8080 -t public public/index.php',
+        command: 'php -S 127.0.0.1:8080 tests/e2e/php-router.php',
         env: {
           ...process.env,
           APP_ENV: 'production',
+          PHP_CLI_SERVER_WORKERS: '4',
         },
         url: `${baseURL}/login`,
         timeout: 120_000,

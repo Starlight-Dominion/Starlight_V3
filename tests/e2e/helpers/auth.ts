@@ -83,6 +83,8 @@ export async function registerCommander(page: Page, creds: CommanderCredentials)
 }
 
 export async function loginCommander(page: Page, creds: CommanderCredentials): Promise<void> {
+  await page.goto('/login');
+
   await submitAuthRequest(page, '/login', {
     username: creds.username,
     password: creds.password,
