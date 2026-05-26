@@ -414,6 +414,31 @@ class AdminController extends BaseController
         }
     }
 
+    public function getRaces(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+        return json_encode(['success' => true, 'races' => $this->adminService->getAllRaces()]);
+    }
+
+    public function updateRace(): string
+    {
+        header('Content-Type: application/json');
+        $this->checkAdmin();
+
+        $id = (int)($_POST['id'] ?? 0);
+        $data = $_POST;
+        unset($data['id'], $data['_csrf']);
+
+        try {
+            $res = $this->adminService->updateRace($id, $data);
+            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_RACE', "Modified evolutionary strain ID {$id}", $data);
+            return json_encode(['success' => $res]);
+        } catch (\Exception $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+
     public function getBattleLogs(): string
     {
         header('Content-Type: application/json');

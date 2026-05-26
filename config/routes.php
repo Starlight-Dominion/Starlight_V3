@@ -75,6 +75,8 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/admin/update-armory-item', [\sdo\Controllers\AdminController::class, 'updateArmoryItem']);
     $r->addRoute('POST', '/admin/add-armory-item', [\sdo\Controllers\AdminController::class, 'addArmoryItem']);
     $r->addRoute('POST', '/admin/delete-armory-item', [\sdo\Controllers\AdminController::class, 'deleteArmoryItem']);
+    $r->addRoute('GET', '/admin/races', [\sdo\Controllers\AdminController::class, 'getRaces']);
+    $r->addRoute('POST', '/admin/update-race', [\sdo\Controllers\AdminController::class, 'updateRace']);
     $r->addRoute('GET', '/admin/battle-logs', [\sdo\Controllers\AdminController::class, 'getBattleLogs']);
     $r->addRoute('GET', '/admin/audit-logs', [\sdo\Controllers\AdminController::class, 'getAuditLogs']);
     $r->addRoute('POST', '/admin/impersonate', [\sdo\Controllers\AdminController::class, 'impersonate']);

@@ -240,6 +240,20 @@ class AdminService
         return ArmoryCategory::all()->toArray();
     }
 
+    // --- Evolutionary Strains (Race) Management ---
+    public function getAllRaces(): array
+    {
+        return \sdo\Models\Race::all()->toArray();
+    }
+
+    public function updateRace(int $id, array $data): bool
+    {
+        $race = \sdo\Models\Race::findOrFail($id);
+        $raceColumns = Capsule::schema()->getColumnListing('races');
+        $filteredData = array_filter($data, fn($key) => in_array($key, $raceColumns), ARRAY_FILTER_USE_KEY);
+        return $race->update($filteredData);
+    }
+
     // --- Audit Trail ---\n    public function logAdminAction(int $adminId, string $action, string $description, array $metadata = []): void\n    {\n        \sdo\Models\GameLog::create([\n            'dominion_id' => $adminId,\n            'action' => 'ADMIN_' . strtoupper($action),\n            'description' => $description,\n            'metadata' => $metadata\n        ]);\n    }\n\n    public function getAuditLogs(int $limit = 100): array\n    {\n        return \sdo\Models\GameLog::where('action', 'LIKE', 'ADMIN_%')\n            ->orderBy('id', 'desc')\n            ->limit($limit)\n            ->get()\n            ->toArray();\n    }\n\n    // --- Logs Oversight ---
     public function getRecentBattleLogs(int $limit = 50): array
     {

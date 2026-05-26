@@ -1,6 +1,13 @@
 <script>
     import { game } from '../stores/gameStore.svelte.js';
     import { fade, slide } from 'svelte/transition';
+
+    // Administrative Components
+    import SovereignInspector from '../components/admin/SovereignInspector.svelte';
+    import ArmoryInspector from '../components/admin/ArmoryInspector.svelte';
+    import UnitInspector from '../components/admin/UnitInspector.svelte';
+    import StructureInspector from '../components/admin/StructureInspector.svelte';
+    import RaceInspector from '../components/admin/RaceInspector.svelte';
     let { stats = {} } = $props();
 
     let activeModule = $state('overview');
@@ -13,7 +20,6 @@
     let categories = $state([]);
     let battleLogs = $state([]);
     let gameSettings = $state([]);
-    let activeStructureId = $state(null);
     let loading = $state(false);
     let savingId = $state(null);
     let notifications = $state([]);
@@ -50,6 +56,7 @@
         { id: 'armory', name: 'Armory Forge', icon: '🛠' },
         { id: 'units', name: 'War Room (Units)', icon: '👥' },
         { id: 'structures', name: 'Structural Engineering', icon: '🏛' },
+        { id: 'barracks', name: 'Evolutionary Strains', icon: '🧬' },
         { id: 'players', name: 'Sovereign Oversight', icon: '👁' },
         { id: 'api', name: 'Neural API Gate', icon: '📡' },
         { id: 'audit', name: 'Audit Trail', icon: '🕵️' },
@@ -77,6 +84,17 @@
     let showUnitInspector = $state(false);
     let selectedUnit = $state(null);
     let unitInspectorTab = $state('identity'); // 'identity', 'costs', 'yield', 'reqs'
+
+    // Structure Inspector State
+    let showStructureInspector = $state(false);
+    let selectedStructure = $state(null);
+    let structureInspectorTab = $state('blueprint'); // 'blueprint', 'matrix'
+
+    // Race Inspector State
+    let showRaceInspector = $state(false);
+    let selectedRace = $state(null);
+    let raceInspectorTab = $state('identity'); // 'identity', 'bonuses'
+    let races = $state([]);
 
     async function fetchKingdomProfile(id) {
         loading = true;
@@ -216,6 +234,34 @@
         } catch (e) { console.error("Failed to fetch API data"); } finally { loading = false; }
     }
 
+    async function fetchRaces() {
+        loading = true;
+        try {
+            const res = await fetch('/admin/races');
+            const data = await res.json();
+            races = data.races;
+        } catch (e) { console.error("Neural uplink failure"); } finally { loading = false; }
+    }
+
+    async function updateRace(race) {
+        savingId = race.id;
+        const formData = new FormData();
+        formData.append('id', race.id);
+        formData.append('name', race.name);
+        formData.append('description', race.description);
+        formData.append('bonus_type', race.bonus_type);
+        formData.append('bonus_value', race.bonus_value);
+        formData.append('_csrf', game.csrf);
+        await adminPost('/admin/update-race', formData);
+        savingId = null;
+    }
+
+    function openRaceInspector(race) {
+        selectedRace = race;
+        raceInspectorTab = 'identity';
+        showRaceInspector = true;
+    }
+
     async function fetchAuditLogs() {
         loading = true;
         try {
@@ -230,6 +276,7 @@
         if (activeModule === 'units') fetchUnits();
         if (activeModule === 'structures') fetchStructures();
         if (activeModule === 'armory') fetchArmoryItems();
+        if (activeModule === 'barracks') fetchRaces();
         if (activeModule === 'logs') fetchBattleLogs();
         if (activeModule === 'players') fetchAllKingdoms();
         if (activeModule === 'api') fetchApiData();
@@ -445,6 +492,12 @@
         showUnitInspector = true;
     }
 
+    function openStructureInspector(s) {
+        selectedStructure = s;
+        structureInspectorTab = 'blueprint';
+        showStructureInspector = true;
+    }
+
     async function addArmoryItem(unitType, categoryId) {
         const formData = new FormData();
         formData.append('unit_type', unitType);
@@ -473,8 +526,6 @@
             window.location.href = '/dashboard';
         }
     }
-
-    const currentStructure = $derived(structures.find(s => s.details.id === activeStructureId) || null);
 </script>
 
 <div in:fade class="space-y-8 pb-24">
@@ -738,111 +789,75 @@
                 </div>
 
             {:else if activeModule === 'structures'}
-                <div in:fade class="space-y-8">
+                <div in:fade class="space-y-12">
                     <div class="flex justify-between items-center">
-                        <div class="flex flex-wrap gap-2">
-                            {#each structures as s}
-                                <button onclick={() => activeStructureId = s.details.id} class="px-6 py-3 rounded-xl font-title font-black text-[10px] uppercase tracking-widest border transition-all {activeStructureId === s.details.id ? 'bg-red-900 border-red-900 text-white shadow-[0_0_10px_#7f1d1d]' : 'bg-black/60 border-white/5 text-gray-600 hover:text-gray-300'}">{s.details.name}</button>
-                            {/each}
-                        </div>
-                        <button onclick={addStructure} class="text-cyan-500 font-title font-black text-[10px] uppercase tracking-widest hover:text-white transition-colors">+ NEW ARCHTYPE</button>
+                        <h3 class="text-3xl font-title font-black text-white uppercase tracking-tighter">Structural Engineering</h3>
+                        <button onclick={addStructure} class="bg-white text-black font-title font-black text-[10px] px-8 py-3 rounded-xl hover:bg-cyan-500 transition-all uppercase tracking-widest">Commission New Blueprint</button>
                     </div>
 
-                    {#if currentStructure}
-                        <div in:slide class="bg-dark-translucent border border-white/5 p-10 rounded-3xl space-y-10 relative group">
-                            <div class="flex justify-between items-start">
-                                <h3 class="text-xs font-black text-gray-600 uppercase tracking-[5px]">Structural Configuration</h3>
-                                <div class="flex gap-4">
-                                    <button onclick={() => saveStructureDetails(currentStructure.details)} class="bg-cyan-900/20 border border-cyan-500/50 text-cyan-400 px-8 py-3 rounded-xl font-title font-black text-[10px] uppercase tracking-widest hover:bg-cyan-600 hover:text-white transition-all disabled:opacity-50" disabled={savingId === currentStructure.details.id}>
-                                        {savingId === currentStructure.details.id ? 'UPLOADING...' : 'COMMIT ARCHITECTURE'}
-                                    </button>
-                                    <button onclick={() => deleteStructure(currentStructure.details.id)} class="text-red-900 hover:text-red-500 text-[10px] font-black uppercase tracking-widest border border-red-950 px-4 py-1 rounded">Demolish ✕</button>
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {#each structures as s}
+                            <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl flex flex-col justify-between group hover:border-cyan-500/30 transition-all relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none font-title font-black text-white italic text-4xl uppercase">
+                                    {s.details.slug.substring(0,3)}
                                 </div>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 font-mono">
-                                <div class="space-y-6">
-                                    <div class="space-y-2">
-                                        <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Building Designation</span>
-                                        <input type="text" bind:value={currentStructure.details.name} class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-4 text-sm font-black text-white uppercase tracking-wider" />
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-6">
-                                        <div class="space-y-2">
-                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Upgrade Slots</span>
-                                            <input type="number" bind:value={currentStructure.details.upgrade_slots} class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-cyan-400" />
+                                <div class="space-y-6 relative z-10">
+                                    <div class="flex items-center gap-6">
+                                        <div class="w-16 h-16 bg-cyan-950/20 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-600 text-2xl font-black">
+                                            {s.details.slug.charAt(0).toUpperCase()}
                                         </div>
-                                        <div class="space-y-2">
-                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Max Tier</span>
-                                            <input type="number" bind:value={currentStructure.details.max_level} class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-cyan-400" />
+                                        <div>
+                                            <h4 class="text-xl font-title font-black text-white uppercase tracking-tight leading-none">{s.details.name}</h4>
+                                            <p class="text-[9px] font-bold text-gray-600 uppercase tracking-[3px] mt-2 italic">MAX RANK: {s.details.max_level}</p>
                                         </div>
                                     </div>
+                                    <div class="bg-black/40 border border-white/5 p-4 rounded-xl">
+                                        <span class="block text-[7px] font-black text-cyan-900 uppercase tracking-widest mb-1">Upgrade Matrix Status</span>
+                                        <span class="text-sm font-mono text-cyan-400 font-black uppercase">{s.levels.length} Ranks Configured</span>
+                                    </div>
                                 </div>
-                                <div class="space-y-3">
-                                    <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Operational Directives (Description)</span>
-                                    <textarea bind:value={currentStructure.details.description} class="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-[11px] text-gray-400 focus:border-red-900 focus:outline-none min-h-[120px] leading-relaxed"></textarea>
+                                <div class="flex items-center gap-3 mt-8 relative z-10">
+                                    <button onclick={() => deleteStructure(s.details.id)} class="w-12 h-12 rounded-xl bg-red-950/20 text-red-500 border border-red-900/30 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all">✕</button>
+                                    <button onclick={() => openStructureInspector(s)} class="flex-grow py-4 bg-cyan-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all shadow-[0_0_20px_rgba(6,182,212,0.2)]">Structural Calibration</button>
                                 </div>
                             </div>
+                        {/each}
+                    </div>
+                </div>
 
-                            <div class="space-y-6 pt-10 border-t border-white/5">
-                                <div class="flex justify-between items-center px-2">
-                                    <h4 class="text-[10px] font-black text-cyan-500 uppercase tracking-[5px]">Rank Evolution Matrix</h4>
-                                    <button onclick={() => addStructureLevel(currentStructure.details.id)} class="text-[9px] font-black text-gray-700 hover:text-white uppercase tracking-widest transition-colors">+ ADD RANK</button>
+            {:else if activeModule === 'barracks'}
+                <div in:fade class="space-y-12">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-3xl font-title font-black text-white uppercase tracking-tighter">Evolutionary Strains</h3>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                        {#each races as race}
+                            <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl flex flex-col justify-between group hover:border-purple-500/30 transition-all relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none font-title font-black text-white italic text-4xl uppercase">
+                                    {race.name.substring(0,3)}
                                 </div>
-                                <div class="bg-black/40 rounded-3xl overflow-hidden shadow-2xl overflow-x-auto border border-white/5">
-                                    <table class="w-full text-left border-collapse min-w-[1200px] font-mono">
-                                        <thead>
-                                            <tr class="bg-cyan-950/20 text-[9px] font-black text-gray-600 uppercase tracking-widest">
-                                                <th class="px-6 py-5">Rank</th>
-                                                <th class="px-6 py-5">Label</th>
-                                                <th class="px-6 py-5">Cost (CP)</th>
-                                                <th class="px-6 py-5">Integrity (HP)</th>
-                                                <th class="px-6 py-5">ATK / DEF Buff</th>
-                                                <th class="px-6 py-5">Economy Buff (%)</th>
-                                                <th class="px-6 py-5">Citizens / Tick</th>
-                                                <th class="px-6 py-5">Military Reinforcements</th>
-                                                <th class="px-6 py-5">Capacity</th>
-                                                <th class="px-6 py-5">Req. Lvl</th>
-                                                <th class="px-6 py-5"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-white/5">
-                                            {#each currentStructure.levels as row}
-                                                <tr class="hover:bg-white/[0.02] transition-colors">
-                                                    <td class="px-6 py-5 text-red-600 font-black text-sm italic">{row.level}</td>
-                                                    <td class="px-6 py-5"><input type="text" bind:value={row.buff_name} class="bg-transparent border-none p-0 text-white text-[11px] font-black uppercase focus:ring-0 w-32" /></td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.cost} class="bg-transparent border-none p-0 text-cyan-400 text-xs font-mono focus:ring-0 w-28" /></td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.buff_hp} class="bg-transparent border-none p-0 text-gray-400 text-xs font-mono focus:ring-0 w-20" /></td>
-                                                    <td class="px-6 py-5">
-                                                        <div class="flex gap-2">
-                                                            <input type="number" bind:value={row.buff_offense} class="bg-transparent border border-white/5 rounded px-2 py-1 text-red-500 text-[10px] font-mono focus:ring-0 w-12" title="Attack" />
-                                                            <input type="number" bind:value={row.buff_defense} class="bg-transparent border border-white/5 rounded px-2 py-1 text-cyan-500 text-[10px] font-mono focus:ring-0 w-12" title="Defense" />
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.buff_economy} class="bg-transparent border-none p-0 text-green-500 text-xs font-mono focus:ring-0 w-16" /></td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.buff_citizens_per_tick} class="bg-transparent border-none p-0 text-blue-300 text-xs font-mono focus:ring-0 w-16" /></td>
-                                                    <td class="px-6 py-5">
-                                                        <div class="flex flex-wrap gap-1 max-w-[200px]">
-                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">G</span><input type="number" bind:value={row.buff_unit_guards} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
-                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">S</span><input type="number" bind:value={row.buff_unit_soldiers} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
-                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">SP</span><input type="number" bind:value={row.buff_unit_spies} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
-                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">SE</span><input type="number" bind:value={row.buff_unit_sentries} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.capacity} class="bg-transparent border-none p-0 text-blue-400 text-xs font-mono focus:ring-0 w-20" /></td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.player_level_req} class="bg-transparent border-none p-0 text-white text-xs font-mono focus:ring-0 w-12" /></td>
-                                                    <td class="px-6 py-5 text-right">
-                                                        <button onclick={() => saveStructureLevel(currentStructure.details.id, row)} class="text-cyan-500 font-black uppercase text-[10px] tracking-[2px] hover:text-white transition-all">
-                                                            {savingId === `level-${currentStructure.details.id}-${row.level}` ? '...' : 'SAVE'}
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            {/each}
-                                        </tbody>
-                                    </table>
+                                <div class="space-y-6 relative z-10">
+                                    <div class="flex items-center gap-6">
+                                        <div class="w-16 h-16 bg-purple-950/20 border border-purple-900/30 rounded-2xl flex items-center justify-center text-purple-600 text-2xl font-black">
+                                            {race.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <h4 class="text-xl font-title font-black text-white uppercase tracking-tight leading-none">{race.name}</h4>
+                                            <p class="text-[9px] font-bold text-gray-600 uppercase tracking-[3px] mt-2 italic">{race.bonus_type}</p>
+                                        </div>
+                                    </div>
+                                    <div class="bg-black/40 border border-white/5 p-4 rounded-xl">
+                                        <span class="block text-[7px] font-black text-purple-900 uppercase tracking-widest mb-1">Neural Multiplier</span>
+                                        <span class="text-sm font-mono text-purple-400 font-black uppercase">{race.bonus_value}x</span>
+                                    </div>
+                                </div>
+                                <div class="mt-8 relative z-10">
+                                    <button onclick={() => openRaceInspector(race)} class="w-full py-4 bg-purple-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-700 transition-all shadow-[0_0_20px_rgba(147,51,234,0.2)]">Genetic Calibration</button>
                                 </div>
                             </div>
-                        </div>
-                    {/if}
+                        {/each}
+                    </div>
                 </div>
 
             {:else if activeModule === 'api'}
@@ -1066,455 +1081,55 @@
         </main>
     </div>
 
-    <!-- Sovereign Inspector Modal -->
-    {#if showInspector && inspectorData}
-        <div in:fade out:fade class="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-12">
-            <div class="absolute inset-0 bg-black/90 backdrop-blur-xl" onclick={() => showInspector = false}></div>
-            <div class="relative w-full max-w-7xl h-full max-h-[90vh] bg-[#050505] border border-white/10 rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden flex flex-col">
-                <!-- Header -->
-                <header class="p-8 md:px-12 md:py-10 border-b border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div class="flex items-center gap-8">
-                        <div class="w-20 h-20 rounded-full bg-cyan-950/30 border border-cyan-500/20 flex items-center justify-center text-cyan-500 font-title font-black text-3xl">
-                            {inspectorData.dominion.id}
-                        </div>
-                        <div>
-                            <h2 class="text-3xl font-title font-black text-white uppercase tracking-tighter leading-none">{inspectorData.dominion.name}</h2>
-                            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-[4px] mt-2">DEEP-DIVE SOVEREIGN OVERSIGHT // CMD: {inspectorData.dominion.user.username}</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <button onclick={updateInspectorDominion} class="px-8 py-4 bg-cyan-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all shadow-[0_0_30px_rgba(6,182,212,0.3)]" disabled={savingId === 'inspector-save'}>
-                            {savingId === 'inspector-save' ? 'UPLOADING...' : 'COMMIT PROFILE'}
-                        </button>
-                        <button onclick={() => showInspector = false} class="w-16 h-16 rounded-full bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-red-500 hover:border-red-500 transition-all font-black text-2xl">×</button>
-                    </div>
-                </header>
+    <!-- Modular Administrative Inspectors -->
+    <SovereignInspector 
+        bind:show={showInspector} 
+        bind:data={inspectorData} 
+        bind:tab={inspectorTab} 
+        bind:savingId 
+        onUpdateDominion={updateInspectorDominion}
+        onUpdateManpower={updateInspectorManpower}
+        onUpdateStructure={updateInspectorStructure}
+        onUpdateArmory={updateInspectorArmory}
+    />
 
-                <!-- Tabs Navigation -->
-                <nav class="flex border-b border-white/5 bg-white/[0.02]">
-                    {#each [
-                        { id: 'identity', name: 'Core Identity' },
-                        { id: 'stats', name: 'Dominion Stats' },
-                        { id: 'military', name: 'Military' },
-                        { id: 'structures', name: 'Structures' },
-                        { id: 'armory', name: 'Armory' }
-                    ] as tab}
-                        <button 
-                            onclick={() => inspectorTab = tab.id}
-                            class="px-10 py-6 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 {inspectorTab === tab.id ? 'text-cyan-400 border-cyan-500 bg-cyan-500/5' : 'text-gray-600 border-transparent hover:text-gray-400'}"
-                        >
-                            {tab.name}
-                        </button>
-                    {/each}
-                </nav>
+    <ArmoryInspector
+        bind:show={showArmoryInspector}
+        bind:data={selectedArmoryItem}
+        bind:tab={armoryInspectorTab}
+        bind:savingId
+        {unitTypes}
+        {categories}
+        allArmoryItems={armoryItems}
+        onSave={saveArmoryItem}
+    />
 
-                <!-- Content Area -->
-                <div class="flex-grow overflow-y-auto p-12 custom-scrollbar">
-                    {#if inspectorTab === 'identity'}
-                        <div in:fade class="grid grid-cols-1 md:grid-cols-2 gap-12">
-                            <div class="space-y-6">
-                                <h3 class="text-xs font-black text-cyan-500 uppercase tracking-widest mb-4">Account Metadata</h3>
-                                <div class="space-y-4">
-                                    <div class="space-y-2">
-                                        <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Username</span>
-                                        <input type="text" bind:value={inspectorData.dominion.user.username} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-cyan-500 outline-none" />
-                                    </div>
-                                    <div class="space-y-2">
-                                        <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Email Address</span>
-                                        <input type="email" bind:value={inspectorData.dominion.user.email} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-cyan-500 outline-none" />
-                                    </div>
-                                    <div class="space-y-2">
-                                        <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Avatar Path</span>
-                                        <input type="text" bind:value={inspectorData.dominion.user.avatar_path} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-cyan-500 outline-none" />
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="space-y-6">
-                                <h3 class="text-xs font-black text-red-500 uppercase tracking-widest mb-4">Security & Clearance</h3>
-                                <div class="space-y-4">
-                                    <div class="flex items-center gap-6 p-6 bg-white/[0.02] border border-white/5 rounded-2xl">
-                                        <input type="checkbox" bind:checked={inspectorData.dominion.user.is_admin} class="w-6 h-6 rounded border-gray-800 text-cyan-600 focus:ring-cyan-500 bg-black/40" />
-                                        <div>
-                                            <span class="block text-[10px] font-black uppercase text-white">Administrator Privileges</span>
-                                            <span class="text-[9px] text-gray-600 uppercase">Access to the High Command terminal.</span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-6 p-6 bg-white/[0.02] border border-white/5 rounded-2xl">
-                                        <input type="checkbox" bind:checked={inspectorData.dominion.user.is_bot} class="w-6 h-6 rounded border-gray-800 text-cyan-600 focus:ring-cyan-500 bg-black/40" />
-                                        <div>
-                                            <span class="block text-[10px] font-black uppercase text-white">Automated Drone (Bot)</span>
-                                            <span class="text-[9px] text-gray-600 uppercase">Flags this account as a non-player entity.</span>
-                                        </div>
-                                    </div>
-                                    <div class="space-y-2">
-                                        <span class="block text-[9px] font-black text-red-900 uppercase tracking-widest">Force Password Reset</span>
-                                        <input type="password" bind:value={inspectorData.dominion.user.password} placeholder="••••••••" class="w-full bg-black/40 border border-red-900/20 rounded-xl px-6 py-4 text-red-500 font-mono focus:border-red-500 outline-none" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    {:else if inspectorTab === 'stats'}
-                        <div in:fade class="grid grid-cols-2 md:grid-cols-4 gap-8">
-                            {#each [
-                                { f: 'credits', n: 'Liquid Credits' },
-                                { f: 'credits_banked', n: 'Sovereign Bank' },
-                                { f: 'xp', n: 'Experience' },
-                                { f: 'turns', n: 'Energy Turns' },
-                                { f: 'citizens', n: 'Total Citizens' },
-                                { f: 'held_citizens', n: 'Held Population' },
-                                { f: 'foundation_hp', n: 'Foundation HP' },
-                                { f: 'foundation_max_hp', n: 'Max HP' },
-                                { f: 'strength_points', n: 'STR Attribute' },
-                                { f: 'dexterity_points', n: 'DEX Attribute' },
-                                { f: 'constitution_points', n: 'CON Attribute' },
-                                { f: 'charisma_points', n: 'CHA Attribute' },
-                                { f: 'current_mine_tier', n: 'Mine Tier' },
-                                { f: 'current_mine_level', n: 'Mine Level' },
-                                { f: 'housing_level', n: 'Housing Level' },
-                                { f: 'mercenary_market_level', n: 'Mercenary Rank' }
-                            ] as stat}
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">{stat.n}</span>
-                                    <input type="number" bind:value={inspectorData.dominion[stat.f]} class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-cyan-400 font-mono text-xs focus:border-cyan-500" />
-                                </div>
-                            {/each}
-                        </div>
-                    {:else if inspectorTab === 'military'}
-                        <div in:fade class="space-y-4">
-                            {#each inspectorData.all_units as unit}
-                                {@const manpower = inspectorData.dominion.manpower.find(m => m.unit_id === unit.id) || { unit_id: unit.id, total_quantity: 0, stabled_quantity: 0 }}
-                                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex items-center justify-between group">
-                                    <div class="flex items-center gap-6 w-1/3">
-                                        <div class="w-12 h-12 bg-cyan-900/20 rounded-lg flex items-center justify-center border border-cyan-500/10 text-cyan-400 font-black">
-                                            {unit.slug.substring(0,2).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <span class="block text-xs font-black text-white uppercase tracking-tight">{unit.name}</span>
-                                            <span class="text-[9px] text-gray-600 uppercase font-black">Unit ID: {unit.id}</span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-8 w-2/3 justify-end">
-                                        <div class="flex gap-4">
-                                            <div class="space-y-1">
-                                                <span class="block text-[8px] font-black text-gray-700 uppercase">Total Fielded</span>
-                                                <input type="number" bind:value={manpower.total_quantity} class="w-24 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono" />
-                                            </div>
-                                            <div class="space-y-1">
-                                                <span class="block text-[8px] font-black text-gray-700 uppercase">In Stables</span>
-                                                <input type="number" bind:value={manpower.stabled_quantity} class="w-24 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono" />
-                                            </div>
-                                        </div>
-                                        <button onclick={() => updateInspectorManpower(manpower)} class="px-6 py-3 bg-white/5 border border-white/10 text-[9px] font-black uppercase text-gray-400 rounded-xl hover:bg-cyan-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 disabled:opacity-30" disabled={savingId === `unit-${unit.id}`}>
-                                            {savingId === `unit-${unit.id}` ? '...' : 'SAVE'}
-                                        </button>
-                                    </div>
-                                </div>
-                            {/each}
-                        </div>
-                    {:else if inspectorTab === 'structures'}
-                        <div in:fade class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {#each inspectorData.all_structures as structure}
-                                {@const domStruct = inspectorData.dominion.structures.find(s => s.structure_id === structure.id) || { structure_id: structure.id, level: 0 }}
-                                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex items-center justify-between group">
-                                    <div class="flex items-center gap-6">
-                                        <div class="w-12 h-12 bg-purple-900/20 rounded-lg flex items-center justify-center border border-purple-500/10 text-purple-400 font-black">
-                                            {structure.slug.substring(0,2).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <span class="block text-xs font-black text-white uppercase tracking-tight">{structure.name}</span>
-                                            <span class="text-[9px] text-gray-600 uppercase font-black">Max Rank: {structure.max_level}</span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-6">
-                                        <div class="space-y-1 text-right">
-                                            <span class="block text-[8px] font-black text-gray-700 uppercase">Current Rank</span>
-                                            <input type="number" bind:value={domStruct.level} class="w-20 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono text-right" />
-                                        </div>
-                                        <button onclick={() => updateInspectorStructure(domStruct)} class="px-6 py-3 bg-white/5 border border-white/10 text-[9px] font-black uppercase text-gray-400 rounded-xl hover:bg-purple-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 disabled:opacity-30" disabled={savingId === `structure-${structure.id}`}>
-                                            {savingId === `structure-${structure.id}` ? '...' : 'COMMIT'}
-                                        </button>
-                                    </div>
-                                </div>
-                            {/each}
-                        </div>
-                    {:else if inspectorTab === 'armory'}
-                        <div in:fade class="space-y-4">
-                            {#each inspectorData.all_armory as item}
-                                {@const domItem = inspectorData.armory.find(ai => ai.item_id === item.id) || { item_id: item.id, quantity: 0, is_equipped: false }}
-                                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex items-center justify-between group">
-                                    <div class="flex items-center gap-6 w-1/3">
-                                        <div class="w-12 h-12 bg-amber-900/20 rounded-lg flex items-center justify-center border border-amber-500/10 text-amber-400 font-black">
-                                            {item.slug.substring(0,2).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <span class="block text-xs font-black text-white uppercase tracking-tight">{item.name}</span>
-                                            <span class="text-[9px] text-gray-600 uppercase font-black">{item.unit_type} // {item.cost.toLocaleString()} CR</span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-8 w-2/3 justify-end">
-                                        <div class="flex items-center gap-8">
-                                            <div class="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-lg border border-white/5">
-                                                <input type="checkbox" bind:checked={domItem.is_equipped} class="w-4 h-4 rounded border-gray-800 text-amber-600 focus:ring-amber-500 bg-black/40" />
-                                                <span class="text-[9px] font-black uppercase {domItem.is_equipped ? 'text-amber-500' : 'text-gray-700'}">Equipped</span>
-                                            </div>
-                                            <div class="space-y-1">
-                                                <span class="block text-[8px] font-black text-gray-700 uppercase">Quantity</span>
-                                                <input type="number" bind:value={domItem.quantity} class="w-24 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white font-mono" />
-                                            </div>
-                                        </div>
-                                        <button onclick={() => updateInspectorArmory(domItem)} class="px-6 py-3 bg-white/5 border border-white/10 text-[9px] font-black uppercase text-gray-400 rounded-xl hover:bg-amber-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 disabled:opacity-30" disabled={savingId === `item-${item.id}`}>
-                                            {savingId === `item-${item.id}` ? '...' : 'SYNC'}
-                                        </button>
-                                    </div>
-                                </div>
-                            {/each}
-                        </div>
-                    {/if}
-                </div>
-            </div>
-        </div>
-    {/if}
+    <UnitInspector
+        bind:show={showUnitInspector}
+        bind:data={selectedUnit}
+        bind:tab={unitInspectorTab}
+        bind:savingId
+        allUnits={units}
+        onSave={saveUnit}
+    />
 
-    <!-- Armory Inspector Modal -->
-    {#if showArmoryInspector && selectedArmoryItem}
-        <div in:fade out:fade class="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-12">
-            <div class="absolute inset-0 bg-black/90 backdrop-blur-xl" onclick={() => showArmoryInspector = false}></div>
-            <div class="relative w-full max-w-4xl h-full max-h-[80vh] bg-[#050505] border border-white/10 rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden flex flex-col">
-                <!-- Header -->
-                <header class="p-8 md:px-12 md:py-10 border-b border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div class="flex items-center gap-8">
-                        <div class="w-20 h-20 bg-amber-950/20 rounded-lg flex items-center justify-center border border-amber-500/20 text-amber-500 font-title font-black text-3xl">
-                            {selectedArmoryItem.slug.substring(0,2).toUpperCase()}
-                        </div>
-                        <div>
-                            <h2 class="text-3xl font-title font-black text-white uppercase tracking-tighter leading-none">{selectedArmoryItem.name}</h2>
-                            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-[4px] mt-2">ARMAMENT CALIBRATION // ID: {selectedArmoryItem.id}</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <button onclick={() => saveArmoryItem(selectedArmoryItem)} class="px-8 py-4 bg-amber-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-400 transition-all shadow-[0_0_30px_rgba(217,119,6,0.3)]" disabled={savingId === selectedArmoryItem.id}>
-                            {savingId === selectedArmoryItem.id ? 'CALIBRATING...' : 'COMMIT ASSET'}
-                        </button>
-                        <button onclick={() => showArmoryInspector = false} class="w-16 h-16 rounded-full bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-red-500 hover:border-red-500 transition-all font-black text-2xl">×</button>
-                    </div>
-                </header>
+    <StructureInspector
+        bind:show={showStructureInspector}
+        bind:data={selectedStructure}
+        bind:tab={structureInspectorTab}
+        bind:savingId
+        onSaveDetails={saveStructureDetails}
+        onSaveLevel={saveStructureLevel}
+        onAddLevel={addStructureLevel}
+    />
 
-                <!-- Tabs Navigation -->
-                <nav class="flex border-b border-white/5 bg-white/[0.02]">
-                    {#each [
-                        { id: 'identity', name: 'Core Identity' },
-                        { id: 'combat', name: 'Combat Calibration' },
-                        { id: 'reqs', name: 'Prerequisites' }
-                    ] as tab}
-                        <button 
-                            onclick={() => armoryInspectorTab = tab.id}
-                            class="px-10 py-6 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 {armoryInspectorTab === tab.id ? 'text-amber-400 border-amber-500 bg-amber-500/5' : 'text-gray-600 border-transparent hover:text-gray-400'}"
-                        >
-                            {tab.name}
-                        </button>
-                    {/each}
-                </nav>
-
-                <!-- Content Area -->
-                <div class="flex-grow overflow-y-auto p-12 custom-scrollbar">
-                    {#if armoryInspectorTab === 'identity'}
-                        <div in:fade class="space-y-8">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Asset Designation (Name)</span>
-                                    <input type="text" bind:value={selectedArmoryItem.name} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-amber-500 outline-none" />
-                                </div>
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Protocol Slug</span>
-                                    <input type="text" bind:value={selectedArmoryItem.slug} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-amber-500 outline-none" />
-                                </div>
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Unit Compatibility Type</span>
-                                    <select bind:value={selectedArmoryItem.unit_type} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-amber-500 outline-none uppercase text-xs font-black">
-                                        {#each unitTypes as u}
-                                            <option value={u.slug}>{u.name.toUpperCase()}</option>
-                                        {/each}
-                                    </select>
-                                </div>
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Asset Category</span>
-                                    <select bind:value={selectedArmoryItem.category_id} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-amber-500 outline-none uppercase text-xs font-black">
-                                        {#each categories as cat}
-                                            <option value={cat.id}>{cat.name.toUpperCase()}</option>
-                                        {/each}
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="space-y-2">
-                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Administrative Notes</span>
-                                <textarea bind:value={selectedArmoryItem.notes} rows="4" class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-gray-400 font-mono text-sm focus:border-amber-500 outline-none resize-none" placeholder="Enter developer context or asset history..."></textarea>
-                            </div>
-                        </div>
-                    {:else if armoryInspectorTab === 'combat'}
-                        <div in:fade class="grid grid-cols-1 md:grid-cols-2 gap-12">
-                            <div class="space-y-2">
-                                <span class="block text-[9px] font-black text-red-900 uppercase tracking-widest mb-1">Offensive Power (ATK Bonus)</span>
-                                <input type="number" bind:value={selectedArmoryItem.attack_bonus} class="w-full bg-black/40 border border-red-900/20 rounded-xl px-8 py-6 text-red-500 font-title font-black text-3xl focus:border-red-500 outline-none text-center" />
-                                <p class="text-[8px] text-gray-600 italic uppercase mt-2">Additive bonus applied to every unit in this item's class.</p>
-                            </div>
-                            <div class="space-y-2">
-                                <span class="block text-[9px] font-black text-cyan-900 uppercase tracking-widest mb-1">Defensive Power (DEF Bonus)</span>
-                                <input type="number" bind:value={selectedArmoryItem.defense_bonus} class="w-full bg-black/40 border border-cyan-900/20 rounded-xl px-8 py-6 text-cyan-500 font-title font-black text-3xl focus:border-cyan-500 outline-none text-center" />
-                                <p class="text-[8px] text-gray-600 italic uppercase mt-2">Armor rating improvement for sector-wide defense.</p>
-                            </div>
-                        </div>
-                    {:else if armoryInspectorTab === 'reqs'}
-                        <div in:fade class="space-y-8">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Requisition Cost (Credits)</span>
-                                    <input type="number" bind:value={selectedArmoryItem.cost} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-cyan-400 font-mono text-lg focus:border-cyan-500 outline-none" />
-                                </div>
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Min. Armory Rank Requirement</span>
-                                    <input type="number" bind:value={selectedArmoryItem.armory_level_req} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono text-lg focus:border-amber-500 outline-none" />
-                                </div>
-                            </div>
-                            <div class="space-y-2">
-                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Prerequisite Schematic (Requirement Slug)</span>
-                                <select bind:value={selectedArmoryItem.requirement_slug} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-amber-500 outline-none uppercase text-xs font-black">
-                                    <option value="">NO PREVIOUS ASSET REQUIRED</option>
-                                    {#each armoryItems.filter(i => i.id !== selectedArmoryItem.id && i.unit_type === selectedArmoryItem.unit_type) as p}
-                                        <option value={p.slug}>{p.name.toUpperCase()} (ID: {p.id})</option>
-                                    {/each}
-                                </select>
-                            </div>
-                        </div>
-                    {/if}
-                </div>
-            </div>
-        </div>
-    {/if}
-
-    <!-- Unit Inspector Modal -->
-    {#if showUnitInspector && selectedUnit}
-        <div in:fade out:fade class="fixed inset-0 z-[1000] flex items-center justify-center p-4 md:p-12">
-            <div class="absolute inset-0 bg-black/90 backdrop-blur-xl" onclick={() => showUnitInspector = false}></div>
-            <div class="relative w-full max-w-5xl h-full max-h-[85vh] bg-[#050505] border border-white/10 rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,1)] overflow-hidden flex flex-col">
-                <!-- Header -->
-                <header class="p-8 md:px-12 md:py-10 border-b border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div class="flex items-center gap-8">
-                        <div class="w-20 h-20 bg-red-950/20 border border-red-900/30 rounded-2xl flex items-center justify-center text-red-600 font-title font-black text-3xl">
-                            {selectedUnit.slug.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                            <h2 class="text-3xl font-title font-black text-white uppercase tracking-tighter leading-none">{selectedUnit.name}</h2>
-                            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-[4px] mt-2">TACTICAL CALIBRATION // ID: {selectedUnit.id}</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <button onclick={() => saveUnit(selectedUnit)} class="px-8 py-4 bg-red-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-[0_0_30px_rgba(153,27,27,0.3)]" disabled={savingId === selectedUnit.id}>
-                            {savingId === selectedUnit.id ? 'UPLOADING...' : 'COMMIT DOCTRINE'}
-                        </button>
-                        <button onclick={() => showUnitInspector = false} class="w-16 h-16 rounded-full bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-red-500 hover:border-red-500 transition-all font-black text-2xl">×</button>
-                    </div>
-                </header>
-
-                <!-- Tabs Navigation -->
-                <nav class="flex border-b border-white/5 bg-white/[0.02]">
-                    {#each [
-                        { id: 'identity', name: 'Core Identity' },
-                        { id: 'costs', name: 'Requisition Costs' },
-                        { id: 'yield', name: 'Tactical Yield' },
-                        { id: 'reqs', name: 'Prerequisites' }
-                    ] as tab}
-                        <button 
-                            onclick={() => unitInspectorTab = tab.id}
-                            class="px-10 py-6 text-[10px] font-black uppercase tracking-widest transition-all border-b-2 {unitInspectorTab === tab.id ? 'text-red-500 border-red-500 bg-red-500/5' : 'text-gray-600 border-transparent hover:text-gray-400'}"
-                        >
-                            {tab.name}
-                        </button>
-                    {/each}
-                </nav>
-
-                <!-- Content Area -->
-                <div class="flex-grow overflow-y-auto p-12 custom-scrollbar">
-                    {#if unitInspectorTab === 'identity'}
-                        <div in:fade class="space-y-8">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Division Designation (Name)</span>
-                                    <input type="text" bind:value={selectedUnit.name} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-red-900 outline-none" />
-                                </div>
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Protocol ID (Slug)</span>
-                                    <input type="text" bind:value={selectedUnit.slug} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-red-900 outline-none" />
-                                </div>
-                            </div>
-                            <div class="space-y-2">
-                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Division Dossier (Description)</span>
-                                <textarea bind:value={selectedUnit.description} rows="6" class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-gray-400 font-mono text-sm focus:border-red-900 outline-none resize-none leading-relaxed" placeholder="Enter combat role and lore..."></textarea>
-                            </div>
-                        </div>
-                    {:else if unitInspectorTab === 'costs'}
-                        <div in:fade class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <div class="space-y-2">
-                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Requisition (Credits)</span>
-                                <input type="number" bind:value={selectedUnit.cost_credits} class="w-full bg-black/40 border border-white/10 rounded-xl px-8 py-6 text-cyan-400 font-title font-black text-3xl focus:border-cyan-500 outline-none text-center" />
-                            </div>
-                            <div class="space-y-2">
-                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Manpower (Citizens)</span>
-                                <input type="number" bind:value={selectedUnit.cost_citizens} class="w-full bg-black/40 border border-white/10 rounded-xl px-8 py-6 text-white font-title font-black text-3xl focus:border-red-500 outline-none text-center" />
-                            </div>
-                            <div class="space-y-2">
-                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Energy Drain (Turns)</span>
-                                <input type="number" bind:value={selectedUnit.cost_turns} class="w-full bg-black/40 border border-white/10 rounded-xl px-8 py-6 text-white font-title font-black text-3xl focus:border-red-500 outline-none text-center" />
-                            </div>
-                        </div>
-                    {:else if unitInspectorTab === 'yield'}
-                        <div in:fade class="space-y-12">
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-8">
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-red-900 uppercase tracking-widest">Offensive Power</span>
-                                    <input type="number" bind:value={selectedUnit.power_offense} class="w-full bg-black/40 border border-red-900/20 rounded-xl px-6 py-4 text-red-500 font-title font-black text-2xl focus:border-red-500 outline-none text-center" />
-                                </div>
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-cyan-900 uppercase tracking-widest">Defensive Power</span>
-                                    <input type="number" bind:value={selectedUnit.power_defense} class="w-full bg-black/40 border border-cyan-900/20 rounded-xl px-6 py-4 text-cyan-500 font-title font-black text-2xl focus:border-cyan-500 outline-none text-center" />
-                                </div>
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-emerald-900 uppercase tracking-widest">Production Yield (CP)</span>
-                                    <input type="number" bind:value={selectedUnit.production_credits} class="w-full bg-black/40 border border-emerald-900/20 rounded-xl px-6 py-4 text-emerald-500 font-title font-black text-2xl focus:border-emerald-500 outline-none text-center" />
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-8 border-t border-white/5 pt-12">
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-purple-900 uppercase tracking-widest">Infiltration (Spy ATK)</span>
-                                    <input type="number" bind:value={selectedUnit.power_spy_offense} class="w-full bg-black/40 border border-purple-900/20 rounded-xl px-6 py-4 text-purple-500 font-title font-black text-2xl focus:border-purple-500 outline-none text-center" />
-                                </div>
-                                <div class="space-y-2">
-                                    <span class="block text-[9px] font-black text-indigo-900 uppercase tracking-widest">Surveillance (Spy DEF)</span>
-                                    <input type="number" bind:value={selectedUnit.power_spy_defense} class="w-full bg-black/40 border border-indigo-900/20 rounded-xl px-6 py-4 text-indigo-400 font-title font-black text-2xl focus:border-indigo-500 outline-none text-center" />
-                                </div>
-                            </div>
-                        </div>
-                    {:else if unitInspectorTab === 'reqs'}
-                        <div in:fade class="space-y-8">
-                            <div class="space-y-2">
-                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Required Foundation Rank</span>
-                                <input type="number" bind:value={selectedUnit.foundation_level_req} class="w-full bg-black/40 border border-white/10 rounded-xl px-8 py-6 text-white font-title font-black text-3xl focus:border-red-900 outline-none text-center" />
-                                <p class="text-[8px] text-gray-600 italic uppercase mt-2 text-center">Minimum command center rank needed to enlist this class.</p>
-                            </div>
-                            <div class="space-y-2 pt-8 border-t border-white/5">
-                                <span class="block text-[9px] font-black text-gray-600 uppercase tracking-widest">Prerequisite Combat Class (Dependency)</span>
-                                <select bind:value={selectedUnit.requirement_slug} class="w-full bg-black/40 border border-white/10 rounded-xl px-6 py-4 text-white font-mono focus:border-red-900 outline-none uppercase text-xs font-black">
-                                    <option value="">NO PREVIOUS CLASS REQUIRED</option>
-                                    {#each units.filter(u => u.id !== selectedUnit.id) as p}
-                                        <option value={p.slug}>{p.name.toUpperCase()} (ID: {p.id})</option>
-                                    {/each}
-                                </select>
-                            </div>
-                        </div>
-                    {/if}
-                </div>
-            </div>
-        </div>
-    {/if}
+    <RaceInspector
+        bind:show={showRaceInspector}
+        bind:data={selectedRace}
+        bind:tab={raceInspectorTab}
+        bind:savingId
+        onSave={updateRace}
+    />
 
     <div class="fixed bottom-8 right-8 z-[200] space-y-4 pointer-events-none">
         {#each notifications as n (n.id)}
