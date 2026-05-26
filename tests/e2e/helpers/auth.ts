@@ -21,21 +21,21 @@ export function makeCommanderCredentials(prefix = 'e2e'): CommanderCredentials {
 export async function registerCommander(page: Page, creds: CommanderCredentials): Promise<void> {
   await page.goto('/register');
 
-  await page.locator('input[type="email"]').fill(creds.email);
-  await page.locator('input[type="text"]').first().fill(creds.username);
-  await page.locator('input[type="text"]').nth(1).fill(creds.dominionName);
-  await page.locator('select').selectOption('Human');
-  await page.locator('input[type="password"]').first().fill(creds.password);
-  await page.locator('input[type="password"]').nth(1).fill(creds.password);
-  await page.getByRole('button', { name: /establish sovereignty/i }).click();
+  await page.getByTestId('register-email').fill(creds.email);
+  await page.getByTestId('register-username').fill(creds.username);
+  await page.getByTestId('register-dominion-name').fill(creds.dominionName);
+  await page.getByTestId('register-race').selectOption('Human');
+  await page.getByTestId('register-password').fill(creds.password);
+  await page.getByTestId('register-password-confirmation').fill(creds.password);
+  await page.getByTestId('register-submit').click();
 
   await expect(page).toHaveURL(/\/login\?success=1$/);
 }
 
 export async function loginCommander(page: Page, creds: CommanderCredentials): Promise<void> {
-  await page.locator('input[type="text"]').fill(creds.username);
-  await page.locator('input[type="password"]').fill(creds.password);
-  await page.getByRole('button', { name: /authorize access/i }).click();
+  await page.getByTestId('login-username').fill(creds.username);
+  await page.getByTestId('login-password').fill(creds.password);
+  await page.getByTestId('login-submit').click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
 }

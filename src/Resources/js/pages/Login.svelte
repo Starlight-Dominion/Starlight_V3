@@ -65,10 +65,10 @@
                 </div>
             {/if}
 
-            <form onsubmit={handleLogin} class="space-y-6">
+            <form onsubmit={handleLogin} class="space-y-6" data-testid="login-form">
                 <div class="space-y-2">
                     <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px] ml-2">Commander Identity</label>
-                    <input type="text" bind:value={formData.username} class="input-terminal" placeholder="HANDLE / ID" required />
+                    <input type="text" name="username" data-testid="login-username" bind:value={formData.username} class="input-terminal" placeholder="HANDLE / ID" required />
                 </div>
 
                 <div class="space-y-2">
@@ -76,10 +76,10 @@
                         <label class="text-[9px] font-black text-cyan-800 uppercase tracking-[2px]">Encryption Key</label>
                         <span class="text-[8px] font-bold text-gray-600 uppercase tracking-widest cursor-pointer hover:text-cyan-400">Lost Cipher?</span>
                     </div>
-                    <input type="password" bind:value={formData.password} class="input-terminal" placeholder="••••••••" required />
+                    <input type="password" name="password" data-testid="login-password" bind:value={formData.password} class="input-terminal" placeholder="••••••••" required />
                 </div>
 
-                <button type="submit" class="w-full bg-cyan-700/50 hover:bg-cyan-600 border border-cyan-500/50 text-white font-title font-black py-5 rounded-xl uppercase tracking-[4px] transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(8,145,178,0.2)]" disabled={loading}>
+                <button type="submit" data-testid="login-submit" class="w-full bg-cyan-700/50 hover:bg-cyan-600 border border-cyan-500/50 text-white font-title font-black py-5 rounded-xl uppercase tracking-[4px] transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(8,145,178,0.2)]" disabled={loading}>
                     {loading ? 'Establishing Neural Link...' : 'Authorize Access'}
                 </button>
             </form>
