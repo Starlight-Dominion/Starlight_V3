@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:8080';
+const useExternalServer = process.env.PLAYWRIGHT_USE_EXTERNAL_SERVER === '1';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -13,7 +14,7 @@ export default defineConfig({
     timeout: 10_000,
   },
   reporter: process.env.CI
-    ? [['github'], ['html', { open: 'never' }], ['list']]
+    ? [['github'], ['junit', { outputFile: 'test-results/junit.xml' }], ['html', { open: 'never' }], ['list']]
     : [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL,
@@ -35,10 +36,12 @@ export default defineConfig({
       use: { ...devices['Desktop Safari'] },
     },
   ],
-  webServer: {
-    command: 'php -S 127.0.0.1:8080 -t public public/index.php',
-    url: `${baseURL}/login`,
-    timeout: 120_000,
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: useExternalServer
+    ? undefined
+    : {
+        command: 'php -S 127.0.0.1:8080 -t public public/index.php',
+        url: `${baseURL}/login`,
+        timeout: 120_000,
+        reuseExistingServer: !process.env.CI,
+      },
 });
