@@ -67,7 +67,7 @@ jobs:
         with:
           php-version: '8.4'
           extensions: pdo_mysql
-          coverage: none
+          coverage: xdebug
 
       - name: Cache Composer downloads
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -100,4 +100,15 @@ jobs:
         run: php vendor/bin/phinx status -e development
 
       - name: Run PHPUnit
-        run: php vendor/bin/phpunit --configuration phpunit.xml
+        run: php vendor/bin/phpunit --configuration phpunit.xml --coverage-clover coverage/clover.xml --coverage-text
+
+      - name: Enforce backend coverage thresholds
+        run: php scripts/check-clover-threshold.php coverage/clover.xml
+
+      - name: Upload backend coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backend-coverage
+          path: coverage/
+          retention-days: 14
