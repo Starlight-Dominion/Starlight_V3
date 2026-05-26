@@ -93,6 +93,27 @@ vendor/bin/phpunit
 
 # Run MVC integrity checks
 bash tests/Architecture/test_mvc_integrity.sh
+
+# Install Playwright browsers
+npm run test:e2e:install
+
+# Run E2E suite (requires DB, Redis, migrations, and seed data)
+npm run test:e2e
+```
+
+### E2E Preparation
+```bash
+# Start dependencies
+docker-compose up -d db redis
+
+# Prepare schema and baseline game data
+php vendor/bin/phinx migrate -e development
+php vendor/bin/phinx seed:run -e development -s InitialDataSeeder
+php vendor/bin/phinx seed:run -e development -s ArmorySeeder
+
+# Build frontend assets and run E2E tests
+npm run build
+npm run test:e2e
 ```
 
 ---

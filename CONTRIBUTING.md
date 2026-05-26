@@ -12,6 +12,7 @@
 - Backend tests: `composer test`
 - Migration status check: `composer migrate:status`
 - Frontend production build: `npm run build`
+- E2E browser tests: `npm run test:e2e`
 
 ## Code Standards
 
