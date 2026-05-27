@@ -526,6 +526,16 @@
             window.location.href = '/dashboard';
         }
     }
+
+    function exportAuditLogsToJson() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(auditLogs, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href",     dataStr);
+        downloadAnchorNode.setAttribute("download", `audit_logs_${new Date().toISOString()}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
 </script>
 
 <div in:fade class="space-y-8 pb-24">
@@ -985,6 +995,15 @@
             {:else if activeModule === 'audit'}
                 <div in:fade class="space-y-6">
                     <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+                        <header class="bg-cyan-950/20 px-8 py-6 border-b border-white/5 flex justify-between items-center">
+                            <div>
+                                <h2 class="text-[10px] font-black text-cyan-500 uppercase tracking-[4px]">Neural Audit Trail</h2>
+                                <p class="text-[8px] text-gray-600 uppercase mt-1">Full record of administrative directives.</p>
+                            </div>
+                            <button onclick={exportAuditLogsToJson} class="px-6 py-3 bg-white/5 border border-white/10 text-[9px] font-black uppercase text-gray-400 rounded-xl hover:bg-cyan-600 hover:text-white transition-all">
+                                Neural Export (JSON)
+                            </button>
+                        </header>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse font-mono">
                                 <thead>
@@ -1005,7 +1024,7 @@
                                             <td class="px-8 py-6">
                                                 <span class="text-xs text-cyan-400 font-black">{log.description}</span>
                                                 {#if log.metadata}
-                                                    <span class="block text-[8px] text-gray-700 mt-1 uppercase truncate max-w-md">{JSON.stringify(log.metadata)}</span>
+                                                    <span class="block text-[8px] text-gray-700 mt-1 uppercase break-all whitespace-pre-wrap">{JSON.stringify(log.metadata, null, 2)}</span>
                                                 {/if}
                                             </td>
                                             <td class="px-8 py-6 text-right text-[10px] text-gray-600 font-black uppercase tracking-widest">{log.created_at}</td>
