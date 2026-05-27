@@ -22,13 +22,9 @@ class TacticalService
         
         $manpower = DominionManpower::with('unit')
             ->where('dominion_id', $dominionId)
-            ->get()
-            ->mapWithKeys(fn($m) => [$m->unit->slug => $m->total_quantity]);
+            ->get();
 
-        $soldiers = (int)($manpower['soldiers'] ?? 0);
-        $guards = (int)($manpower['guards'] ?? 0);
-        $spies = (int)($manpower['spies'] ?? 0);
-        $sentries = (int)($manpower['sentries'] ?? 0);
+        $manpowerMap = $manpower->mapWithKeys(fn($m) => [$m->unit->slug => $m->total_quantity]);
 
         // Attribute Multipliers (1% per point)
         $strengthMult = 1 + ($dom->strength_points * 0.01);
@@ -36,9 +32,24 @@ class TacticalService
         $dexterityMult = 1 + ($dom->dexterity_points * 0.01);
         $charismaMult = 1 + ($dom->charisma_points * 0.01);
 
-        // 1:1 Equipping Logic
-        $atkArmoryBonus = $this->getArmoryBonus($dominionId, 'soldiers', $soldiers, 'attack_bonus');
-        $defArmoryBonus = $this->getArmoryBonus($dominionId, 'guards', $guards, 'defense_bonus');
+        $rawAttack = 0;
+        $rawDefense = 0;
+        $rawEspionage = 0;
+        $rawSentry = 0;
+
+        foreach ($manpower as $m) {
+            $qty = $m->total_quantity;
+            if ($qty > 0) {
+                $rawAttack += $qty * (int)$m->unit->power_offense;
+                $rawDefense += $qty * (int)$m->unit->power_defense;
+                $rawEspionage += $qty * (int)$m->unit->power_spy_offense;
+                $rawSentry += $qty * (int)$m->unit->power_spy_defense;
+            }
+        }
+
+        // 1:1 Equipping Logic (Assuming only specific units get armory bonuses for now)
+        $atkArmoryBonus = $this->getArmoryBonus($dominionId, 'soldiers', (int)($manpowerMap['soldiers'] ?? 0), 'attack_bonus');
+        $defArmoryBonus = $this->getArmoryBonus($dominionId, 'guards', (int)($manpowerMap['guards'] ?? 0), 'defense_bonus');
 
         // Structural Multipliers (From dominion_structures table)
         $structs = DominionStructure::join('structure_levels', function($j) {
@@ -52,18 +63,18 @@ class TacticalService
         $offenseUpgradeMult = 1 + (($structs->off ?? 0) / 100.0);
         $defenseUpgradeMult = 1 + (($structs->def ?? 0) / 100.0);
 
-        // Legacy Formula
-        $rawAttack = (($soldiers * self::AVG_UNIT_POWER * $strengthMult) + $atkArmoryBonus) * $offenseUpgradeMult;
-        $rawDefense = (($guards * self::AVG_UNIT_POWER * $constitutionMult) + $defArmoryBonus) * $defenseUpgradeMult;
-        $rawEspionage = $spies * self::AVG_UNIT_POWER * $dexterityMult;
-        $rawSentry = $sentries * self::AVG_UNIT_POWER * $charismaMult;
+        // Final Aggregate Ratings
+        $rawAttack = ($rawAttack * $strengthMult + $atkArmoryBonus) * $offenseUpgradeMult;
+        $rawDefense = ($rawDefense * $constitutionMult + $defArmoryBonus) * $defenseUpgradeMult;
+        $rawEspionage = $rawEspionage * $dexterityMult;
+        $rawSentry = $rawSentry * $charismaMult;
 
         return [
             'offense' => (int)$rawAttack,
             'defense' => (int)$rawDefense,
             'espionage' => (int)$rawEspionage,
             'sentry' => (int)$rawSentry,
-            'army' => $manpower->toArray()
+            'army' => $manpowerMap->toArray()
         ];
     }
 

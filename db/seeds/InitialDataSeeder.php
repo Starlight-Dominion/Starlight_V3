@@ -30,9 +30,11 @@ class InitialDataSeeder extends AbstractSeed {
 
         // Structures
         $this->table('structures')->insert([
-            ['slug' => 'foundation', 'name' => 'Planetary Foundation', 'description' => 'The Capital of your Dominion, the last line of defense.', 'max_level' => 20],
-            ['slug' => 'economy', 'name' => 'Economic Hub', 'description' => 'The Economic center of your dominion.', 'max_level' => 20],
-            ['slug' => 'armory', 'name' => 'Sector Armory', 'description' => 'Advanced military research and development facility for tactical equipment.', 'max_level' => 20]
+            ['id' => 1, 'slug' => 'foundation', 'name' => 'Planetary Foundation', 'description' => 'The Capital of your Dominion, the last line of defense.', 'max_level' => 20],
+            ['id' => 2, 'slug' => 'economy', 'name' => 'Economic Hub', 'description' => 'The Economic center of your dominion.', 'max_level' => 20],
+            ['id' => 3, 'slug' => 'armory', 'name' => 'Sector Armory', 'description' => 'Advanced military research and development facility for tactical equipment.', 'max_level' => 20],
+            ['id' => 4, 'slug' => 'housing', 'name' => 'Civilian Housing', 'description' => 'Supports population growth and provides a baseline for mobilization.', 'max_level' => 5],
+            ['id' => 5, 'slug' => 'mercenary_market', 'name' => 'Mercenary Market', 'description' => 'Recruit specialized reinforcements to bolster your frontline.', 'max_level' => 5]
         ])->saveData();
 
         // 1. Foundation Levels
@@ -101,5 +103,52 @@ class InitialDataSeeder extends AbstractSeed {
             ];
         }
         $this->table('structure_levels')->insert($aLevels)->saveData();
+
+        // 4. Housing Levels
+        $housing = $this->fetchRow("SELECT id FROM structures WHERE slug = 'housing'");
+        $hLevels = [
+            1 => ['cost' => 0, 'cit' => 50],
+            2 => ['cost' => 1000, 'cit' => 60],
+            3 => ['cost' => 5000, 'cit' => 75],
+            4 => ['cost' => 20000, 'cit' => 100],
+            5 => ['cost' => 75000, 'cit' => 150],
+        ];
+        $housingData = [];
+        foreach ($hLevels as $lvl => $d) {
+            $housingData[] = [
+                'structure_id' => $housing['id'],
+                'level' => $lvl,
+                'cost' => $d['cost'],
+                'buff_citizens_per_tick' => $d['cit'],
+                'buff_name' => "Tier {$lvl}",
+                'player_level_req' => $lvl
+            ];
+        }
+        $this->table('structure_levels')->insert($housingData)->saveData();
+
+        // 5. Mercenary Market Levels
+        $merc = $this->fetchRow("SELECT id FROM structures WHERE slug = 'mercenary_market'");
+        $mLevels = [
+            1 => ['cost' => 5000, 'g' => 4, 's' => 2, 'sp' => 1, 'se' => 1],
+            2 => ['cost' => 15000, 'g' => 8, 's' => 4, 'sp' => 2, 'se' => 2],
+            3 => ['cost' => 40000, 'g' => 16, 's' => 8, 'sp' => 4, 'se' => 4],
+            4 => ['cost' => 100000, 'g' => 32, 's' => 16, 'sp' => 8, 'se' => 8],
+            5 => ['cost' => 250000, 'g' => 64, 's' => 32, 'sp' => 16, 'se' => 16],
+        ];
+        $mercData = [];
+        foreach ($mLevels as $lvl => $d) {
+            $mercData[] = [
+                'structure_id' => $merc['id'],
+                'level' => $lvl,
+                'cost' => $d['cost'],
+                'buff_unit_guards' => $d['g'],
+                'buff_unit_soldiers' => $d['s'],
+                'buff_unit_spies' => $d['sp'],
+                'buff_unit_sentries' => $d['se'],
+                'buff_name' => "Rank {$lvl}",
+                'player_level_req' => $lvl
+            ];
+        }
+        $this->table('structure_levels')->insert($mercData)->saveData();
     }
 }

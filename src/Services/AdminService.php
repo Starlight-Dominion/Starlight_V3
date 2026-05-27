@@ -22,10 +22,16 @@ class AdminService
     {
         $playerCount = User::count();
         $kingdomCount = Dominion::count();
+        $totalCredits = (float)Dominion::sum('credits');
+        $totalCitizens = (float)Dominion::sum('citizens');
+        $totalManpower = (float)\sdo\Models\DominionManpower::sum('total_quantity');
         
         return [
             'total_users' => $playerCount,
             'total_kingdoms' => $kingdomCount,
+            'total_credits' => $totalCredits,
+            'total_citizens' => $totalCitizens,
+            'total_manpower' => $totalManpower,
             'server_time' => (new \DateTime('now', new \DateTimeZone('America/New_York')))->format('H:i:s T')
         ];
     }
@@ -51,22 +57,87 @@ class AdminService
             ->toArray();
     }
 
+    public function getKingdomFullProfile(int $dominionId): array
+    {
+        $dominion = Dominion::with(['user', 'manpower.unit', 'structures.structure', 'race'])
+            ->findOrFail($dominionId);
+
+        // Get armory items separately since relationship name in model is non-standard or missing
+        $armory = \sdo\Models\DominionArmoryItem::with('item')
+            ->where('kingdom_id', $dominionId)
+            ->get()
+            ->toArray();
+
+        return [
+            'dominion' => $dominion->toArray(),
+            'armory' => $armory,
+            // Provide all available units/structures for "granting" new assets
+            'all_units' => Unit::all()->toArray(),
+            'all_structures' => Structure::all()->toArray(),
+            'all_armory' => ArmoryItem::all()->toArray()
+        ];
+    }
+
     public function updateDominionStats(int $dominionId, array $stats): bool
     {
         $dominion = Dominion::with('user')->findOrFail($dominionId);
         
-        $allowedDominion = ['credits', 'xp', 'turns', 'citizens', 'name'];
-        $allowedUser = ['username'];
+        $domColumns = Capsule::schema()->getColumnListing('dominions');
+        $userColumns = Capsule::schema()->getColumnListing('users');
         
+        // Helper to normalize values based on model casts
+        $normalize = function($model, $field, $value) {
+            $casts = $model->getCasts();
+            $type = $casts[$field] ?? null;
+
+            if ($type === 'datetime' && (empty($value) || $value === 'null')) {
+                return null;
+            }
+            if ($type === 'boolean') {
+                return ($value === 'true' || $value === '1' || $value === 1 || $value === true);
+            }
+            return $value;
+        };
+
         foreach ($stats as $field => $value) {
-            if (in_array($field, $allowedDominion)) {
-                $dominion->$field = $value;
-            } elseif (in_array($field, $allowedUser) && $dominion->user) {
-                $dominion->user->$field = $value;
+            if (in_array($field, $domColumns)) {
+                $dominion->$field = $normalize($dominion, $field, $value);
+            } elseif (in_array($field, $userColumns) && $dominion->user) {
+                if ($field === 'password') {
+                    if (!empty($value)) {
+                        $dominion->user->password = $value; // Mutator handles hashing
+                    }
+                    continue;
+                }
+                $dominion->user->$field = $normalize($dominion->user, $field, $value);
             }
         }
 
         return $dominion->push();
+    }
+
+    public function updateKingdomManpower(int $dominionId, int $unitId, int $total, int $stabled): bool
+    {
+        return \sdo\Models\DominionManpower::updateOrCreate(
+            ['dominion_id' => $dominionId, 'unit_id' => $unitId],
+            ['total_quantity' => $total, 'stabled_quantity' => $stabled]
+        )->exists;
+    }
+
+    public function updateKingdomStructure(int $dominionId, int $structureId, int $level): bool
+    {
+        return \sdo\Models\DominionStructure::updateOrCreate(
+            ['dominion_id' => $dominionId, 'structure_id' => $structureId],
+            ['level' => $level]
+        )->exists;
+    }
+
+    public function updateKingdomArmory(int $dominionId, int $itemId, int $quantity, bool $equipped): bool
+    {
+        return \sdo\Models\DominionArmoryItem::updateOrCreate(
+            ['kingdom_id' => $dominionId, 'item_id' => $itemId],
+            ['quantity' => $quantity, 'is_equipped' => $equipped]
+        )->exists;
     }
 
     // --- Units Management ---
@@ -78,7 +149,13 @@ class AdminService
     public function updateUnit(int $id, array $data): bool
     {
         $unit = Unit::findOrFail($id);
-        return $unit->update($data);
+        
+        // Defensive check: only update columns that actually exist in the units table
+        $unitColumns = Capsule::schema()->getColumnListing('units');
+
+        $filteredData = array_filter($data, fn($key) => in_array($key, $unitColumns), ARRAY_FILTER_USE_KEY);
+
+        return $unit->update($filteredData);
     }
 
     public function addUnit(array $data): int
@@ -115,7 +192,9 @@ class AdminService
     public function updateStructure(int $id, array $data): bool
     {
         $structure = Structure::findOrFail($id);
-        return $structure->update($data);
+        $columns = Capsule::schema()->getColumnListing('structures');
+        $filteredData = array_filter($data, fn($key) => in_array($key, $columns), ARRAY_FILTER_USE_KEY);
+        return $structure->update($filteredData);
     }
 
     public function deleteStructure(int $id): bool
@@ -125,9 +204,12 @@ class AdminService
 
     public function updateStructureLevel(int $structureId, int $level, array $data): bool
     {
+        $columns = Capsule::schema()->getColumnListing('structure_levels');
+        $filteredData = array_filter($data, fn($key) => in_array($key, $columns), ARRAY_FILTER_USE_KEY);
+        
         return StructureLevel::where('structure_id', $structureId)
             ->where('level', $level)
-            ->update($data) > 0;
+            ->update($filteredData) > 0;
     }
 
     public function addStructureLevel(array $data): bool
@@ -144,7 +226,13 @@ class AdminService
     public function updateArmoryItem(int $id, array $data): bool
     {
         $item = ArmoryItem::findOrFail($id);
-        return $item->update($data);
+
+        // Defensive check: only update columns that actually exist
+        $armoryColumns = Capsule::schema()->getColumnListing('armory_items');
+
+        $filteredData = array_filter($data, fn($key) => in_array($key, $armoryColumns), ARRAY_FILTER_USE_KEY);
+
+        return $item->update($filteredData);
     }
 
     public function addArmoryItem(array $data): int
@@ -166,6 +254,40 @@ class AdminService
     public function getArmoryCategories(): array
     {
         return ArmoryCategory::all()->toArray();
+    }
+
+    // --- Evolutionary Strains (Race) Management ---
+    public function getAllRaces(): array
+    {
+        return \sdo\Models\Race::all()->toArray();
+    }
+
+    public function updateRace(int $id, array $data): bool
+    {
+        $race = \sdo\Models\Race::findOrFail($id);
+        $raceColumns = Capsule::schema()->getColumnListing('races');
+        $filteredData = array_filter($data, fn($key) => in_array($key, $raceColumns), ARRAY_FILTER_USE_KEY);
+        return $race->update($filteredData);
+    }
+
+    // --- Audit Trail ---
+    public function logAdminAction(int $adminId, string $action, string $description, array $metadata = []): void
+    {
+        \sdo\Models\GameLog::create([
+            'dominion_id' => $adminId,
+            'action' => 'ADMIN_' . strtoupper($action),
+            'description' => $description,
+            'metadata' => $metadata
+        ]);
+    }
+
+    public function getAuditLogs(int $limit = 100): array
+    {
+        return \sdo\Models\GameLog::where('action', 'LIKE', 'ADMIN_%')
+            ->orderBy('id', 'desc')
+            ->limit($limit)
+            ->get()
+            ->toArray();
     }
 
     // --- Logs Oversight ---

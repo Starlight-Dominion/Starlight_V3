@@ -15,6 +15,9 @@ class Unit extends Model
         'cost_turns' => 'integer',
         'power_offense' => 'integer',
         'power_defense' => 'integer',
-        'production_credits' => 'integer'
+        'power_spy_offense' => 'integer',
+        'power_spy_defense' => 'integer',
+        'production_credits' => 'integer',
+        'foundation_level_req' => 'integer'
     ];
 }
