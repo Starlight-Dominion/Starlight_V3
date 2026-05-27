@@ -15,6 +15,11 @@ class EloquentDominionRepository implements DominionRepositoryInterface
         return Dominion::with('user')->find($id);
     }
 
+    public function findByName(string $name): ?Dominion
+    {
+        return Dominion::where('name', $name)->first();
+    }
+
     public function findByUserId(int $userId): ?Dominion
     {
         return Dominion::with('user')->where('user_id', $userId)->first();

@@ -60,13 +60,11 @@ class AdvisorService
         return $this->getAdvice();
     }
 
-    /** Persist advisor message in session history */
-    public function recordAdvisorAdvice(string $text): void
+    /**
+     * Prepare a log entry for advisor history.
+     */
+    public function formatAdviceLog(string $text, array $history): array
     {
-        if (!isset($_SESSION)) {
-            return;
-        }
-        $history = $_SESSION['advisor_history'] ?? [];
         $history[] = [
             'ts' => (new \DateTime())->format('Y-m-d H:i:s'),
             'text' => $text,
@@ -74,6 +72,6 @@ class AdvisorService
         if (count($history) > 5) {
             $history = array_slice($history, -5);
         }
-        $_SESSION['advisor_history'] = $history;
+        return $history;
     }
 }

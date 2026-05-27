@@ -7,9 +7,15 @@ services:
     volumes:
       - .:/var/www/html
     environment:
-      - DATABASE_URL=mysql://sdo_admin:password@db:3306/sdo
-      - REDIS_URL=redis://redis:6379
+      - DB_HOST=db
+      - DB_NAME=sdo
+      - DB_USER=sdo_admin
+      - DB_PASS=password
+      - DB_PORT=3306
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - APP_ENV=development
+      - APP_DEBUG=true
     depends_on:
       - db
       - redis
@@ -39,6 +45,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: sdo_redis
+    ports:
+      - "6379:6379"
     volumes:
       - redis_data:/data
 

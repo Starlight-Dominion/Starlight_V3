@@ -11,24 +11,34 @@ use sdo\Models\DominionStructure;
 use sdo\Models\Unit;
 use sdo\Models\DominionManpower;
 use sdo\Services\ConfigService;
+use sdo\Repositories\Interfaces\UserRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\UnitRepositoryInterface;
+use sdo\Repositories\Interfaces\StructureRepositoryInterface;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class AuthService
 {
-    public function __construct(private ConfigService $configService) {}
+    public function __construct(
+        private ConfigService $configService,
+        private UserRepositoryInterface $userRepository,
+        private DominionRepositoryInterface $dominionRepository,
+        private UnitRepositoryInterface $unitRepository,
+        private StructureRepositoryInterface $structureRepository
+    ) {}
 
     public function register(string $username, string $email, string $password, string $dominionName, string $raceName): array
     {
         try {
             // 1. Identity Verification
-            if (User::where('username', $username)->exists()) {
+            if ($this->userRepository->findByUsername($username)) {
                 return ['success' => false, 'message' => "Identity handle is already claimed."];
             }
-            if (User::where('email', $email)->exists()) {
+            if ($this->userRepository->findByEmail($email)) {
                 return ['success' => false, 'message' => "Comms frequency (Email) is in use."];
             }
-            if (Dominion::where('name', $dominionName)->exists()) {
+            if ($this->dominionRepository->findByName($dominionName)) {
                 return ['success' => false, 'message' => "Dominion designation is already claimed."];
             }
 
@@ -45,7 +55,7 @@ class AuthService
             Capsule::transaction(function () use ($username, $email, $password, $dominionName, $race, $startingCredits, $startingCitizens) {
                 
                 // Create Commander
-                $user = User::create([
+                $user = $this->userRepository->create([
                     'username' => $username,
                     'email'    => $email,
                     'password' => $password, // Automatically hashed by the User Model mutator
@@ -63,7 +73,7 @@ class AuthService
                 ]);
 
                 // Initialize Structural Blueprints
-                $structures = Structure::all();
+                $structures = $this->structureRepository->all();
                 foreach ($structures as $s) {
                     DominionStructure::create([
                         'dominion_id' => $dominion->id,
@@ -73,7 +83,7 @@ class AuthService
                 }
 
                 // Initialize Manpower Roster
-                $units = Unit::all();
+                $units = $this->unitRepository->all();
                 foreach ($units as $u) {
                     DominionManpower::create([
                         'dominion_id' => $dominion->id,
@@ -91,21 +101,11 @@ class AuthService
 
     public function login(string $username, string $password): ?User
     {
-        $user = User::with('dominion')->where('username', $username)->first();
+        $user = $this->userRepository->findByUsername($username);
         if ($user && password_verify($password, $user->password)) {
-            if (session_status() === PHP_SESSION_ACTIVE) {
-                session_regenerate_id(true);
-            }
             return $user;
         }
         return null;
-    }
-
-    public function logout(): void 
-    { 
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            session_destroy(); 
-        }
     }
 
     public function isLoggedIn(array $session): bool
@@ -125,11 +125,5 @@ class AuthService
         }
 
         return (bool)$user->is_admin;
-    }
-
-    public function getCurrentUser(): ?User
-    {
-        if (!isset($_SESSION['user_id'])) return null;
-        return User::find((int)$_SESSION['user_id']);
     }
 }

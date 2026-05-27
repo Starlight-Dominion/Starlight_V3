@@ -53,6 +53,8 @@ export default defineConfig({
         env: {
           ...process.env,
           APP_ENV: 'production',
+          DB_HOST: '127.0.0.1',
+          REDIS_HOST: '127.0.0.1',
           PHP_CLI_SERVER_WORKERS: '4',
         },
         url: `${baseURL}/login`,

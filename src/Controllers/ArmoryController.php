@@ -8,6 +8,7 @@ use sdo\Services\AdvisorService;
 use sdo\Services\ArmoryService;
 use sdo\Services\AuthService;
 use sdo\Services\ConfigService;
+use sdo\Dto\Armory\ArmoryActionRequest;
 
 class ArmoryController extends BaseController
 {
@@ -40,96 +41,60 @@ class ArmoryController extends BaseController
 
     public function buy(): string
     {
-        header('Content-Type: application/json');
-        
-        $validator = \sdo\Infrastructure\Validator::make($_POST, [
-            'item_id' => 'required|numeric',
-            'quantity' => 'required|numeric'
-        ]);
-
-        if ($validator->fails()) {
-            return json_encode(['success' => false, 'message' => 'Invalid tactical parameters.']);
-        }
-
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
-        $itemId = (int)$_POST['item_id'];
-        $qty = (int)$_POST['quantity'];
-
-        if ($qty <= 0) {
-            return json_encode(['success' => false, 'message' => 'Quantity must be positive.']);
-        }
-
-        try {
-            return json_encode($this->armoryService->buyItem($dominion->id, $itemId, $qty));
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
+            $request = new ArmoryActionRequest($_POST);
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            return $this->armoryService->buyItem($dominion->id, $request->item_id, $request->quantity);
+        });
     }
 
     public function sell(): string
     {
-        header('Content-Type: application/json');
-        
-        $validator = \sdo\Infrastructure\Validator::make($_POST, [
-            'item_id' => 'required|numeric',
-            'quantity' => 'required|numeric'
-        ]);
-
-        if ($validator->fails()) {
-            return json_encode(['success' => false, 'message' => 'Invalid tactical parameters.']);
-        }
-
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
-        $itemId = (int)$_POST['item_id'];
-        $qty = (int)$_POST['quantity'];
-
-        if ($qty <= 0) {
-            return json_encode(['success' => false, 'message' => 'Quantity must be positive.']);
-        }
-
-        try {
-            return json_encode($this->armoryService->sellItem($dominion->id, $itemId, $qty));
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
+            $request = new ArmoryActionRequest($_POST);
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            return $this->armoryService->sellItem($dominion->id, $request->item_id, $request->quantity);
+        });
     }
 
     public function upgrade(): string
     {
-        header('Content-Type: application/json');
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
-
-        try {
-            return json_encode($this->armoryService->upgradeArmory($dominion->id));
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            return $this->armoryService->upgradeArmory($dominion->id);
+        });
     }
 
     public function toggleEquip(): string
     {
-        header('Content-Type: application/json');
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
-        $itemId = (int)($_POST['item_id'] ?? 0);
-
-        try {
-            return json_encode($this->armoryService->toggleEquip($dominion->id, $itemId));
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            $itemId = (int)($_POST['item_id'] ?? 0);
+            return $this->armoryService->toggleEquip($dominion->id, $itemId);
+        });
     }
 
     public function upgradeItem(): string
     {
-        header('Content-Type: application/json');
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
-        $itemId = (int)($_POST['item_id'] ?? 0);
-        $qty = (int)($_POST['quantity'] ?? 1);
-
-        try {
-            return json_encode($this->armoryService->upgradeItem($dominion->id, $itemId, $qty));
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
+            $request = new ArmoryActionRequest($_POST);
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            return $this->armoryService->upgradeItem($dominion->id, $request->item_id, $request->quantity);
+        });
     }
 }
