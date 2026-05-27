@@ -83,57 +83,91 @@
                             <h4 class="text-[10px] font-black text-cyan-500 uppercase tracking-[5px]">Rank Evolution Matrix</h4>
                             <button onclick={() => onAddLevel(data.details.id)} class="text-[9px] font-black text-gray-700 hover:text-white uppercase tracking-widest transition-colors">+ ADD RANK</button>
                         </div>
-                        <div class="bg-black/40 rounded-3xl overflow-hidden shadow-2xl overflow-x-auto border border-white/5">
-                            <table class="w-full text-left border-collapse min-w-[1200px] font-mono">
-                                <thead>
-                                    <tr class="bg-cyan-950/20 text-[9px] font-black text-gray-600 uppercase tracking-widest">
-                                        <th class="px-6 py-5">Rank</th>
-                                        <th class="px-6 py-5">Label</th>
-                                        <th class="px-6 py-5">Cost (CP)</th>
-                                        <th class="px-6 py-5">Integrity (HP)</th>
-                                        <th class="px-6 py-5">ATK / DEF Buff</th>
-                                        <th class="px-6 py-5">Economy Buff (%)</th>
-                                        <th class="px-6 py-5">Citizens / Tick</th>
-                                        <th class="px-6 py-5">Military Reinforcements</th>
-                                        <th class="px-6 py-5">Capacity</th>
-                                        <th class="px-6 py-5">Req. Lvl</th>
-                                        <th class="px-6 py-5"></th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-white/5">
-                                    {#each data.levels as row}
-                                        <tr class="hover:bg-white/[0.02] transition-colors">
-                                            <td class="px-6 py-5 text-red-600 font-black text-sm italic">{row.level}</td>
-                                            <td class="px-6 py-5"><input type="text" bind:value={row.buff_name} class="bg-transparent border-none p-0 text-white text-[11px] font-black uppercase focus:ring-0 w-32" /></td>
-                                            <td class="px-6 py-5"><input type="number" bind:value={row.cost} class="bg-transparent border-none p-0 text-cyan-400 text-xs font-mono focus:ring-0 w-28" /></td>
-                                            <td class="px-6 py-5"><input type="number" bind:value={row.buff_hp} class="bg-transparent border-none p-0 text-gray-400 text-xs font-mono focus:ring-0 w-20" /></td>
-                                            <td class="px-6 py-5">
-                                                <div class="flex gap-2">
-                                                    <input type="number" bind:value={row.buff_offense} class="bg-transparent border border-white/5 rounded px-2 py-1 text-red-500 text-[10px] font-mono focus:ring-0 w-12" title="Attack" />
-                                                    <input type="number" bind:value={row.buff_defense} class="bg-transparent border border-white/5 rounded px-2 py-1 text-cyan-500 text-[10px] font-mono focus:ring-0 w-12" title="Defense" />
+                        
+                        <div class="space-y-4">
+                            {#each data.levels as row}
+                                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col xl:flex-row gap-6 group relative transition-all hover:border-white/10">
+                                    <!-- Rank & Label -->
+                                    <div class="flex items-center gap-6 xl:w-1/4">
+                                        <div class="w-16 h-16 bg-red-950/20 rounded-xl flex items-center justify-center border border-red-500/10 text-red-500 font-black text-2xl font-title italic">
+                                            {row.level}
+                                        </div>
+                                        <div class="space-y-2 flex-grow">
+                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Rank Designation</span>
+                                            <input type="text" bind:value={row.buff_name} class="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white text-xs font-black uppercase focus:border-cyan-500 outline-none transition-all" />
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Stats Grid -->
+                                    <div class="flex-grow grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div class="space-y-1">
+                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-tighter">Cost (CP)</span>
+                                            <input type="number" bind:value={row.cost} class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-cyan-400 text-xs font-mono focus:border-cyan-500 outline-none" />
+                                        </div>
+                                        <div class="space-y-1">
+                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-tighter">Integrity (HP)</span>
+                                            <input type="number" bind:value={row.buff_hp} class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-gray-400 text-xs font-mono focus:border-cyan-500 outline-none" />
+                                        </div>
+                                        <div class="space-y-1">
+                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-tighter">Capacity</span>
+                                            <input type="number" bind:value={row.capacity} class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-blue-400 text-xs font-mono focus:border-cyan-500 outline-none" />
+                                        </div>
+                                        <div class="space-y-1">
+                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-tighter">Req. Player Lvl</span>
+                                            <input type="number" bind:value={row.player_level_req} class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-xs font-mono focus:border-cyan-500 outline-none" />
+                                        </div>
+                                        
+                                        <div class="space-y-1">
+                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-tighter">Economy Buff (%)</span>
+                                            <input type="number" bind:value={row.buff_economy} class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-green-500 text-xs font-mono focus:border-cyan-500 outline-none" />
+                                        </div>
+                                        <div class="space-y-1">
+                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-tighter">Citizens / Tick</span>
+                                            <input type="number" bind:value={row.buff_citizens_per_tick} class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-blue-300 text-xs font-mono focus:border-cyan-500 outline-none" />
+                                        </div>
+                                        <div class="space-y-1 col-span-2">
+                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-tighter">Combat Buffs (ATK / DEF)</span>
+                                            <div class="flex gap-2">
+                                                <input type="number" bind:value={row.buff_offense} class="w-1/2 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-red-500 text-xs font-mono focus:border-cyan-500 outline-none" title="Attack" />
+                                                <input type="number" bind:value={row.buff_defense} class="w-1/2 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-cyan-500 text-xs font-mono focus:border-cyan-500 outline-none" title="Defense" />
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="space-y-1 col-span-2 md:col-span-4">
+                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-tighter">Military Reinforcements (G / S / SP / SE)</span>
+                                            <div class="flex gap-2">
+                                                <div class="relative flex-grow">
+                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[7px] font-black text-gray-700">G</span>
+                                                    <input type="number" bind:value={row.buff_unit_guards} class="w-full bg-black/40 border border-white/10 rounded-lg pl-6 pr-3 py-2 text-white text-xs font-mono focus:border-cyan-500 outline-none" />
                                                 </div>
-                                            </td>
-                                            <td class="px-6 py-5"><input type="number" bind:value={row.buff_economy} class="bg-transparent border-none p-0 text-green-500 text-xs font-mono focus:ring-0 w-16" /></td>
-                                            <td class="px-6 py-5"><input type="number" bind:value={row.buff_citizens_per_tick} class="bg-transparent border-none p-0 text-blue-300 text-xs font-mono focus:ring-0 w-16" /></td>
-                                            <td class="px-6 py-5">
-                                                <div class="flex flex-wrap gap-1 max-w-[200px]">
-                                                    <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">G</span><input type="number" bind:value={row.buff_unit_guards} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
-                                                    <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">S</span><input type="number" bind:value={row.buff_unit_soldiers} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
-                                                    <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">SP</span><input type="number" bind:value={row.buff_unit_spies} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
-                                                    <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">SE</span><input type="number" bind:value={row.buff_unit_sentries} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
+                                                <div class="relative flex-grow">
+                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[7px] font-black text-gray-700">S</span>
+                                                    <input type="number" bind:value={row.buff_unit_soldiers} class="w-full bg-black/40 border border-white/10 rounded-lg pl-6 pr-3 py-2 text-white text-xs font-mono focus:border-cyan-500 outline-none" />
                                                 </div>
-                                            </td>
-                                            <td class="px-6 py-5"><input type="number" bind:value={row.capacity} class="bg-transparent border-none p-0 text-blue-400 text-xs font-mono focus:ring-0 w-20" /></td>
-                                            <td class="px-6 py-5"><input type="number" bind:value={row.player_level_req} class="bg-transparent border-none p-0 text-white text-xs font-mono focus:ring-0 w-12" /></td>
-                                            <td class="px-6 py-5 text-right">
-                                                <button onclick={() => onSaveLevel(data.details.id, row)} class="text-cyan-500 font-black uppercase text-[10px] tracking-[2px] hover:text-white transition-all">
-                                                    {savingId === `level-${data.details.id}-${row.level}` ? '...' : 'SAVE'}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    {/each}
-                                </tbody>
-                            </table>
+                                                <div class="relative flex-grow">
+                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[7px] font-black text-gray-700">SP</span>
+                                                    <input type="number" bind:value={row.buff_unit_spies} class="w-full bg-black/40 border border-white/10 rounded-lg pl-6 pr-3 py-2 text-white text-xs font-mono focus:border-cyan-500 outline-none" />
+                                                </div>
+                                                <div class="relative flex-grow">
+                                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[7px] font-black text-gray-700">SE</span>
+                                                    <input type="number" bind:value={row.buff_unit_sentries} class="w-full bg-black/40 border border-white/10 rounded-lg pl-6 pr-3 py-2 text-white text-xs font-mono focus:border-cyan-500 outline-none" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Actions -->
+                                    <div class="flex items-center xl:w-32 justify-end">
+                                        <button 
+                                            onclick={() => onSaveLevel(data.details.id, row)} 
+                                            class="w-full xl:h-full px-6 py-4 bg-white/5 border border-white/10 text-[9px] font-black uppercase text-gray-400 rounded-xl hover:bg-cyan-600 hover:text-white transition-all xl:opacity-0 group-hover:opacity-100 disabled:opacity-30" 
+                                            disabled={savingId === `level-${data.details.id}-${row.level}`}
+                                        >
+                                            {savingId === `level-${data.details.id}-${row.level}` ? '...' : 'SAVE'}
+                                        </button>
+                                    </div>
+                                </div>
+                            {/each}
                         </div>
                     </div>
                 {/if}
