@@ -85,20 +85,31 @@ class AdminService
         $domColumns = Capsule::schema()->getColumnListing('dominions');
         $userColumns = Capsule::schema()->getColumnListing('users');
         
+        // Helper to normalize values based on model casts
+        $normalize = function($model, $field, $value) {
+            $casts = $model->getCasts();
+            $type = $casts[$field] ?? null;
+
+            if ($type === 'datetime' && (empty($value) || $value === 'null')) {
+                return null;
+            }
+            if ($type === 'boolean') {
+                return ($value === 'true' || $value === '1' || $value === 1 || $value === true);
+            }
+            return $value;
+        };
+
         foreach ($stats as $field => $value) {
             if (in_array($field, $domColumns)) {
-                $dominion->$field = $value;
+                $dominion->$field = $normalize($dominion, $field, $value);
             } elseif (in_array($field, $userColumns) && $dominion->user) {
-                if ($field === 'is_admin' || $field === 'is_bot') {
-                    $value = (bool)$value;
+                if ($field === 'password') {
+                    if (!empty($value)) {
+                        $dominion->user->password = $value; // Mutator handles hashing
+                    }
+                    continue;
                 }
-                if ($field === 'stasis_until' && (empty($value) || $value === 'null')) {
-                    $value = null;
-                }
-                if ($field === 'password' && !empty($value)) {
-                    $value = password_hash($value, PASSWORD_DEFAULT);
-                }
-                $dominion->user->$field = $value;
+                $dominion->user->$field = $normalize($dominion->user, $field, $value);
             }
         }
 
