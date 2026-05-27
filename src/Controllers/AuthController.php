@@ -52,6 +52,11 @@ class AuthController extends BaseController
         $user = $this->authService->login($_POST['username'], $_POST['password']);
 
         if ($user) {
+            // Check for Stasis Sanctions
+            if ($user->stasis_until && $user->stasis_until > new \DateTime()) {
+                $this->jsonResponse(false, ['Commander in stasis until ' . $user->stasis_until->format('Y-m-d H:i:s T')], 403);
+            }
+
             $_SESSION['user_id'] = $user->id;
             $_SESSION['username'] = $user->username;
             $this->jsonResponse(true, []);

@@ -45,7 +45,7 @@ services:
   scheduler:
     build: .
     container_name: sdo_scheduler
-    command: bash -c "while true; do php bin/tick-worker.php; sleep 900; done"
+    command: php bin/tick-worker.php
     volumes:
       - .:/var/www/html
     depends_on:

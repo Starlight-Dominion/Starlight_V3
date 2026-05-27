@@ -1,6 +1,13 @@
 <script>
     import { game } from '../stores/gameStore.svelte.js';
     import { fade, slide } from 'svelte/transition';
+
+    // Administrative Components
+    import SovereignInspector from '../components/admin/SovereignInspector.svelte';
+    import ArmoryInspector from '../components/admin/ArmoryInspector.svelte';
+    import UnitInspector from '../components/admin/UnitInspector.svelte';
+    import StructureInspector from '../components/admin/StructureInspector.svelte';
+    import RaceInspector from '../components/admin/RaceInspector.svelte';
     let { stats = {} } = $props();
 
     let activeModule = $state('overview');
@@ -13,9 +20,34 @@
     let categories = $state([]);
     let battleLogs = $state([]);
     let gameSettings = $state([]);
-    let activeStructureId = $state(null);
     let loading = $state(false);
     let savingId = $state(null);
+    let notifications = $state([]);
+
+    function notify(message, type = 'success') {
+        const id = Math.random();
+        notifications = [...notifications, { id, message, type }];
+        setTimeout(() => {
+            notifications = notifications.filter(n => n.id !== id);
+        }, 5000);
+    }
+
+    async function adminPost(endpoint, formData) {
+        try {
+            const res = await fetch(endpoint, { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                notify("Directives Committed Successfully");
+                return true;
+            } else {
+                notify(data.message || "Directive Failure", "error");
+                return false;
+            }
+        } catch (e) {
+            notify("Neural Link Failure", "error");
+            return false;
+        }
+    }
 
     const modules = [
         { id: 'overview', name: 'Command Overview', icon: '◈' },
@@ -24,8 +56,10 @@
         { id: 'armory', name: 'Armory Forge', icon: '🛠' },
         { id: 'units', name: 'War Room (Units)', icon: '👥' },
         { id: 'structures', name: 'Structural Engineering', icon: '🏛' },
+        { id: 'barracks', name: 'Evolutionary Strains', icon: '🧬' },
         { id: 'players', name: 'Sovereign Oversight', icon: '👁' },
         { id: 'api', name: 'Neural API Gate', icon: '📡' },
+        { id: 'audit', name: 'Audit Trail', icon: '🕵️' },
         { id: 'docs', name: 'Documentation', icon: '📝' },
         { id: 'logs', name: 'Battle Records', icon: '📜' }
     ];
@@ -33,7 +67,101 @@
     let apiKeys = $state([]);
     let apiLogs = $state([]);
     let apiApps = $state([]);
+    let auditLogs = $state([]);
     let apiTab = $state('keys'); // 'keys', 'apps', 'logs'
+
+    // Sovereign Inspector State
+    let showInspector = $state(false);
+    let inspectorData = $state(null);
+    let inspectorTab = $state('identity'); // 'identity', 'stats', 'military', 'structures', 'armory'
+
+    // Armory Inspector State
+    let showArmoryInspector = $state(false);
+    let selectedArmoryItem = $state(null);
+    let armoryInspectorTab = $state('identity'); // 'identity', 'combat', 'reqs'
+
+    // Unit Inspector State
+    let showUnitInspector = $state(false);
+    let selectedUnit = $state(null);
+    let unitInspectorTab = $state('identity'); // 'identity', 'costs', 'yield', 'reqs'
+
+    // Structure Inspector State
+    let showStructureInspector = $state(false);
+    let selectedStructure = $state(null);
+    let structureInspectorTab = $state('blueprint'); // 'blueprint', 'matrix'
+
+    // Race Inspector State
+    let showRaceInspector = $state(false);
+    let selectedRace = $state(null);
+    let raceInspectorTab = $state('identity'); // 'identity', 'bonuses'
+    let races = $state([]);
+
+    async function fetchKingdomProfile(id) {
+        loading = true;
+        try {
+            const res = await fetch(`/admin/kingdom/profile?id=${id}`);
+            const data = await res.json();
+            if (data.success) {
+                inspectorData = data.profile;
+                showInspector = true;
+            } else {
+                notify(data.message || "Uplink Failed", "error");
+            }
+        } catch (e) { notify("Neural Link Failure", "error"); } finally { loading = false; }
+    }
+
+    async function updateInspectorDominion() {
+        savingId = 'inspector-save';
+        const formData = new FormData();
+        formData.append('id', inspectorData.dominion.id);
+        
+        // Dynamic payload for all user/dominion fields
+        Object.entries(inspectorData.dominion.user).forEach(([k, v]) => {
+            if (k !== 'dominion') formData.append(k, v === null ? '' : v);
+        });
+        Object.entries(inspectorData.dominion).forEach(([k, v]) => {
+            if (typeof v !== 'object') formData.append(k, v === null ? '' : v);
+        });
+        
+        formData.append('_csrf', game.csrf);
+        await adminPost('/admin/update-kingdom', formData);
+        savingId = null;
+    }
+
+    async function updateInspectorManpower(unit) {
+        savingId = `unit-${unit.unit_id}`;
+        const formData = new FormData();
+        formData.append('dominion_id', inspectorData.dominion.id);
+        formData.append('unit_id', unit.unit_id);
+        formData.append('total_quantity', unit.total_quantity);
+        formData.append('stabled_quantity', unit.stabled_quantity);
+        formData.append('_csrf', game.csrf);
+        await adminPost('/admin/update-kingdom-manpower', formData);
+        savingId = null;
+    }
+
+    async function updateInspectorStructure(s) {
+        savingId = `structure-${s.structure_id}`;
+        const formData = new FormData();
+        formData.append('dominion_id', inspectorData.dominion.id);
+        formData.append('structure_id', s.structure_id);
+        formData.append('level', s.level);
+        formData.append('_csrf', game.csrf);
+        await adminPost('/admin/update-kingdom-structure', formData);
+        savingId = null;
+    }
+
+    async function updateInspectorArmory(item) {
+        savingId = `item-${item.item_id}`;
+        const formData = new FormData();
+        formData.append('dominion_id', inspectorData.dominion.id);
+        formData.append('item_id', item.item_id);
+        formData.append('quantity', item.quantity);
+        formData.append('is_equipped', item.is_equipped ? 1 : 0);
+        formData.append('_csrf', game.csrf);
+        await adminPost('/admin/update-kingdom-armory', formData);
+        savingId = null;
+    }
 
     async function fetchSettings() {
         loading = true;
@@ -106,14 +234,53 @@
         } catch (e) { console.error("Failed to fetch API data"); } finally { loading = false; }
     }
 
+    async function fetchRaces() {
+        loading = true;
+        try {
+            const res = await fetch('/admin/races');
+            const data = await res.json();
+            races = data.races;
+        } catch (e) { console.error("Neural uplink failure"); } finally { loading = false; }
+    }
+
+    async function updateRace(race) {
+        savingId = race.id;
+        const formData = new FormData();
+        formData.append('id', race.id);
+        formData.append('name', race.name);
+        formData.append('description', race.description);
+        formData.append('bonus_type', race.bonus_type);
+        formData.append('bonus_value', race.bonus_value);
+        formData.append('_csrf', game.csrf);
+        await adminPost('/admin/update-race', formData);
+        savingId = null;
+    }
+
+    function openRaceInspector(race) {
+        selectedRace = race;
+        raceInspectorTab = 'identity';
+        showRaceInspector = true;
+    }
+
+    async function fetchAuditLogs() {
+        loading = true;
+        try {
+            const res = await fetch('/admin/audit-logs');
+            const data = await res.json();
+            auditLogs = data.logs;
+        } catch (e) { console.error("Failed to fetch audit logs"); } finally { loading = false; }
+    }
+
     $effect(() => {
         if (activeModule === 'mechanics' || activeModule === 'doctrine' || activeModule === 'docs') fetchSettings();
         if (activeModule === 'units') fetchUnits();
         if (activeModule === 'structures') fetchStructures();
         if (activeModule === 'armory') fetchArmoryItems();
+        if (activeModule === 'barracks') fetchRaces();
         if (activeModule === 'logs') fetchBattleLogs();
         if (activeModule === 'players') fetchAllKingdoms();
         if (activeModule === 'api') fetchApiData();
+        if (activeModule === 'audit') fetchAuditLogs();
     });
 
     async function handleSearch() {
@@ -132,9 +299,9 @@
         formData.append('key', setting.setting_key);
         formData.append('value', setting.setting_value);
         formData.append('_csrf', game.csrf);
-        try {
-            await fetch('/admin/update-setting', { method: 'POST', body: formData });
-        } catch (e) { console.error("Update failed"); } finally { savingId = null; }
+        
+        await adminPost('/admin/update-setting', formData);
+        savingId = null;
     }
 
     async function saveKingdom(kingdom) {
@@ -148,40 +315,41 @@
         formData.append('turns', kingdom.turns);
         formData.append('citizens', kingdom.citizens);
         formData.append('is_admin', kingdom.user.is_admin ? 1 : 0);
+        formData.append('stasis_until', kingdom.user.stasis_until || '');
         formData.append('_csrf', game.csrf);
-        try {
-            await fetch('/admin/update-kingdom', { method: 'POST', body: formData });
-        } catch (e) { console.error("Update failed"); } finally { savingId = null; }
+        
+        await adminPost('/admin/update-kingdom', formData);
+        savingId = null;
     }
 
     async function saveUnit(unit) {
         savingId = unit.id;
         const formData = new FormData();
         formData.append('id', unit.id);
-        formData.append('name', unit.name);
-        formData.append('slug', unit.slug);
-        formData.append('cost_credits', unit.cost_credits);
-        formData.append('cost_citizens', unit.cost_citizens);
-        formData.append('cost_turns', unit.cost_turns);
-        formData.append('power_offense', unit.power_offense);
-        formData.append('power_defense', unit.power_defense);
-        formData.append('foundation_level_req', unit.foundation_level_req);
+        formData.append('name', unit.name || '');
+        formData.append('slug', unit.slug || '');
+        formData.append('cost_credits', unit.cost_credits || 0);
+        formData.append('cost_citizens', unit.cost_citizens || 0);
+        formData.append('cost_turns', unit.cost_turns || 0);
+        formData.append('power_offense', unit.power_offense || 0);
+        formData.append('power_defense', unit.power_defense || 0);
+        formData.append('power_spy_offense', unit.power_spy_offense || 0);
+        formData.append('power_spy_defense', unit.power_spy_defense || 0);
+        formData.append('production_credits', unit.production_credits || 0);
+        formData.append('foundation_level_req', unit.foundation_level_req || 0);
         formData.append('requirement_slug', unit.requirement_slug || '');
-        formData.append('description', unit.description);
+        formData.append('description', unit.description || '');
         formData.append('_csrf', game.csrf);
-        try {
-            await fetch('/admin/update-unit', { method: 'POST', body: formData });
-        } catch (e) { console.error("Unit update failed"); } finally { savingId = null; }
+        
+        await adminPost('/admin/update-unit', formData);
+        savingId = null;
     }
 
     async function addUnit() {
         const formData = new FormData();
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/add-unit', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchUnits();
-        } catch (e) { console.error("Failed to add unit"); }
+        const res = await adminPost('/admin/add-unit', formData);
+        if (res) fetchUnits();
     }
 
     async function deleteUnit(id) {
@@ -189,33 +357,29 @@
         const formData = new FormData();
         formData.append('id', id);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/delete-unit', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchUnits();
-        } catch (e) { console.error("Failed to delete unit"); }
+        const res = await adminPost('/admin/delete-unit', formData);
+        if (res) fetchUnits();
     }
 
     async function saveStructureDetails(s) {
         savingId = s.id;
         const formData = new FormData();
         formData.append('id', s.id);
-        formData.append('name', s.name);
-        formData.append('upgrade_slots', s.upgrade_slots);
-        formData.append('max_level', s.max_level);
-        formData.append('description', s.description);
+        formData.append('name', s.name || '');
+        formData.append('upgrade_slots', s.upgrade_slots || 1);
+        formData.append('max_level', s.max_level || 10);
+        formData.append('description', s.description || '');
         formData.append('_csrf', game.csrf);
-        try { await fetch('/admin/update-structure', { method: 'POST', body: formData }); } catch (e) { console.error("Structure update failed"); } finally { savingId = null; }
+        
+        await adminPost('/admin/update-structure', formData);
+        savingId = null;
     }
 
     async function addStructure() {
         const formData = new FormData();
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/add-structure', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchStructures();
-        } catch (e) { console.error("Failed to add structure"); }
+        const res = await adminPost('/admin/add-structure', formData);
+        if (res) fetchStructures();
     }
 
     async function deleteStructure(id) {
@@ -223,14 +387,8 @@
         const formData = new FormData();
         formData.append('id', id);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/delete-structure', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) {
-                activeStructureId = null;
-                fetchStructures();
-            }
-        } catch (e) { console.error("Failed to delete structure"); }
+        const res = await adminPost('/admin/delete-structure', formData);
+        if (res) fetchStructures();
     }
 
     // --- API Gate Functions ---
@@ -239,11 +397,8 @@
         formData.append('user_id', userId);
         formData.append('rate_limit', 60);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/api/issue', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchApiData();
-        } catch (e) { console.error("Failed to issue key"); }
+        const res = await adminPost('/admin/api/issue', formData);
+        if (res) fetchApiData();
     }
 
     async function updateApiKey(key) {
@@ -251,11 +406,10 @@
         const formData = new FormData();
         formData.append('id', key.id);
         formData.append('rate_limit', key.rate_limit_per_minute);
-        formData.append('is_active', key.is_active);
+        formData.append('is_active', key.is_active ? 1 : 0);
         formData.append('_csrf', game.csrf);
-        try {
-            await fetch('/admin/api/update', { method: 'POST', body: formData });
-        } catch (e) { console.error("Update failed"); } finally { savingId = null; }
+        await adminPost('/admin/api/update', formData);
+        savingId = null;
     }
 
     async function deleteApiKey(id) {
@@ -263,10 +417,8 @@
         const formData = new FormData();
         formData.append('id', id);
         formData.append('_csrf', game.csrf);
-        try {
-            await fetch('/admin/api/delete', { method: 'POST', body: formData });
-            fetchApiData();
-        } catch (e) { console.error("Revocation failed"); }
+        const res = await adminPost('/admin/api/delete', formData);
+        if (res) fetchApiData();
     }
 
     async function processApp(app, action) {
@@ -277,11 +429,9 @@
         formData.append('rate_limit', app._new_limit || 60);
         formData.append('notes', app.admin_notes || '');
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/api/process-app', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchApiData();
-        } catch (e) { console.error("Processing failed"); } finally { savingId = null; }
+        const res = await adminPost('/admin/api/process-app', formData);
+        if (res) fetchApiData();
+        savingId = null;
     }
 
     async function saveStructureLevel(sId, row) {
@@ -293,7 +443,9 @@
             if (k !== 'structure_id' && k !== 'level') formData.append(k, v || 0);
         });
         formData.append('_csrf', game.csrf);
-        try { await fetch('/admin/update-structure-level', { method: 'POST', body: formData }); } catch (e) { console.error("Level update failed"); } finally { savingId = null; }
+        
+        await adminPost('/admin/update-structure-level', formData);
+        savingId = null;
     }
 
     async function addStructureLevel(sId) {
@@ -304,30 +456,46 @@
         formData.append('structure_id', sId);
         formData.append('level', nextLvl);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/add-structure-level', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchStructures();
-        } catch (e) { console.error("Failed to add level"); }
+        const res = await adminPost('/admin/add-structure-level', formData);
+        if (res) fetchStructures();
     }
 
     async function saveArmoryItem(item) {
         savingId = item.id;
         const formData = new FormData();
         formData.append('id', item.id);
-        formData.append('field', 'all'); // Special flag for multiple fields if needed, but we'll use individual
-        
-        const fields = ['name', 'slug', 'attack_bonus', 'defense_bonus', 'cost', 'requirement_slug', 'armory_level_req'];
-        fields.forEach(f => {
-            const fd = new FormData();
-            fd.append('id', item.id);
-            fd.append('field', f);
-            fd.append('value', item[f]);
-            fd.append('_csrf', game.csrf);
-            fetch('/admin/update-armory-item', { method: 'POST', body: fd });
-        });
-        
-        setTimeout(() => savingId = null, 500);
+        formData.append('name', item.name);
+        formData.append('slug', item.slug);
+        formData.append('category_id', item.category_id);
+        formData.append('unit_type', item.unit_type);
+        formData.append('attack_bonus', item.attack_bonus);
+        formData.append('defense_bonus', item.defense_bonus);
+        formData.append('cost', item.cost);
+        formData.append('requirement_slug', item.requirement_slug || '');
+        formData.append('armory_level_req', item.armory_level_req);
+        formData.append('notes', item.notes || '');
+        formData.append('_csrf', game.csrf);
+
+        await adminPost('/admin/update-armory-item', formData);
+        savingId = null;
+    }
+
+    function openArmoryInspector(item) {
+        selectedArmoryItem = item;
+        armoryInspectorTab = 'identity';
+        showArmoryInspector = true;
+    }
+
+    function openUnitInspector(unit) {
+        selectedUnit = unit;
+        unitInspectorTab = 'identity';
+        showUnitInspector = true;
+    }
+
+    function openStructureInspector(s) {
+        selectedStructure = s;
+        structureInspectorTab = 'blueprint';
+        showStructureInspector = true;
     }
 
     async function addArmoryItem(unitType, categoryId) {
@@ -335,11 +503,8 @@
         formData.append('unit_type', unitType);
         formData.append('category_id', categoryId);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/add-armory-item', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchArmoryItems();
-        } catch (e) { console.error("Failed to add item"); }
+        const res = await adminPost('/admin/add-armory-item', formData);
+        if (res) fetchArmoryItems();
     }
 
     async function deleteArmoryItem(id) {
@@ -347,14 +512,20 @@
         const formData = new FormData();
         formData.append('id', id);
         formData.append('_csrf', game.csrf);
-        try {
-            const res = await fetch('/admin/delete-armory-item', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) fetchArmoryItems();
-        } catch (e) { console.error("Failed to delete item"); }
+        const res = await adminPost('/admin/delete-armory-item', formData);
+        if (res) fetchArmoryItems();
     }
 
-    const currentStructure = $derived(structures.find(s => s.details.id === activeStructureId) || null);
+    async function impersonateCommander(id) {
+        if (!confirm("Caution: You are about to initiate a neural link with this commander's perspective. Proceed?")) return;
+        const formData = new FormData();
+        formData.append('id', id);
+        formData.append('_csrf', game.csrf);
+        const res = await adminPost('/admin/impersonate', formData);
+        if (res) {
+            window.location.href = '/dashboard';
+        }
+    }
 </script>
 
 <div in:fade class="space-y-8 pb-24">
@@ -391,29 +562,74 @@
 
         <main class="lg:col-span-3 space-y-8">
             {#if activeModule === 'overview'}
-                <div in:fade class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl space-y-4">
-                        <h3 class="text-[10px] font-black text-gray-600 uppercase tracking-[4px]">System Status</h3>
-                        <div class="space-y-2 font-mono">
-                            <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Database</span><span class="text-[10px] font-black text-cyan-400 uppercase">Connected</span></div>
-                            <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Heartbeat</span><span class="text-[10px] font-black text-cyan-400 uppercase">Synchronized</span></div>
-                            <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Redis Cache</span><span class="text-[10px] font-black text-cyan-400 uppercase">Active</span></div>
+                <div in:fade class="space-y-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl relative overflow-hidden group">
+                            <span class="text-[8px] font-black text-gray-600 uppercase tracking-[4px] block mb-2">Total Sovereigns</span>
+                            <span class="text-4xl font-title font-black text-white">{stats.total_users || 0}</span>
+                            <div class="absolute -bottom-4 -right-4 text-white/5 text-6xl font-black italic select-none group-hover:text-cyan-500/10 transition-colors">USR</div>
+                        </div>
+                        <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl relative overflow-hidden group">
+                            <span class="text-[8px] font-black text-gray-600 uppercase tracking-[4px] block mb-2">Active Sectors</span>
+                            <span class="text-4xl font-title font-black text-white">{stats.total_kingdoms || 0}</span>
+                            <div class="absolute -bottom-4 -right-4 text-white/5 text-6xl font-black italic select-none group-hover:text-red-500/10 transition-colors">DOM</div>
+                        </div>
+                        <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl relative overflow-hidden group">
+                            <span class="text-[8px] font-black text-gray-600 uppercase tracking-[4px] block mb-2">Total Wealth</span>
+                            <span class="text-4xl font-title font-black text-emerald-500">{((stats.total_credits || 0) / 1000000).toFixed(1)}M</span>
+                            <div class="absolute -bottom-4 -right-4 text-white/5 text-6xl font-black italic select-none group-hover:text-emerald-500/10 transition-colors">CP</div>
+                        </div>
+                        <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl relative overflow-hidden group">
+                            <span class="text-[8px] font-black text-gray-600 uppercase tracking-[4px] block mb-2">Total Population</span>
+                            <span class="text-4xl font-title font-black text-cyan-400">{((stats.total_citizens || 0) / 1000).toFixed(1)}K</span>
+                            <div class="absolute -bottom-4 -right-4 text-white/5 text-6xl font-black italic select-none group-hover:text-cyan-400/10 transition-colors">POP</div>
                         </div>
                     </div>
-                    <div class="bg-red-950/10 border border-red-900/20 p-8 rounded-3xl space-y-4">
-                        <h3 class="text-[10px] font-black text-red-500 uppercase tracking-[4px]">Global Warning</h3>
-                        <p class="text-gray-400 text-[10px] leading-relaxed italic">Changes made within this terminal affect the live production database immediately. Unauthorized modifications constitute sector-level treason.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl space-y-4">
+                            <h3 class="text-[10px] font-black text-gray-600 uppercase tracking-[4px]">System Status</h3>
+                            <div class="space-y-2 font-mono">
+                                <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Database</span><span class="text-[10px] font-black text-cyan-400 uppercase">Connected</span></div>
+                                <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Heartbeat</span><span class="text-[10px] font-black text-cyan-400 uppercase">Synchronized</span></div>
+                                <div class="flex justify-between items-center py-2 border-b border-white/5"><span class="text-[10px] uppercase text-gray-500">Total Manpower</span><span class="text-[10px] font-black text-white uppercase">{((stats.total_manpower || 0) / 1000).toFixed(1)}K Units</span></div>
+                            </div>
+                        </div>
+                        <div class="bg-red-950/10 border border-red-900/20 p-8 rounded-3xl space-y-4">
+                            <h3 class="text-[10px] font-black text-red-500 uppercase tracking-[4px]">Global Warning</h3>
+                            <p class="text-gray-400 text-[10px] leading-relaxed italic">Changes made within this terminal affect the live production database immediately. Unauthorized modifications constitute sector-level treason.</p>
+                        </div>
                     </div>
                 </div>
 
             {:else if activeModule === 'mechanics'}
-                <div in:fade class="space-y-6">
+                <div in:fade class="space-y-8">
+                    <!-- Comms Relay -->
+                    <div class="bg-red-950/20 border border-red-900/30 rounded-3xl overflow-hidden shadow-2xl">
+                        <header class="bg-red-900/20 px-8 py-5 border-b border-red-900/30 flex justify-between items-center">
+                            <h2 class="text-[10px] font-black text-red-500 uppercase tracking-[4px]">Sector Comms Relay (Global Broadcast)</h2>
+                        </header>
+                        <div class="p-8 space-y-4">
+                            {#each gameSettings.filter(s => s.setting_key === 'global_broadcast') as broadcast}
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+                                    <div class="md:col-span-3">
+                                        <span class="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-2">Announcement / Maintenance Signal</span>
+                                        <input type="text" bind:value={broadcast.setting_value} class="w-full bg-black/60 border border-red-900/30 rounded-xl px-6 py-4 text-red-400 font-mono text-sm focus:border-red-500 outline-none" placeholder="Enter global transmission..." />
+                                    </div>
+                                    <div class="md:col-span-1 text-right">
+                                        <button onclick={() => saveSetting(broadcast)} class="w-full md:w-auto px-8 py-4 bg-red-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-[0_0_15px_rgba(153,27,27,0.3)]">Transmit</button>
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
+                    </div>
+
                     <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
                         <header class="bg-cyan-950/20 px-8 py-4 border-b border-cyan-500/10 flex justify-between items-center">
                             <h2 class="text-[10px] font-black text-cyan-500 uppercase tracking-[4px]">Global Balance Parameters</h2>
                         </header>
                         <div class="p-8 space-y-6">
-                            {#each gameSettings.filter(s => !s.setting_key.startsWith('battle_')) as setting}
+                            {#each gameSettings.filter(s => !s.setting_key.startsWith('battle_') && s.setting_key !== 'global_broadcast') as setting}
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center border-b border-white/5 pb-6 last:border-0 last:pb-0">
                                     <div class="md:col-span-1">
                                         <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{setting.setting_key.replace(/_/g, ' ')}</span>
@@ -466,41 +682,21 @@
                         <input type="text" bind:value={searchQuery} placeholder="Search kingdoms..." class="flex-grow bg-black/60 border border-white/10 rounded-xl px-6 py-4 text-white focus:border-red-900 focus:outline-none font-mono" onkeydown={(e) => e.key === 'Enter' && handleSearch()} />
                         <button onclick={handleSearch} class="bg-red-900 text-white px-8 rounded-xl font-title font-black text-[10px] uppercase tracking-widest hover:bg-red-700 transition-all">Search</button>
                     </div>
-                    <div class="space-y-4">
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
                         {#each searchResults as kingdom}
-                            <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl flex flex-col gap-8 relative overflow-hidden">
-                                <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none font-title font-black text-white italic text-4xl uppercase">
-                                    SECTOR {kingdom.id}
-                                </div>
-                                <div class="flex justify-between items-center relative z-10">
-                                    <div class="flex-grow max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div class="space-y-2">
-                                            <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">Dominion Designation</span>
-                                            <input type="text" bind:value={kingdom.name} class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-2xl font-title font-black text-white uppercase tracking-tight focus:border-cyan-500 outline-none" />
-                                        </div>
-                                        <div class="space-y-2">
-                                            <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">Commander Handle</span>
-                                            <input type="text" bind:value={kingdom.user.username} class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-sm font-black text-gray-500 uppercase tracking-[2px] focus:border-cyan-500 outline-none" />
-                                        </div>
-                                        <div class="space-y-2">
-                                            <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">Clearance Level</span>
-                                            <div class="flex items-center gap-3 bg-black/60 border border-white/10 rounded-xl px-4 py-3 h-[48px]">
-                                                <input type="checkbox" bind:checked={kingdom.user.is_admin} class="w-4 h-4 rounded border-gray-800 text-cyan-600 focus:ring-cyan-500 bg-black/40" />
-                                                <span class="text-[10px] font-black uppercase {kingdom.user.is_admin ? 'text-red-500' : 'text-gray-600'}">{kingdom.user.is_admin ? 'Administrator' : 'Standard'}</span>
-                                            </div>
-                                        </div>
+                            <div class="bg-dark-translucent border border-white/5 p-6 rounded-2xl flex justify-between items-center group hover:border-cyan-500/30 transition-all">
+                                <div class="flex items-center gap-6">
+                                    <div class="w-12 h-12 rounded-full bg-cyan-950/30 border border-cyan-500/20 flex items-center justify-center text-cyan-500 font-title font-black">
+                                        {kingdom.id}
                                     </div>
-                                    <button onclick={() => saveKingdom(kingdom)} class="bg-cyan-600 text-white px-8 py-4 rounded-xl font-title font-black text-[10px] uppercase tracking-widest hover:bg-cyan-400 transition-all disabled:opacity-50 shadow-[0_0_10px_rgba(6,182,212,0.3)]" disabled={savingId === kingdom.id}>
-                                        {savingId === kingdom.id ? 'UPLOADING...' : 'SAVE DIRECTIVES'}
-                                    </button>
+                                    <div>
+                                        <h4 class="text-sm font-black text-white uppercase tracking-tight">{kingdom.name}</h4>
+                                        <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">CDR: {kingdom.user.username}</p>
+                                    </div>
                                 </div>
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-white/5 relative z-10">
-                                    {#each ['credits', 'xp', 'turns', 'citizens'] as field}
-                                        <div class="space-y-2">
-                                            <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">{field}</span>
-                                            <input type="number" bind:value={kingdom[field]} class="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-3 text-sm font-mono text-cyan-400 focus:border-cyan-500" />
-                                        </div>
-                                    {/each}
+                                <div class="flex items-center gap-3">
+                                    <button onclick={() => impersonateCommander(kingdom.user.id)} class="px-4 py-2 bg-red-950/20 text-red-500 border border-red-900/30 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100">Impersonate</button>
+                                    <button onclick={() => fetchKingdomProfile(kingdom.id)} class="px-6 py-3 bg-cyan-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all shadow-[0_0_15px_rgba(6,182,212,0.2)]">Sovereign Inspector</button>
                                 </div>
                             </div>
                         {/each}
@@ -519,66 +715,29 @@
                             </div>
 
                             {#each categories.filter(c => c.unit_type_id === uType.id) as cat}
-                                <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-xl">
-                                    <div class="bg-cyan-950/10 px-8 py-5 flex justify-between items-center border-b border-white/5">
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-center px-4">
                                         <h4 class="text-[10px] font-black text-cyan-500 uppercase tracking-[4px]">{cat.name}</h4>
-                                        <button onclick={() => addArmoryItem(uType.slug, cat.id)} class="text-[9px] font-black text-gray-500 uppercase hover:text-cyan-400 transition-colors tracking-widest">+ NEW ASSET</button>
+                                        <button onclick={() => addArmoryItem(uType.slug, cat.id)} class="text-[9px] font-black text-gray-700 uppercase hover:text-cyan-400 transition-colors tracking-widest">+ NEW ASSET</button>
                                     </div>
-                                    <div class="overflow-x-auto">
-                                        <table class="w-full text-left border-collapse font-mono">
-                                            <thead>
-                                                <tr class="bg-black/40 text-[9px] font-black text-gray-600 uppercase tracking-[2px]">
-                                                    <th class="px-8 py-4">Item Identity</th>
-                                                    <th class="px-8 py-4">Stat Modification</th>
-                                                    <th class="px-8 py-4">Requisition (CP)</th>
-                                                    <th class="px-8 py-4">Prerequisites</th>
-                                                    <th class="px-8 py-4"></th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="divide-y divide-white/5">
-                                                {#each armoryItems.filter(i => i.category_id === cat.id) as item}
-                                                    <tr class="group hover:bg-white/[0.02] transition-colors">
-                                                        <td class="px-8 py-6">
-                                                            <input type="text" bind:value={item.name} class="bg-transparent border-none p-0 text-white text-sm font-black uppercase w-full focus:ring-0" />
-                                                            <input type="text" bind:value={item.slug} class="bg-transparent border-none p-0 text-[9px] text-gray-700 uppercase font-mono w-full focus:ring-0 mt-1" />
-                                                        </td>
-                                                        <td class="px-8 py-6">
-                                                            <div class="flex gap-4">
-                                                                <div class="flex flex-col gap-1">
-                                                                    <span class="text-[7px] text-red-900 uppercase font-black">ATK</span>
-                                                                    <input type="number" bind:value={item.attack_bonus} class="bg-black/60 border border-white/10 px-3 py-1.5 text-red-500 text-xs font-mono w-20 rounded focus:border-red-900" />
-                                                                </div>
-                                                                <div class="flex flex-col gap-1">
-                                                                    <span class="text-[7px] text-cyan-900 uppercase font-black">DEF</span>
-                                                                    <input type="number" bind:value={item.defense_bonus} class="bg-black/60 border border-white/10 px-3 py-1.5 text-cyan-500 text-xs font-mono w-20 rounded focus:border-cyan-900" />
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="px-8 py-6">
-                                                            <input type="number" bind:value={item.cost} class="bg-black/40 border border-white/5 px-4 py-2 text-cyan-400 text-sm font-black w-32 rounded focus:border-cyan-500" />
-                                                        </td>
-                                                        <td class="px-8 py-6">
-                                                            <div class="flex flex-col gap-2">
-                                                                <select bind:value={item.requirement_slug} class="bg-black/60 border border-white/10 text-[10px] text-gray-500 rounded px-3 py-2 focus:outline-none uppercase font-black tracking-tighter">
-                                                                    <option value="">NO PREREQ</option>
-                                                                    {#each armoryItems.filter(i => i.id !== item.id && i.unit_type === item.unit_type) as p}
-                                                                        <option value={p.slug}>{p.name.toUpperCase()}</option>
-                                                                    {/each}
-                                                                </select>
-                                                                <div class="flex items-center gap-2">
-                                                                    <span class="text-[7px] text-gray-600 uppercase font-black">RANK REQ:</span>
-                                                                    <input type="number" bind:value={item.armory_level_req} class="bg-black/60 border border-white/10 px-2 py-1 text-white text-[10px] font-mono w-12 rounded" />
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                        <td class="px-8 py-6 text-right space-x-4">
-                                                            <button onclick={() => saveArmoryItem(item)} class="text-cyan-500 font-black uppercase text-[10px] tracking-widest opacity-30 group-hover:opacity-100 hover:text-cyan-400 transition-all">{savingId === item.id ? '...' : 'COMMIT'}</button>
-                                                            <button onclick={() => deleteArmoryItem(item.id)} class="text-red-900 hover:text-red-500 opacity-20 group-hover:opacity-100 transition-all text-xs">✕</button>
-                                                        </td>
-                                                    </tr>
-                                                {/each}
-                                            </tbody>
-                                        </table>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                        {#each armoryItems.filter(i => i.category_id === cat.id) as item}
+                                            <div class="bg-dark-translucent border border-white/5 p-6 rounded-2xl flex justify-between items-center group hover:border-amber-500/30 transition-all">
+                                                <div class="flex items-center gap-6">
+                                                    <div class="w-12 h-12 bg-amber-950/20 rounded-lg flex items-center justify-center border border-amber-500/10 text-amber-500 font-black">
+                                                        {item.slug.substring(0,2).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <h4 class="text-xs font-black text-white uppercase tracking-tight">{item.name}</h4>
+                                                        <p class="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{item.cost.toLocaleString()} CP</p>
+                                                    </div>
+                                                </div>
+                                                <div class="flex items-center gap-3">
+                                                    <button onclick={() => deleteArmoryItem(item.id)} class="w-10 h-10 rounded-lg bg-red-950/20 text-red-500 border border-red-900/30 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all">✕</button>
+                                                    <button onclick={() => openArmoryInspector(item)} class="px-5 py-3 bg-amber-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-400 transition-all shadow-[0_0_15px_rgba(217,119,6,0.2)]">Calibrate Asset</button>
+                                                </div>
+                                            </div>
+                                        {/each}
                                     </div>
                                 </div>
                             {/each}
@@ -593,72 +752,36 @@
                         <button onclick={addUnit} class="bg-white text-black font-title font-black text-[10px] px-8 py-3 rounded-xl hover:bg-cyan-500 transition-all uppercase tracking-widest">Enlist New Class</button>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                         {#each units as unit}
-                            <div class="bg-dark-translucent border border-white/5 p-10 rounded-3xl space-y-10 relative group hover:border-red-900/20 transition-all">
-                                <div class="flex justify-between items-start">
-                                    <div class="flex items-center gap-8">
-                                        <div class="w-20 h-20 bg-red-950/20 border border-red-900/30 rounded-2xl flex items-center justify-center text-red-600 text-3xl font-black shadow-[inset_0_0_20px_rgba(153,27,27,0.1)]">
+                            <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl flex flex-col justify-between group hover:border-red-900/30 transition-all relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none font-title font-black text-white italic text-4xl uppercase">
+                                    {unit.slug.substring(0,3)}
+                                </div>
+                                <div class="space-y-6 relative z-10">
+                                    <div class="flex items-center gap-6">
+                                        <div class="w-16 h-16 bg-red-950/20 border border-red-900/30 rounded-2xl flex items-center justify-center text-red-600 text-2xl font-black">
                                             {unit.slug.charAt(0).toUpperCase()}
                                         </div>
-                                        <div class="flex-grow">
-                                            <input type="text" bind:value={unit.name} class="bg-transparent border-none text-3xl font-title font-black text-white uppercase focus:ring-0 p-0 w-full tracking-wider" />
-                                            <div class="flex items-center gap-6 mt-2">
-                                                <p class="text-[10px] font-black text-gray-700 uppercase tracking-[3px]">Protocol ID: {unit.slug}</p>
-                                                <input type="text" bind:value={unit.slug} class="bg-black/60 border border-white/10 rounded px-3 py-1 text-[10px] font-mono text-gray-500 w-48 focus:border-red-900" />
-                                            </div>
+                                        <div>
+                                            <h4 class="text-xl font-title font-black text-white uppercase tracking-tight leading-none">{unit.name}</h4>
+                                            <p class="text-[9px] font-bold text-gray-600 uppercase tracking-[3px] mt-2 italic">{unit.slug}</p>
                                         </div>
                                     </div>
-                                    <div class="flex gap-3">
-                                        <button onclick={() => saveUnit(unit)} class="bg-red-900/20 border border-red-900/50 text-red-500 px-8 py-4 rounded-xl font-title font-black text-[10px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all disabled:opacity-50" disabled={savingId === unit.id}>
-                                            {savingId === unit.id ? 'COMMITTING...' : 'UPDATE DOCTRINE'}
-                                        </button>
-                                        <button onclick={() => deleteUnit(unit.id)} class="text-red-900 hover:text-red-500 p-4 transition-colors">✕</button>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-1 lg:grid-cols-3 gap-16 pt-10 border-t border-white/5 font-mono">
-                                    <div class="space-y-6">
-                                        <h4 class="text-[10px] font-black text-gray-600 uppercase tracking-[5px]">Requisition (Cost)</h4>
-                                        <div class="grid grid-cols-3 gap-6">
-                                            {#each ['cost_credits', 'cost_citizens', 'cost_turns'] as field}
-                                                <div class="space-y-2">
-                                                    <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">{field.split('_')[1]}</span>
-                                                    <input type="number" bind:value={unit[field]} class="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-3 text-xs font-mono text-cyan-400" />
-                                                </div>
-                                            {/each}
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="bg-black/40 border border-white/5 p-4 rounded-xl">
+                                            <span class="block text-[7px] font-black text-red-900 uppercase tracking-widest mb-1">ATK Power</span>
+                                            <span class="text-xl font-title font-black text-red-500">{unit.power_offense}</span>
                                         </div>
-                                    </div>
-
-                                    <div class="space-y-6">
-                                        <h4 class="text-[10px] font-black text-gray-600 uppercase tracking-[5px]">Tactical Yield</h4>
-                                        <div class="grid grid-cols-3 gap-6">
-                                            <div class="space-y-2">
-                                                <span class="block text-[8px] font-black text-red-900 uppercase tracking-widest text-shadow-glow-red">Offense</span>
-                                                <input type="number" bind:value={unit.power_offense} class="w-full bg-black/60 border border-red-900/20 rounded-lg px-4 py-3 text-xs font-mono text-red-500" />
-                                            </div>
-                                            <div class="space-y-2">
-                                                <span class="block text-[8px] font-black text-cyan-900 uppercase tracking-widest text-shadow-glow">Defense</span>
-                                                <input type="number" bind:value={unit.power_defense} class="w-full bg-black/60 border border-cyan-900/20 rounded-lg px-4 py-3 text-xs font-mono text-cyan-400" />
-                                            </div>
-                                            <div class="space-y-2">
-                                                <span class="block text-[8px] font-black text-emerald-900 uppercase tracking-widest">Prod (CP)</span>
-                                                <input type="number" bind:value={unit.production_credits} class="w-full bg-black/60 border border-emerald-900/20 rounded-lg px-4 py-3 text-xs font-mono text-emerald-500" />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="space-y-6">
-                                        <h4 class="text-[10px] font-black text-gray-600 uppercase tracking-[5px]">Tech Prereq</h4>
-                                        <div class="space-y-2">
-                                             <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Foundation Rank</span>
-                                             <input type="number" bind:value={unit.foundation_level_req} class="w-full bg-black/60 border border-white/10 rounded-lg px-4 py-3 text-xs font-mono text-white" />
+                                        <div class="bg-black/40 border border-white/5 p-4 rounded-xl">
+                                            <span class="block text-[7px] font-black text-cyan-900 uppercase tracking-widest mb-1">DEF Power</span>
+                                            <span class="text-xl font-title font-black text-cyan-400">{unit.power_defense}</span>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="space-y-3">
-                                    <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">Division Dossier (Description)</span>
-                                    <textarea bind:value={unit.description} class="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-[11px] text-gray-400 focus:border-red-900 focus:outline-none min-h-[100px] leading-relaxed italic"></textarea>
+                                <div class="flex items-center gap-3 mt-8 relative z-10">
+                                    <button onclick={() => deleteUnit(unit.id)} class="w-12 h-12 rounded-xl bg-red-950/20 text-red-500 border border-red-900/30 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all">✕</button>
+                                    <button onclick={() => openUnitInspector(unit)} class="flex-grow py-4 bg-red-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-[0_0_20px_rgba(127,29,29,0.2)]">Tactical Calibration</button>
                                 </div>
                             </div>
                         {/each}
@@ -666,111 +789,75 @@
                 </div>
 
             {:else if activeModule === 'structures'}
-                <div in:fade class="space-y-8">
+                <div in:fade class="space-y-12">
                     <div class="flex justify-between items-center">
-                        <div class="flex flex-wrap gap-2">
-                            {#each structures as s}
-                                <button onclick={() => activeStructureId = s.details.id} class="px-6 py-3 rounded-xl font-title font-black text-[10px] uppercase tracking-widest border transition-all {activeStructureId === s.details.id ? 'bg-red-900 border-red-900 text-white shadow-[0_0_10px_#7f1d1d]' : 'bg-black/60 border-white/5 text-gray-600 hover:text-gray-300'}">{s.details.name}</button>
-                            {/each}
-                        </div>
-                        <button onclick={addStructure} class="text-cyan-500 font-title font-black text-[10px] uppercase tracking-widest hover:text-white transition-colors">+ NEW ARCHTYPE</button>
+                        <h3 class="text-3xl font-title font-black text-white uppercase tracking-tighter">Structural Engineering</h3>
+                        <button onclick={addStructure} class="bg-white text-black font-title font-black text-[10px] px-8 py-3 rounded-xl hover:bg-cyan-500 transition-all uppercase tracking-widest">Commission New Blueprint</button>
                     </div>
 
-                    {#if currentStructure}
-                        <div in:slide class="bg-dark-translucent border border-white/5 p-10 rounded-3xl space-y-10 relative group">
-                            <div class="flex justify-between items-start">
-                                <h3 class="text-xs font-black text-gray-600 uppercase tracking-[5px]">Structural Configuration</h3>
-                                <div class="flex gap-4">
-                                    <button onclick={() => saveStructureDetails(currentStructure.details)} class="bg-cyan-900/20 border border-cyan-500/50 text-cyan-400 px-8 py-3 rounded-xl font-title font-black text-[10px] uppercase tracking-widest hover:bg-cyan-600 hover:text-white transition-all disabled:opacity-50" disabled={savingId === currentStructure.details.id}>
-                                        {savingId === currentStructure.details.id ? 'UPLOADING...' : 'COMMIT ARCHITECTURE'}
-                                    </button>
-                                    <button onclick={() => deleteStructure(currentStructure.details.id)} class="text-red-900 hover:text-red-500 text-[10px] font-black uppercase tracking-widest border border-red-950 px-4 py-1 rounded">Demolish ✕</button>
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {#each structures as s}
+                            <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl flex flex-col justify-between group hover:border-cyan-500/30 transition-all relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none font-title font-black text-white italic text-4xl uppercase">
+                                    {s.details.slug.substring(0,3)}
                                 </div>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 font-mono">
-                                <div class="space-y-6">
-                                    <div class="space-y-2">
-                                        <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Building Designation</span>
-                                        <input type="text" bind:value={currentStructure.details.name} class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-4 text-sm font-black text-white uppercase tracking-wider" />
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-6">
-                                        <div class="space-y-2">
-                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Upgrade Slots</span>
-                                            <input type="number" bind:value={currentStructure.details.upgrade_slots} class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-cyan-400" />
+                                <div class="space-y-6 relative z-10">
+                                    <div class="flex items-center gap-6">
+                                        <div class="w-16 h-16 bg-cyan-950/20 border border-cyan-500/30 rounded-2xl flex items-center justify-center text-cyan-600 text-2xl font-black">
+                                            {s.details.slug.charAt(0).toUpperCase()}
                                         </div>
-                                        <div class="space-y-2">
-                                            <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Max Tier</span>
-                                            <input type="number" bind:value={currentStructure.details.max_level} class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-cyan-400" />
+                                        <div>
+                                            <h4 class="text-xl font-title font-black text-white uppercase tracking-tight leading-none">{s.details.name}</h4>
+                                            <p class="text-[9px] font-bold text-gray-600 uppercase tracking-[3px] mt-2 italic">MAX RANK: {s.details.max_level}</p>
                                         </div>
                                     </div>
+                                    <div class="bg-black/40 border border-white/5 p-4 rounded-xl">
+                                        <span class="block text-[7px] font-black text-cyan-900 uppercase tracking-widest mb-1">Upgrade Matrix Status</span>
+                                        <span class="text-sm font-mono text-cyan-400 font-black uppercase">{s.levels.length} Ranks Configured</span>
+                                    </div>
                                 </div>
-                                <div class="space-y-3">
-                                    <span class="block text-[8px] font-black text-gray-700 uppercase tracking-widest">Operational Directives (Description)</span>
-                                    <textarea bind:value={currentStructure.details.description} class="w-full bg-black/60 border border-white/10 rounded-2xl p-6 text-[11px] text-gray-400 focus:border-red-900 focus:outline-none min-h-[120px] leading-relaxed"></textarea>
+                                <div class="flex items-center gap-3 mt-8 relative z-10">
+                                    <button onclick={() => deleteStructure(s.details.id)} class="w-12 h-12 rounded-xl bg-red-950/20 text-red-500 border border-red-900/30 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all">✕</button>
+                                    <button onclick={() => openStructureInspector(s)} class="flex-grow py-4 bg-cyan-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all shadow-[0_0_20px_rgba(6,182,212,0.2)]">Structural Calibration</button>
                                 </div>
                             </div>
+                        {/each}
+                    </div>
+                </div>
 
-                            <div class="space-y-6 pt-10 border-t border-white/5">
-                                <div class="flex justify-between items-center px-2">
-                                    <h4 class="text-[10px] font-black text-cyan-500 uppercase tracking-[5px]">Rank Evolution Matrix</h4>
-                                    <button onclick={() => addStructureLevel(currentStructure.details.id)} class="text-[9px] font-black text-gray-700 hover:text-white uppercase tracking-widest transition-colors">+ ADD RANK</button>
+            {:else if activeModule === 'barracks'}
+                <div in:fade class="space-y-12">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-3xl font-title font-black text-white uppercase tracking-tighter">Evolutionary Strains</h3>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                        {#each races as race}
+                            <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl flex flex-col justify-between group hover:border-purple-500/30 transition-all relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none font-title font-black text-white italic text-4xl uppercase">
+                                    {race.name.substring(0,3)}
                                 </div>
-                                <div class="bg-black/40 rounded-3xl overflow-hidden shadow-2xl overflow-x-auto border border-white/5">
-                                    <table class="w-full text-left border-collapse min-w-[1200px] font-mono">
-                                        <thead>
-                                            <tr class="bg-cyan-950/20 text-[9px] font-black text-gray-600 uppercase tracking-widest">
-                                                <th class="px-6 py-5">Rank</th>
-                                                <th class="px-6 py-5">Label</th>
-                                                <th class="px-6 py-5">Cost (CP)</th>
-                                                <th class="px-6 py-5">Integrity (HP)</th>
-                                                <th class="px-6 py-5">ATK / DEF Buff</th>
-                                                <th class="px-6 py-5">Economy Buff (%)</th>
-                                                <th class="px-6 py-5">Citizens / Tick</th>
-                                                <th class="px-6 py-5">Military Reinforcements</th>
-                                                <th class="px-6 py-5">Capacity</th>
-                                                <th class="px-6 py-5">Req. Lvl</th>
-                                                <th class="px-6 py-5"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-white/5">
-                                            {#each currentStructure.levels as row}
-                                                <tr class="hover:bg-white/[0.02] transition-colors">
-                                                    <td class="px-6 py-5 text-red-600 font-black text-sm italic">{row.level}</td>
-                                                    <td class="px-6 py-5"><input type="text" bind:value={row.buff_name} class="bg-transparent border-none p-0 text-white text-[11px] font-black uppercase focus:ring-0 w-32" /></td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.cost} class="bg-transparent border-none p-0 text-cyan-400 text-xs font-mono focus:ring-0 w-28" /></td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.buff_hp} class="bg-transparent border-none p-0 text-gray-400 text-xs font-mono focus:ring-0 w-20" /></td>
-                                                    <td class="px-6 py-5">
-                                                        <div class="flex gap-2">
-                                                            <input type="number" bind:value={row.buff_offense} class="bg-transparent border border-white/5 rounded px-2 py-1 text-red-500 text-[10px] font-mono focus:ring-0 w-12" title="Attack" />
-                                                            <input type="number" bind:value={row.buff_defense} class="bg-transparent border border-white/5 rounded px-2 py-1 text-cyan-500 text-[10px] font-mono focus:ring-0 w-12" title="Defense" />
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.buff_economy} class="bg-transparent border-none p-0 text-green-500 text-xs font-mono focus:ring-0 w-16" /></td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.buff_citizens_per_tick} class="bg-transparent border-none p-0 text-blue-300 text-xs font-mono focus:ring-0 w-16" /></td>
-                                                    <td class="px-6 py-5">
-                                                        <div class="flex flex-wrap gap-1 max-w-[200px]">
-                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">G</span><input type="number" bind:value={row.buff_unit_guards} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
-                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">S</span><input type="number" bind:value={row.buff_unit_soldiers} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
-                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">SP</span><input type="number" bind:value={row.buff_unit_spies} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
-                                                            <div class="flex items-center gap-1 bg-black/40 px-1 rounded"><span class="text-[7px] text-gray-700 font-black">SE</span><input type="number" bind:value={row.buff_unit_sentries} class="bg-transparent border-none p-0 text-white text-[9px] font-mono w-8" /></div>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.capacity} class="bg-transparent border-none p-0 text-blue-400 text-xs font-mono focus:ring-0 w-20" /></td>
-                                                    <td class="px-6 py-5"><input type="number" bind:value={row.player_level_req} class="bg-transparent border-none p-0 text-white text-xs font-mono focus:ring-0 w-12" /></td>
-                                                    <td class="px-6 py-5 text-right">
-                                                        <button onclick={() => saveStructureLevel(currentStructure.details.id, row)} class="text-cyan-500 font-black uppercase text-[10px] tracking-[2px] hover:text-white transition-all">
-                                                            {savingId === `level-${currentStructure.details.id}-${row.level}` ? '...' : 'SAVE'}
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            {/each}
-                                        </tbody>
-                                    </table>
+                                <div class="space-y-6 relative z-10">
+                                    <div class="flex items-center gap-6">
+                                        <div class="w-16 h-16 bg-purple-950/20 border border-purple-900/30 rounded-2xl flex items-center justify-center text-purple-600 text-2xl font-black">
+                                            {race.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <h4 class="text-xl font-title font-black text-white uppercase tracking-tight leading-none">{race.name}</h4>
+                                            <p class="text-[9px] font-bold text-gray-600 uppercase tracking-[3px] mt-2 italic">{race.bonus_type}</p>
+                                        </div>
+                                    </div>
+                                    <div class="bg-black/40 border border-white/5 p-4 rounded-xl">
+                                        <span class="block text-[7px] font-black text-purple-900 uppercase tracking-widest mb-1">Neural Multiplier</span>
+                                        <span class="text-sm font-mono text-purple-400 font-black uppercase">{race.bonus_value}x</span>
+                                    </div>
+                                </div>
+                                <div class="mt-8 relative z-10">
+                                    <button onclick={() => openRaceInspector(race)} class="w-full py-4 bg-purple-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-700 transition-all shadow-[0_0_20px_rgba(147,51,234,0.2)]">Genetic Calibration</button>
                                 </div>
                             </div>
-                        </div>
-                    {/if}
+                        {/each}
+                    </div>
                 </div>
 
             {:else if activeModule === 'api'}
@@ -895,6 +982,41 @@
                     {/if}
                 </div>
 
+            {:else if activeModule === 'audit'}
+                <div in:fade class="space-y-6">
+                    <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse font-mono">
+                                <thead>
+                                    <tr class="bg-cyan-950/20 border-b border-white/5 text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                                        <th class="px-8 py-5 text-red-500">ID</th>
+                                        <th class="px-8 py-5">ADMIN ID</th>
+                                        <th class="px-8 py-5">OPERATION</th>
+                                        <th class="px-8 py-5">LOG DIRECTIVE (DESCRIPTION)</th>
+                                        <th class="px-8 py-5 text-right">TIMESTAMP</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-white/5">
+                                    {#each auditLogs as log}
+                                        <tr class="group hover:bg-white/[0.02] transition-colors border-b border-white/5 last:border-0">
+                                            <td class="px-8 py-6 text-red-900 text-xs font-black">#{log.id}</td>
+                                            <td class="px-8 py-6 text-gray-400 text-xs font-black">CMD_{log.dominion_id}</td>
+                                            <td class="px-8 py-6 text-white text-xs font-black uppercase tracking-tighter">{log.action.replace('ADMIN_', '')}</td>
+                                            <td class="px-8 py-6">
+                                                <span class="text-xs text-cyan-400 font-black">{log.description}</span>
+                                                {#if log.metadata}
+                                                    <span class="block text-[8px] text-gray-700 mt-1 uppercase truncate max-w-md">{JSON.stringify(log.metadata)}</span>
+                                                {/if}
+                                            </td>
+                                            <td class="px-8 py-6 text-right text-[10px] text-gray-600 font-black uppercase tracking-widest">{log.created_at}</td>
+                                        </tr>
+                                    {/each}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
             {:else if activeModule === 'docs'}
                 <div in:fade class="space-y-6">
                     <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
@@ -957,5 +1079,63 @@
                 </div>
             {/if}
         </main>
+    </div>
+
+    <!-- Modular Administrative Inspectors -->
+    <SovereignInspector 
+        bind:show={showInspector} 
+        bind:data={inspectorData} 
+        bind:tab={inspectorTab} 
+        bind:savingId 
+        onUpdateDominion={updateInspectorDominion}
+        onUpdateManpower={updateInspectorManpower}
+        onUpdateStructure={updateInspectorStructure}
+        onUpdateArmory={updateInspectorArmory}
+    />
+
+    <ArmoryInspector
+        bind:show={showArmoryInspector}
+        bind:data={selectedArmoryItem}
+        bind:tab={armoryInspectorTab}
+        bind:savingId
+        {unitTypes}
+        {categories}
+        allArmoryItems={armoryItems}
+        onSave={saveArmoryItem}
+    />
+
+    <UnitInspector
+        bind:show={showUnitInspector}
+        bind:data={selectedUnit}
+        bind:tab={unitInspectorTab}
+        bind:savingId
+        allUnits={units}
+        onSave={saveUnit}
+    />
+
+    <StructureInspector
+        bind:show={showStructureInspector}
+        bind:data={selectedStructure}
+        bind:tab={structureInspectorTab}
+        bind:savingId
+        onSaveDetails={saveStructureDetails}
+        onSaveLevel={saveStructureLevel}
+        onAddLevel={addStructureLevel}
+    />
+
+    <RaceInspector
+        bind:show={showRaceInspector}
+        bind:data={selectedRace}
+        bind:tab={raceInspectorTab}
+        bind:savingId
+        onSave={updateRace}
+    />
+
+    <div class="fixed bottom-8 right-8 z-[200] space-y-4 pointer-events-none">
+        {#each notifications as n (n.id)}
+            <div in:slide out:fade class="pointer-events-auto px-8 py-4 rounded-xl border font-title font-black text-[10px] uppercase tracking-widest shadow-2xl backdrop-blur-md {n.type === 'success' ? 'bg-cyan-900/40 border-cyan-500 text-cyan-400' : 'bg-red-900/40 border-red-500 text-red-400'}">
+                {n.message}
+            </div>
+        {/each}
     </div>
 </div>
