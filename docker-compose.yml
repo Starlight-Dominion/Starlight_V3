@@ -42,10 +42,21 @@ services:
     volumes:
       - redis_data:/data
 
-  scheduler:
+  tick_dispatcher:
     build: .
-    container_name: sdo_scheduler
-    command: php bin/tick-worker.php
+    container_name: sdo_tick_dispatcher
+    command: php bin/tick-dispatcher.php
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - db
+      - redis
+
+  tick_processor:
+    build: .
+    command: php bin/tick-processor.php
+    deploy:
+      replicas: 2
     volumes:
       - .:/var/www/html
     depends_on:

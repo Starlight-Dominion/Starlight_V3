@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace sdo\Controllers;
@@ -10,6 +11,9 @@ use sdo\Services\AuthService;
 use sdo\Services\ConfigService;
 use sdo\Services\ApiService;
 use sdo\Services\DiscordLinkService;
+use sdo\Dto\Settings\UpdateIdentityRequest;
+use sdo\Dto\Settings\UpdateCipherRequest;
+use sdo\Exceptions\ValidationException;
 
 class SettingsController extends BaseController
 {
@@ -90,6 +94,12 @@ class SettingsController extends BaseController
         try {
             $res = $action();
             return json_encode($res);
+        } catch (ValidationException $e) {
+            return json_encode([
+                'success' => false, 
+                'message' => 'Validation error.',
+                'errors' => $e->getErrors()
+            ]);
         } catch (\Exception $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
@@ -97,21 +107,24 @@ class SettingsController extends BaseController
 
     public function updateIdentity(): string
     {
-        return $this->jsonResponse(fn() => $this->settingsService->updateIdentity(
-            (int)$_SESSION['user_id'],
-            (string)($_POST['username'] ?? ''),
-            (string)($_POST['email'] ?? '')
-        ));
+        return $this->jsonResponse(function() {
+            $request = new UpdateIdentityRequest($_POST);
+            return $this->settingsService->updateIdentity(
+                (int)$_SESSION['user_id'],
+                $request
+            );
+        });
     }
 
     public function updateCipher(): string
     {
-        return $this->jsonResponse(fn() => $this->settingsService->updateCipher(
-            (int)$_SESSION['user_id'],
-            (string)($_POST['current_password'] ?? ''),
-            (string)($_POST['new_password'] ?? ''),
-            (string)($_POST['confirm_password'] ?? '')
-        ));
+        return $this->jsonResponse(function() {
+            $request = new UpdateCipherRequest($_POST);
+            return $this->settingsService->updateCipher(
+                (int)$_SESSION['user_id'],
+                $request
+            );
+        });
     }
 
     /**
