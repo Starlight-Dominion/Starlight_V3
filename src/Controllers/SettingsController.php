@@ -13,7 +13,6 @@ use sdo\Services\ApiService;
 use sdo\Services\DiscordLinkService;
 use sdo\Dto\Settings\UpdateIdentityRequest;
 use sdo\Dto\Settings\UpdateCipherRequest;
-use sdo\Exceptions\ValidationException;
 
 class SettingsController extends BaseController
 {
@@ -86,23 +85,6 @@ class SettingsController extends BaseController
                 (string)($_POST['justification'] ?? '')
             );
         });
-    }
-
-    private function jsonResponse(callable $action): string
-    {
-        header('Content-Type: application/json');
-        try {
-            $res = $action();
-            return json_encode($res);
-        } catch (ValidationException $e) {
-            return json_encode([
-                'success' => false, 
-                'message' => 'Validation error.',
-                'errors' => $e->getErrors()
-            ]);
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
     }
 
     public function updateIdentity(): string

@@ -7,8 +7,11 @@ namespace sdo\Controllers;
 use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
 use sdo\Services\AuthService;
-use sdo\Services\AdminService;
+use sdo\Services\AdminPlayerService;
+use sdo\Services\AdminGameDataService;
+use sdo\Services\AdminSystemService;
 use sdo\Services\ConfigService;
+use sdo\Services\ApiService;
 
 class AdminController extends BaseController
 {
@@ -17,8 +20,10 @@ class AdminController extends BaseController
         AdvisorService $advisorService,
         ConfigService $configService,
         AuthService $authService,
-        private AdminService $adminService,
-        private \sdo\Services\ApiService $apiService
+        private AdminPlayerService $playerService,
+        private AdminGameDataService $gameDataService,
+        private AdminSystemService $systemService,
+        private ApiService $apiService
     ) {
         parent::__construct($gameService, $advisorService, $configService, $authService);
     }
@@ -42,7 +47,7 @@ class AdminController extends BaseController
 
         return $this->render('admin/index', [
             'title' => 'Command Center',
-            'stats' => $this->adminService->getSystemStats()
+            'stats' => $this->systemService->getSystemStats()
         ]);
     }
 
@@ -52,7 +57,7 @@ class AdminController extends BaseController
         $this->checkAdmin();
 
         $query = (string)($_GET['q'] ?? '');
-        $results = $this->adminService->searchDominions($query);
+        $results = $this->playerService->searchDominions($query);
 
         return json_encode(['success' => true, 'results' => $results]);
     }
@@ -62,7 +67,7 @@ class AdminController extends BaseController
         header('Content-Type: application/json');
         $this->checkAdmin();
 
-        return json_encode(['success' => true, 'results' => $this->adminService->getAllDominions()]);
+        return json_encode(['success' => true, 'results' => $this->playerService->getAllDominions()]);
     }
 
     public function updateDominion(): string
@@ -75,8 +80,8 @@ class AdminController extends BaseController
         unset($data['id'], $data['_csrf']);
 
         try {
-            $res = $this->adminService->updateDominionStats($id, $data);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_DOMINION', "Modified sector ID {$id}", $data);
+            $res = $this->playerService->updateDominionStats($id, $data);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_DOMINION', "Modified sector ID {$id}", $data);
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -90,7 +95,7 @@ class AdminController extends BaseController
 
         $id = (int)($_GET['id'] ?? 0);
         try {
-            $profile = $this->adminService->getKingdomFullProfile($id);
+            $profile = $this->playerService->getKingdomFullProfile($id);
             return json_encode(['success' => true, 'profile' => $profile]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -108,8 +113,8 @@ class AdminController extends BaseController
         $stabled = (int)($_POST['stabled_quantity'] ?? 0);
 
         try {
-            $res = $this->adminService->updateKingdomManpower($domId, $unitId, $total, $stabled);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_MANPOWER', "Modified manpower for sector {$domId}, unit {$unitId}", ['total' => $total, 'stabled' => $stabled]);
+            $res = $this->playerService->updateKingdomManpower($domId, $unitId, $total, $stabled);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_MANPOWER', "Modified manpower for sector {$domId}, unit {$unitId}", ['total' => $total, 'stabled' => $stabled]);
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -126,8 +131,8 @@ class AdminController extends BaseController
         $level = (int)($_POST['level'] ?? 0);
 
         try {
-            $res = $this->adminService->updateKingdomStructure($domId, $structureId, $level);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_KINGDOM_STRUCTURE', "Modified structure level for sector {$domId}, structure {$structureId}", ['level' => $level]);
+            $res = $this->playerService->updateKingdomStructure($domId, $structureId, $level);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_KINGDOM_STRUCTURE', "Modified structure level for sector {$domId}, structure {$structureId}", ['level' => $level]);
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -145,8 +150,8 @@ class AdminController extends BaseController
         $equipped = (bool)($_POST['is_equipped'] ?? false);
 
         try {
-            $res = $this->adminService->updateKingdomArmory($domId, $itemId, $quantity, $equipped);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_KINGDOM_ARMORY', "Modified armory for sector {$domId}, item {$itemId}", ['quantity' => $quantity, 'equipped' => $equipped]);
+            $res = $this->playerService->updateKingdomArmory($domId, $itemId, $quantity, $equipped);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_KINGDOM_ARMORY', "Modified armory for sector {$domId}, item {$itemId}", ['quantity' => $quantity, 'equipped' => $equipped]);
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -158,7 +163,7 @@ class AdminController extends BaseController
         header('Content-Type: application/json');
         $this->checkAdmin();
 
-        return json_encode(['success' => true, 'units' => $this->adminService->getAllUnits()]);
+        return json_encode(['success' => true, 'units' => $this->gameDataService->getAllUnits()]);
     }
 
     public function updateUnit(): string
@@ -171,8 +176,8 @@ class AdminController extends BaseController
         unset($data['id'], $data['_csrf']);
 
         try {
-            $res = $this->adminService->updateUnit($id, $data);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_UNIT', "Modified unit ID {$id} ({$data['slug']})", $data);
+            $res = $this->gameDataService->updateUnit($id, $data);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_UNIT', "Modified unit ID {$id} ({$data['slug']})", $data);
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -199,8 +204,8 @@ class AdminController extends BaseController
         ];
 
         try {
-            $id = $this->adminService->addUnit($data);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'ADD_UNIT', "Enlisted new unit class ID {$id}", $data);
+            $id = $this->gameDataService->addUnit($data);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'ADD_UNIT', "Enlisted new unit class ID {$id}", $data);
             return json_encode(['success' => true, 'id' => $id]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -215,8 +220,8 @@ class AdminController extends BaseController
         $id = (int)($_POST['id'] ?? 0);
 
         try {
-            $res = $this->adminService->deleteUnit($id);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'DELETE_UNIT', "Decommissioned unit class ID {$id}");
+            $res = $this->gameDataService->deleteUnit($id);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'DELETE_UNIT', "Decommissioned unit class ID {$id}");
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -229,13 +234,13 @@ class AdminController extends BaseController
         $this->checkAdmin();
 
         try {
-            $structures = $this->adminService->getAllStructures();
+            $structures = $this->gameDataService->getAllStructures();
             $detailedStructures = [];
 
             foreach ($structures as $s) {
                 $detailedStructures[] = [
                     'details' => $s,
-                    'levels' => $this->adminService->getStructureLevels((int)$s['id'])
+                    'levels' => $this->gameDataService->getStructureLevels((int)$s['id'])
                 ];
             }
 
@@ -258,8 +263,8 @@ class AdminController extends BaseController
         unset($data['id'], $data['_csrf']);
 
         try {
-            $res = $this->adminService->updateStructure($id, $data);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_STRUCTURE', "Modified structure ID {$id}", $data);
+            $res = $this->gameDataService->updateStructure($id, $data);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_STRUCTURE', "Modified structure ID {$id}", $data);
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -280,7 +285,7 @@ class AdminController extends BaseController
         ];
 
         try {
-            $id = $this->adminService->addStructure($data);
+            $id = $this->gameDataService->addStructure($data);
             return json_encode(['success' => true, 'id' => $id]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -295,7 +300,7 @@ class AdminController extends BaseController
         $id = (int)($_POST['id'] ?? 0);
 
         try {
-            $res = $this->adminService->deleteStructure($id);
+            $res = $this->gameDataService->deleteStructure($id);
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -318,7 +323,7 @@ class AdminController extends BaseController
         ];
 
         try {
-            $res = $this->adminService->addStructureLevel($data);
+            $res = $this->gameDataService->addStructureLevel($data);
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -333,12 +338,11 @@ class AdminController extends BaseController
         $sId = (int)($_POST['structure_id'] ?? 0);
         $level = (int)($_POST['level'] ?? 0);
         
-        // Collect all fields from POST except structure_id, level, and _csrf
         $data = $_POST;
         unset($data['structure_id'], $data['level'], $data['_csrf']);
 
         try {
-            $res = $this->adminService->updateStructureLevel($sId, $level, $data);
+            $res = $this->gameDataService->updateStructureLevel($sId, $level, $data);
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -352,9 +356,9 @@ class AdminController extends BaseController
 
         return json_encode([
             'success' => true, 
-            'items' => $this->adminService->getAllArmoryItems(),
-            'unit_types' => $this->adminService->getArmoryUnitTypes(),
-            'categories' => $this->adminService->getArmoryCategories()
+            'items' => $this->gameDataService->getAllArmoryItems(),
+            'unit_types' => $this->gameDataService->getArmoryUnitTypes(),
+            'categories' => $this->gameDataService->getArmoryCategories()
         ]);
     }
 
@@ -368,8 +372,8 @@ class AdminController extends BaseController
         unset($data['id'], $data['_csrf']);
 
         try {
-            $res = $this->adminService->updateArmoryItem($id, $data);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_ARMORY_ITEM', "Calibrated armory asset ID {$id}", $data);
+            $res = $this->gameDataService->updateArmoryItem($id, $data);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_ARMORY_ITEM', "Calibrated armory asset ID {$id}", $data);
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -390,8 +394,8 @@ class AdminController extends BaseController
         ];
 
         try {
-            $id = $this->adminService->addArmoryItem($data);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'ADD_ARMORY_ITEM', "Enlisted new armory asset ID {$id}", $data);
+            $id = $this->gameDataService->addArmoryItem($data);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'ADD_ARMORY_ITEM', "Enlisted new armory asset ID {$id}", $data);
             return json_encode(['success' => true, 'id' => $id]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -406,8 +410,8 @@ class AdminController extends BaseController
         $id = (int)($_POST['id'] ?? 0);
 
         try {
-            $res = $this->adminService->deleteArmoryItem($id);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'DELETE_ARMORY_ITEM', "Decommissioned armory asset ID {$id}");
+            $res = $this->gameDataService->deleteArmoryItem($id);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'DELETE_ARMORY_ITEM', "Decommissioned armory asset ID {$id}");
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -418,7 +422,7 @@ class AdminController extends BaseController
     {
         header('Content-Type: application/json');
         $this->checkAdmin();
-        return json_encode(['success' => true, 'races' => $this->adminService->getAllRaces()]);
+        return json_encode(['success' => true, 'races' => $this->gameDataService->getAllRaces()]);
     }
 
     public function updateRace(): string
@@ -431,8 +435,8 @@ class AdminController extends BaseController
         unset($data['id'], $data['_csrf']);
 
         try {
-            $res = $this->adminService->updateRace($id, $data);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_RACE', "Modified evolutionary strain ID {$id}", $data);
+            $res = $this->gameDataService->updateRace($id, $data);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_RACE', "Modified evolutionary strain ID {$id}", $data);
             return json_encode(['success' => $res]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
@@ -444,7 +448,7 @@ class AdminController extends BaseController
         header('Content-Type: application/json');
         $this->checkAdmin();
 
-        return json_encode(['success' => true, 'logs' => $this->adminService->getRecentBattleLogs()]);
+        return json_encode(['success' => true, 'logs' => $this->systemService->getRecentBattleLogs()]);
     }
 
     public function getApiKeys(): string
@@ -533,6 +537,7 @@ class AdminController extends BaseController
             return json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }
+
     public function impersonate(): string
     {
         header('Content-Type: application/json');
@@ -553,7 +558,7 @@ class AdminController extends BaseController
         $_SESSION['user_id'] = $targetUser->id;
         $_SESSION['username'] = $targetUser->username;
 
-        $this->adminService->logAdminAction((int)$_SESSION['impersonator_id'], 'IMPERSONATE', "Started impersonation of commander {$targetUser->username} (ID {$id})");
+        $this->systemService->logAdminAction((int)$_SESSION['impersonator_id'], 'IMPERSONATE', "Started impersonation of commander {$targetUser->username} (ID {$id})");
 
         return json_encode(['success' => true]);
     }
@@ -565,7 +570,7 @@ class AdminController extends BaseController
             if ($admin) {
                 $_SESSION['user_id'] = $admin->id;
                 $_SESSION['username'] = $admin->username;
-                $this->adminService->logAdminAction($admin->id, 'STOP_IMPERSONATE', "Terminated active impersonation.");
+                $this->systemService->logAdminAction($admin->id, 'STOP_IMPERSONATE', "Terminated active impersonation.");
             }
             unset($_SESSION['impersonator_id']);
         }
@@ -585,7 +590,7 @@ class AdminController extends BaseController
     {
         header('Content-Type: application/json');
         $this->checkAdmin();
-        return json_encode(['success' => true, 'logs' => $this->adminService->getAuditLogs()]);
+        return json_encode(['success' => true, 'logs' => $this->systemService->getAuditLogs()]);
     }
 
     public function getSettings(): string
@@ -606,7 +611,7 @@ class AdminController extends BaseController
 
         try {
             $this->configService->set($key, $value);
-            $this->adminService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_SETTING', "Modified setting {$key}", ['value' => $value]);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_SETTING', "Modified setting {$key}", ['value' => $value]);
             return json_encode(['success' => true]);
         } catch (\Throwable $e) {
             return json_encode(['success' => false, 'message' => $e->getMessage()]);

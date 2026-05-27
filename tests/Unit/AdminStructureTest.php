@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use sdo\Services\AdminService;
+use sdo\Services\AdminGameDataService;
+use sdo\Repositories\Eloquent\EloquentUnitRepository;
+use sdo\Repositories\Eloquent\EloquentStructureRepository;
+use sdo\Repositories\Eloquent\EloquentArmoryRepository;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class AdminStructureTest extends TestCase
 {
+    private AdminGameDataService $service;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -18,6 +23,12 @@ class AdminStructureTest extends TestCase
         $capsule->setAsGlobal();
         $capsule->bootEloquent();
         $this->createTables();
+        
+        $this->service = new AdminGameDataService(
+            new EloquentUnitRepository(),
+            new EloquentStructureRepository(),
+            new EloquentArmoryRepository()
+        );
     }
 
     private function createTables(): void
@@ -49,12 +60,15 @@ class AdminStructureTest extends TestCase
             $table->integer('capacity')->nullable();
             $table->primary(['structure_id', 'level']);
         });
+        
+        // Mock units/armory tables
+        Capsule::schema()->create('units', function($table) { $table->increments('id'); });
+        Capsule::schema()->create('armory_items', function($table) { $table->increments('id'); });
     }
 
     public function testAddAndFetchStructure(): void
     {
-        $adminService = new AdminService();
-        $sId = $adminService->addStructure([
+        $sId = $this->service->addStructure([
             'slug' => 'test_bldg',
             'name' => 'Test Building',
             'description' => 'Desc'
@@ -62,14 +76,13 @@ class AdminStructureTest extends TestCase
 
         $this->assertNotNull($sId);
         
-        $all = $adminService->getAllStructures();
+        $all = $this->service->getAllStructures();
         $this->assertCount(1, $all);
         $this->assertEquals('test_bldg', $all[0]['slug']);
     }
 
     public function testUpdateStructureLevelBuffs(): void
     {
-        $adminService = new AdminService();
         $sId = Capsule::table('structures')->insertGetId(['slug' => 'f', 'name' => 'F', 'description' => 'D']);
         
         Capsule::table('structure_levels')->insert([
@@ -79,7 +92,7 @@ class AdminStructureTest extends TestCase
             'buff_offense' => 0
         ]);
 
-        $res = $adminService->updateStructureLevel((int)$sId, 1, ['buff_offense' => 50, 'cost' => 5000]);
+        $res = $this->service->updateStructureLevel((int)$sId, 1, ['buff_offense' => 50, 'cost' => 5000]);
         $this->assertTrue($res);
 
         $level = Capsule::table('structure_levels')->where('structure_id', $sId)->where('level', 1)->first();

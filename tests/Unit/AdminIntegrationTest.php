@@ -3,13 +3,16 @@
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use sdo\Services\AdminService;
+use sdo\Services\AdminGameDataService;
 use sdo\Services\TrainingService;
 use sdo\Services\LogService;
 use sdo\Models\User;
 use sdo\Models\Dominion;
 use sdo\Models\Unit;
 use sdo\Models\DominionManpower;
+use sdo\Repositories\Eloquent\EloquentUnitRepository;
+use sdo\Repositories\Eloquent\EloquentStructureRepository;
+use sdo\Repositories\Eloquent\EloquentArmoryRepository;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class AdminIntegrationTest extends TestCase
@@ -102,7 +105,11 @@ class AdminIntegrationTest extends TestCase
 
         $logMock = $this->createMock(LogService::class);
         $trainingService = new TrainingService($logMock);
-        $adminService = new AdminService();
+        $service = new AdminGameDataService(
+            new EloquentUnitRepository(),
+            new EloquentStructureRepository(),
+            new EloquentArmoryRepository()
+        );
 
         // 3. Verify current training works (costs 100 credits)
         $res = $trainingService->train($dominion->id, 'soldiers', 1);
@@ -112,7 +119,7 @@ class AdminIntegrationTest extends TestCase
         $this->assertEquals(50, $dominion->credits);
 
         // 4. Admin updates cost to 200 credits
-        $adminService->updateUnit((int)$unit->id, ['cost_credits' => 200]);
+        $service->updateUnit((int)$unit->id, ['cost_credits' => 200]);
 
         // 5. Training should now fail for another unit (remaining credits 50 < 200)
         $this->expectException(\Exception::class);

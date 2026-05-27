@@ -9,6 +9,7 @@ use sdo\Services\AdvisorService;
 use sdo\Services\BattlefieldService;
 use sdo\Services\AuthService;
 use sdo\Services\ConfigService;
+use sdo\Dto\Combat\AttackRequest;
 
 class BattlefieldController extends BaseController
 {
@@ -34,30 +35,22 @@ class BattlefieldController extends BaseController
         ]);
     }
 
-    public function attack(): void
+    public function attack(): string
     {
-        header('Content-Type: application/json');
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
 
-        if (!$this->authService->isLoggedIn($_SESSION)) {
-            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-            return;
-        }
+            $request = new AttackRequest($_POST);
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
 
-        $targetId = (int)($_POST['target_id'] ?? 0);
-        $turns = (int)($_POST['turns'] ?? 1);
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            if (!$dominion) {
+                throw new \Exception('Sector not found.');
+            }
 
-        if (!$dominion) {
-            echo json_encode(['success' => false, 'message' => 'Sector not found.']);
-            return;
-        }
-
-        try {
-            $result = $this->battlefieldService->executeAttack($dominion->id, $targetId, $turns);
-            echo json_encode($result);
-        } catch (\Exception $e) {
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+            return $this->battlefieldService->executeAttack($dominion->id, $request->target_id, $request->turns);
+        });
     }
 
     public function report(array $vars): string

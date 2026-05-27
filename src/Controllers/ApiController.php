@@ -12,6 +12,9 @@ use sdo\Services\DiscordLinkService;
 use sdo\Services\FoundationService;
 use sdo\Models\DominionManpower;
 use sdo\Models\DominionStructure;
+use sdo\Infrastructure\Api\DominionResource;
+use sdo\Infrastructure\Api\ManpowerResource;
+use sdo\Infrastructure\Api\StructureResource;
 
 class ApiController extends BaseController
 {
@@ -63,20 +66,7 @@ class ApiController extends BaseController
 
         return json_encode([
             'success' => true,
-            'data' => [
-                'name' => $dom->name,
-                'credits' => $dom->credits,
-                'banked' => $dom->credits_banked,
-                'citizens' => $dom->citizens,
-                'turns' => $dom->turns,
-                'xp' => $dom->xp,
-                'level' => $dom->getPlayerLevel(),
-                'integrity' => [
-                    'current' => $dom->foundation_hp,
-                    'max' => $dom->foundation_max_hp
-                ],
-                'last_tick' => $dom->last_tick
-            ]
+            'data' => DominionResource::make($dom)->toArray()
         ]);
     }
 
@@ -89,18 +79,13 @@ class ApiController extends BaseController
         $dom = $this->getDominion($vars);
         if (!$dom) return json_encode(['success' => false, 'message' => 'Sector not found.']);
 
-        $units = DominionManpower::with('unit')
+        $manpower = DominionManpower::with('unit')
             ->where('dominion_id', $dom->id)
-            ->get()
-            ->map(fn($m) => [
-                'slug' => $m->unit->slug,
-                'name' => $m->unit->name,
-                'quantity' => (int)$m->total_quantity
-            ]);
+            ->get();
 
         return json_encode([
             'success' => true,
-            'data' => $units
+            'data' => ManpowerResource::collection($manpower)
         ]);
     }
 
@@ -115,21 +100,11 @@ class ApiController extends BaseController
 
         $structures = DominionStructure::with(['structure', 'levelData'])
             ->where('dominion_id', $dom->id)
-            ->get()
-            ->map(fn($s) => [
-                'slug' => $s->structure->slug,
-                'name' => $s->structure->name,
-                'current_level' => (int)$s->level,
-                'buffs' => [
-                    'economy' => (int)($s->levelData->buff_economy ?? 0),
-                    'offense' => (int)($s->levelData->buff_offense ?? 0),
-                    'defense' => (int)($s->levelData->buff_defense ?? 0)
-                ]
-            ]);
+            ->get();
 
         return json_encode([
             'success' => true,
-            'data' => $structures
+            'data' => StructureResource::collection($structures)
         ]);
     }
 
@@ -139,7 +114,6 @@ class ApiController extends BaseController
     public function battlefield(): string
     {
         header('Content-Type: application/json');
-        // Battlefield list is public tactical data within the sector
         return json_encode([
             'success' => true,
             'data' => $this->battlefieldService->getBattlefieldList()

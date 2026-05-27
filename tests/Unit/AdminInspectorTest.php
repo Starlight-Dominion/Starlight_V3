@@ -7,12 +7,17 @@ use sdo\Models\User;
 use sdo\Models\Dominion;
 use sdo\Models\Unit;
 use sdo\Models\Structure;
-use sdo\Services\AdminService;
+use sdo\Services\AdminPlayerService;
+use sdo\Repositories\Eloquent\EloquentUserRepository;
+use sdo\Repositories\Eloquent\EloquentDominionRepository;
+use sdo\Repositories\Eloquent\EloquentUnitRepository;
+use sdo\Repositories\Eloquent\EloquentStructureRepository;
+use sdo\Repositories\Eloquent\EloquentArmoryRepository;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class AdminInspectorTest extends TestCase
 {
-    private AdminService $adminService;
+    private AdminPlayerService $service;
     private int $testDomId;
 
     protected function setUp(): void
@@ -30,7 +35,13 @@ class AdminInspectorTest extends TestCase
 
         $this->createTables();
 
-        $this->adminService = new AdminService();
+        $this->service = new AdminPlayerService(
+            new EloquentDominionRepository(),
+            new EloquentUserRepository(),
+            new EloquentUnitRepository(),
+            new EloquentStructureRepository(),
+            new EloquentArmoryRepository()
+        );
         
         // Setup a test player
         $user = User::create([
@@ -124,17 +135,9 @@ class AdminInspectorTest extends TestCase
         });
     }
 
-    protected function tearDown(): void
-    {
-        Capsule::schema()->dropIfExists('users');
-        Capsule::schema()->dropIfExists('dominions');
-        Capsule::schema()->dropIfExists('units');
-        Capsule::schema()->dropIfExists('dominion_manpower');
-    }
-
     public function testGetKingdomFullProfile(): void
     {
-        $profile = $this->adminService->getKingdomFullProfile($this->testDomId);
+        $profile = $this->service->getKingdomFullProfile($this->testDomId);
         
         $this->assertArrayHasKey('dominion', $profile);
         $this->assertArrayHasKey('manpower', $profile['dominion']);
@@ -151,7 +154,7 @@ class AdminInspectorTest extends TestCase
             'non_existent_column' => 'garbage'
         ];
 
-        $res = $this->adminService->updateDominionStats($this->testDomId, $newData);
+        $res = $this->service->updateDominionStats($this->testDomId, $newData);
         $this->assertTrue($res);
 
         $updatedDom = Dominion::with('user')->find($this->testDomId);
@@ -165,7 +168,7 @@ class AdminInspectorTest extends TestCase
         $unit = Unit::first();
         if (!$unit) $this->markTestSkipped('No units in DB');
 
-        $res = $this->adminService->updateKingdomManpower($this->testDomId, (int)$unit->id, 500, 100);
+        $res = $this->service->updateKingdomManpower($this->testDomId, (int)$unit->id, 500, 100);
         $this->assertTrue($res);
 
         $manpower = \sdo\Models\DominionManpower::where('dominion_id', $this->testDomId)
