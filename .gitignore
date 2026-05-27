@@ -12,6 +12,8 @@
 /playwright-report/
 /test-results/
 /playwright/.auth/
+/.nyc_output/
+/coverage/
 
 # macOS
 .DS_Store

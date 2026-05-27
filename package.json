@@ -10,17 +10,24 @@
     "test:e2e:install": "playwright install --with-deps chromium firefox webkit",
     "test:e2e": "playwright test",
     "test:e2e:ci": "CI=1 playwright test",
+    "test:e2e:ci:coverage": "CI=1 PLAYWRIGHT_COLLECT_COVERAGE=1 playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "coverage:e2e:clean": "rm -rf .nyc_output coverage",
+    "coverage:e2e:report": "nyc report --temp-dir .nyc_output --report-dir coverage --reporter=lcov --reporter=text-summary",
+    "coverage:e2e:check": "nyc check-coverage --temp-dir .nyc_output --statements 70 --branches 60 --functions 70 --lines 70",
+    "test:e2e:ci:gate": "npm run coverage:e2e:clean && PLAYWRIGHT_COVERAGE=1 npm run build && npm run test:e2e:ci:coverage && npm run coverage:e2e:report && npm run coverage:e2e:check"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
     "autoprefixer": "^10.4.17",
+    "nyc": "^17.1.0",
     "postcss": "^8.4.35",
     "svelte": "^5.0.0",
     "tailwindcss": "^3.4.1",
-    "vite": "^5.1.4"
+    "vite": "^5.1.4",
+    "vite-plugin-istanbul": "^6.0.2"
   },
   "dependencies": {
     "axios": "^1.16.1"
