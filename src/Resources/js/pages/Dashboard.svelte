@@ -4,9 +4,7 @@
 
     let { 
         tactical = {}, 
-        production_total = 0, 
-        production_base = 0, 
-        production_mines = 0 
+        income_breakdown = { base: 0, units: [], unit_total: 0, bonus_percent: 0, total: 0 }
     } = $props();
 
     const user = $derived(game.user);
@@ -90,16 +88,35 @@
             {#if activeModules.eco}
                 <div in:slide class="p-8 space-y-4 font-mono">
                     <div class="flex justify-between items-end border-b border-white/5 pb-2">
-                        <span class="text-[10px] text-gray-500 uppercase tracking-widest">Credits</span>
-                        <span class="text-xl font-black text-white">{resources.credits.toLocaleString()}</span>
+                        <span class="text-[10px] text-gray-500 uppercase tracking-widest">Treasury Balance</span>
+                        <span class="text-xl font-black text-white">{resources.credits.toLocaleString()} CP</span>
                     </div>
-                    <div class="flex justify-between items-center text-xs">
-                        <span class="text-gray-600 uppercase font-bold">Income</span>
-                        <span class="text-cyan-400 font-bold">+{production_total.toLocaleString()} CP</span>
+                    
+                    <div class="space-y-2 pt-2 text-[10px] text-gray-400">
+                        <div class="flex justify-between">
+                            <span>Base Stipend</span>
+                            <span class="text-white">+{income_breakdown.base.toLocaleString()} CP</span>
+                        </div>
+                        {#if income_breakdown.units.length > 0}
+                            <div class="pt-2 border-t border-white/5 space-y-1">
+                                <span class="text-[8px] uppercase tracking-widest text-cyan-600 block mb-1">Division Output</span>
+                                {#each income_breakdown.units as unit}
+                                    <div class="flex justify-between">
+                                        <span>{unit.name} x{unit.quantity}</span>
+                                        <span class="text-emerald-400">+{unit.production.toLocaleString()} CP</span>
+                                    </div>
+                                {/each}
+                            </div>
+                        {/if}
+                        <div class="pt-2 border-t border-white/5 flex justify-between">
+                            <span class="text-[8px] uppercase tracking-widest text-cyan-600">Structural Multiplier</span>
+                            <span class="text-cyan-400">+{income_breakdown.bonus_percent}%</span>
+                        </div>
                     </div>
-                    <div class="flex justify-between items-center text-[9px] text-gray-700">
-                        <span class="uppercase">Base: {production_base}</span>
-                        <span class="uppercase">Bonus: {production_mines}</span>
+                    
+                    <div class="flex justify-between items-center text-xs mt-4 pt-4 border-t border-white/10">
+                        <span class="text-gray-500 uppercase font-bold tracking-widest">Net Income / Tick</span>
+                        <span class="text-cyan-400 font-bold">+{income_breakdown.total.toLocaleString()} CP</span>
                     </div>
                 </div>
             {/if}

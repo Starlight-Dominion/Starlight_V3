@@ -56,7 +56,11 @@ return function (RouteCollector $r) {
     $r->addRoute('GET', '/admin', [\sdo\Controllers\AdminController::class, 'index']);
     $r->addRoute('GET', '/admin/search', [\sdo\Controllers\AdminController::class, 'searchDominions']);
     $r->addRoute('GET', '/admin/kingdoms', [\sdo\Controllers\AdminController::class, 'getAllDominions']);
+    $r->addRoute('GET', '/admin/kingdom/profile', [\sdo\Controllers\AdminController::class, 'getKingdomProfile']);
     $r->addRoute('POST', '/admin/update-kingdom', [\sdo\Controllers\AdminController::class, 'updateDominion']);
+    $r->addRoute('POST', '/admin/update-kingdom-manpower', [\sdo\Controllers\AdminController::class, 'updateKingdomManpower']);
+    $r->addRoute('POST', '/admin/update-kingdom-structure', [\sdo\Controllers\AdminController::class, 'updateKingdomStructure']);
+    $r->addRoute('POST', '/admin/update-kingdom-armory', [\sdo\Controllers\AdminController::class, 'updateKingdomArmory']);
     $r->addRoute('GET', '/admin/units', [\sdo\Controllers\AdminController::class, 'getUnits']);
     $r->addRoute('POST', '/admin/update-unit', [\sdo\Controllers\AdminController::class, 'updateUnit']);
     $r->addRoute('POST', '/admin/add-unit', [\sdo\Controllers\AdminController::class, 'addUnit']);
@@ -71,7 +75,12 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/admin/update-armory-item', [\sdo\Controllers\AdminController::class, 'updateArmoryItem']);
     $r->addRoute('POST', '/admin/add-armory-item', [\sdo\Controllers\AdminController::class, 'addArmoryItem']);
     $r->addRoute('POST', '/admin/delete-armory-item', [\sdo\Controllers\AdminController::class, 'deleteArmoryItem']);
+    $r->addRoute('GET', '/admin/races', [\sdo\Controllers\AdminController::class, 'getRaces']);
+    $r->addRoute('POST', '/admin/update-race', [\sdo\Controllers\AdminController::class, 'updateRace']);
     $r->addRoute('GET', '/admin/battle-logs', [\sdo\Controllers\AdminController::class, 'getBattleLogs']);
+    $r->addRoute('GET', '/admin/audit-logs', [\sdo\Controllers\AdminController::class, 'getAuditLogs']);
+    $r->addRoute('POST', '/admin/impersonate', [\sdo\Controllers\AdminController::class, 'impersonate']);
+    $r->addRoute('GET', '/admin/stop-impersonating', [\sdo\Controllers\AdminController::class, 'stopImpersonating']);
     
     // API Management
     $r->addRoute('GET', '/admin/api/keys', [\sdo\Controllers\AdminController::class, 'getApiKeys']);

@@ -34,13 +34,6 @@
 </script>
 
 <div in:fade class="space-y-8 pb-24">
-    <header class="border-b border-cyan-500/20 pb-6 flex justify-between items-end">
-        <div>
-            <h1 class="text-4xl font-title font-black text-white uppercase tracking-tighter text-shadow-glow">Foundations</h1>
-            <p class="text-cyan-500/60 text-[9px] font-bold uppercase tracking-[4px] mt-2">Structural Engineering Terminal</p>
-        </div>
-    </header>
-
     {#if message}
         <div in:slide class="p-4 rounded-xl text-[10px] font-black uppercase text-center border {message.success ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'bg-red-950/30 border-red-500 text-red-500'}">
             {message.message}
@@ -51,7 +44,6 @@
     <div class="bg-dark-translucent border-2 border-cyan-500/20 rounded-3xl p-8 relative overflow-hidden">
         <div class="flex flex-col md:flex-row justify-between items-center gap-8">
             <div class="space-y-2 text-center md:text-left">
-                <h2 class="text-white font-title text-xl uppercase tracking-widest">Sector Integrity</h2>
                 <p class="text-[10px] text-gray-500 uppercase">Nano-repair requires active credit flow.</p>
                 <div class="flex items-center gap-4 mt-4">
                     <span class="text-3xl font-mono font-bold {hpPercent < 50 ? 'text-red-500' : 'text-cyan-400'}">{hpPercent}%</span>

@@ -69,6 +69,14 @@ class GameService
      */
     public function getTotalIncome(int $dominionId): int
     {
+        return $this->getIncomeBreakdown($dominionId)['total'];
+    }
+
+    /**
+     * Provides a detailed breakdown of the total credit income.
+     */
+    public function getIncomeBreakdown(int $dominionId): array
+    {
         $baseCredits = (int)$this->configService->get('baseline_credits_per_tick', 100);
         
         // Defensive check: Verify column exists before querying
@@ -77,16 +85,39 @@ class GameService
             $hasProductionColumn = Capsule::schema()->hasColumn('units', 'production_credits');
         }
 
-        $unitProduction = 0;
+        $unitProductionList = [];
+        $totalUnitProduction = 0;
+        
         if ($hasProductionColumn) {
-            $unitProduction = (int)\sdo\Models\DominionManpower::join('units', 'dominion_manpower.unit_id', '=', 'units.id')
-                ->where('dominion_manpower.dominion_id', $dominionId)
-                ->sum(Capsule::raw('dominion_manpower.total_quantity * units.production_credits'));
+            $manpower = \sdo\Models\DominionManpower::with('unit')
+                ->where('dominion_id', $dominionId)
+                ->get();
+                
+            foreach ($manpower as $m) {
+                if ($m->total_quantity > 0 && ($m->unit->production_credits ?? 0) > 0) {
+                    $prod = $m->total_quantity * $m->unit->production_credits;
+                    $totalUnitProduction += $prod;
+                    $unitProductionList[] = [
+                        'name' => $m->unit->name,
+                        'quantity' => $m->total_quantity,
+                        'production' => $prod
+                    ];
+                }
+            }
         }
 
-        $multiplier = $this->getEconomyMultiplier($dominionId);
+        $totalBuff = (float)$this->sumStructureLevelBuff($dominionId, 'buff_economy');
+        $multiplier = 1 + ($totalBuff / 100);
         
-        return (int)floor(($baseCredits + $unitProduction) * $multiplier);
+        $totalIncome = (int)floor(($baseCredits + $totalUnitProduction) * $multiplier);
+
+        return [
+            'base' => $baseCredits,
+            'units' => $unitProductionList,
+            'unit_total' => $totalUnitProduction,
+            'bonus_percent' => (int)$totalBuff,
+            'total' => $totalIncome
+        ];
     }
 
     /**

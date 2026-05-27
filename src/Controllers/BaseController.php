@@ -68,7 +68,9 @@ abstract class BaseController
             'component' => $component,
             'props' => $pageData,
             'user' => $userData,
-            'csrf' => Csrf::getToken()
+            'csrf' => Csrf::getToken(),
+            'global_broadcast' => $this->configService->get('global_broadcast', ''),
+            'is_impersonating' => isset($_SESSION['impersonator_id'])
         ];
 
         if ($this->isJsonRequest()) {

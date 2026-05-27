@@ -35,17 +35,12 @@ class DashboardController extends BaseController
         }
 
         // Use centralized growth reporting
-        $baseCredits = (int)$this->configService->get('baseline_credits_per_tick', 100);
-        $totalIncome = $this->gameService->getTotalIncome($dominion->id);
-        $bonusCredits = $totalIncome - $baseCredits;
-
+        $incomeBreakdown = $this->gameService->getIncomeBreakdown($dominion->id);
         $tactical = $this->tacticalService->getTacticalOverview($dominion->id);
 
         return $this->render('dashboard/index', [
             'title' => 'Sector Dashboard',
-            'production_base' => $baseCredits,
-            'production_mines' => $bonusCredits, // Maps to "Structural Bonus" in the UI
-            'production_total' => $totalIncome,
+            'income_breakdown' => $incomeBreakdown,
             'tactical' => $tactical
         ]);
     }
