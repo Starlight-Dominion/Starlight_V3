@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use sdo\Services\AdminService;
+use sdo\Services\AdminGameDataService;
+use sdo\Repositories\Eloquent\EloquentUnitRepository;
+use sdo\Repositories\Eloquent\EloquentStructureRepository;
+use sdo\Repositories\Eloquent\EloquentArmoryRepository;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class AdminUnitCRUDTest extends TestCase
 {
+    private AdminGameDataService $service;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -18,6 +23,12 @@ class AdminUnitCRUDTest extends TestCase
         $capsule->setAsGlobal();
         $capsule->bootEloquent();
         $this->createTables();
+        
+        $this->service = new AdminGameDataService(
+            new EloquentUnitRepository(),
+            new EloquentStructureRepository(),
+            new EloquentArmoryRepository()
+        );
     }
 
     private function createTables(): void
@@ -38,14 +49,16 @@ class AdminUnitCRUDTest extends TestCase
             $table->string('requirement_slug')->nullable();
             $table->integer('foundation_level_req')->default(0);
         });
+        
+        // Mock structures/armory tables
+        Capsule::schema()->create('structures', function($table) { $table->increments('id'); });
+        Capsule::schema()->create('armory_items', function($table) { $table->increments('id'); });
     }
 
     public function testAddAndDeleteUnit(): void
     {
-        $adminService = new AdminService();
-
         // 1. Add Unit
-        $unitId = $adminService->addUnit([
+        $unitId = $this->service->addUnit([
             'slug' => 'test_unit',
             'name' => 'Test Unit',
             'description' => 'Test Desc',
@@ -67,14 +80,13 @@ class AdminUnitCRUDTest extends TestCase
         $this->assertEquals(50, $unit->production_credits);
 
         // 2. Delete Unit
-        $res = $adminService->deleteUnit($unitId);
+        $res = $this->service->deleteUnit($unitId);
         $this->assertTrue($res);
         $this->assertEquals(0, Capsule::table('units')->count());
     }
 
     public function testUpdateUnitRequirements(): void
     {
-        $adminService = new AdminService();
         $unitId = Capsule::table('units')->insertGetId([
             'slug' => 'soldiers',
             'name' => 'Soldiers',
@@ -89,7 +101,7 @@ class AdminUnitCRUDTest extends TestCase
             'production_credits' => 0
         ]);
 
-        $res = $adminService->updateUnit((int)$unitId, [
+        $res = $this->service->updateUnit((int)$unitId, [
             'requirement_slug' => 'guards',
             'foundation_level_req' => 5,
             'power_spy_offense' => 10

@@ -40,22 +40,21 @@ class SpyController extends BaseController
         ]);
     }
 
-    public function executeReconnaissance(): void
+    public function executeReconnaissance(): string
     {
-        header('Content-Type: application/json');
-        if (!$this->authService->isLoggedIn($_SESSION)) {
-            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-            return;
-        }
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
 
-        $targetId = (int)($_POST['target_id'] ?? 0);
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            $targetId = (int)($_POST['target_id'] ?? 0);
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
 
-        try {
-            $result = $this->spyService->executeReconnaissance($dominion->id, $targetId);
-            echo json_encode($result);
-        } catch (\Exception $e) {
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+            if (!$dominion) {
+                throw new \Exception('Sector not found.');
+            }
+
+            return $this->spyService->executeReconnaissance($dominion->id, $targetId);
+        });
     }
 }

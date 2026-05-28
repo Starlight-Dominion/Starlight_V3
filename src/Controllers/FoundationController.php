@@ -42,20 +42,6 @@ class FoundationController extends BaseController
     }
 
     /**
-     * Generic JSON response helper for structural actions
-     */
-    private function jsonResponse(callable $action): string
-    {
-        header('Content-Type: application/json');
-        try {
-            $res = $action();
-            return json_encode($res);
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-    }
-
-    /**
      * Initialize Nano-Repair sequence
      */
     public function repair(): string

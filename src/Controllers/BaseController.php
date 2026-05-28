@@ -9,6 +9,7 @@ use sdo\Services\AdvisorService;
 use sdo\Services\ConfigService;
 use sdo\Services\AuthService;
 use sdo\ViewModels\GameStateViewModel;
+use sdo\Exceptions\ValidationException;
 
 abstract class BaseController
 {
@@ -82,6 +83,23 @@ abstract class BaseController
         extract(['state' => $state]);
         require __DIR__ . "/../Views/app.php";
         return ob_get_clean();
+    }
+
+    protected function jsonResponse(callable $action): string
+    {
+        header('Content-Type: application/json');
+        try {
+            $res = $action();
+            return json_encode($res);
+        } catch (ValidationException $e) {
+            return json_encode([
+                'success' => false, 
+                'message' => 'Validation error.',
+                'errors' => $e->getErrors()
+            ]);
+        } catch (\Throwable $e) {
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
     }
 
     private function isJsonRequest(): bool

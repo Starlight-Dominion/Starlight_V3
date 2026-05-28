@@ -8,6 +8,7 @@ use sdo\Services\AdvisorService;
 use sdo\Services\ConfigService;
 use sdo\Services\AuthService;
 use sdo\Services\RecruitmentService;
+use sdo\Dto\Recruitment\RecruitmentClickRequest;
 
 class RecruitmentController extends BaseController
 {
@@ -38,36 +39,24 @@ class RecruitmentController extends BaseController
 
     public function start(): string
     {
-        header('Content-Type: application/json');
-        if (!$this->authService->isLoggedIn($_SESSION)) {
-            return json_encode(['success' => false, 'message' => 'Unauthorized']);
-        }
-
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
-
-        try {
-            $res = $this->recruitmentService->startSession($dominion->id);
-            return json_encode($res);
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            return $this->recruitmentService->startSession($dominion->id);
+        });
     }
 
     public function click(): string
     {
-        header('Content-Type: application/json');
-        if (!$this->authService->isLoggedIn($_SESSION)) {
-            return json_encode(['success' => false, 'message' => 'Unauthorized']);
-        }
-
-        $sessionId = (int)($_POST['session_id'] ?? 0);
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
-
-        try {
-            $res = $this->recruitmentService->processClick($dominion->id, $sessionId);
-            return json_encode($res);
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
+            $request = new RecruitmentClickRequest($_POST);
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            return $this->recruitmentService->processClick($dominion->id, $request->session_id);
+        });
     }
 }

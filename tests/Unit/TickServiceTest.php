@@ -11,11 +11,13 @@ use sdo\Models\DominionStructure;
 use sdo\Services\TickService;
 use sdo\Services\ConfigService;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use Predis\Client as Redis;
 
 class TickServiceTest extends TestCase
 {
     private TickService $service;
     private $configMock;
+    private $redisMock;
 
     protected function setUp(): void
     {
@@ -90,13 +92,26 @@ class TickServiceTest extends TestCase
             $table->primary(['dominion_id', 'unit_id']);
         });
 
+        Capsule::schema()->create('tick_logs', function ($table) {
+            $table->increments('id');
+            $table->datetime('tick_time');
+            $table->integer('total_sectors');
+            $table->bigInteger('total_credits_granted');
+            $table->integer('total_citizens_born');
+            $table->integer('total_turns_granted');
+            $table->float('execution_time_ms');
+            $table->text('metadata')->nullable();
+        });
+
         $this->configMock = $this->createMock(ConfigService::class);
         $this->configMock->method('get')->willReturnMap([
             ['baseline_citizens_per_tick', 50, 50],
             ['baseline_credits_per_tick', 100, 100],
         ]);
 
-        $this->service = new TickService($this->configMock);
+        $this->redisMock = $this->createMock(Redis::class);
+
+        $this->service = new TickService($this->configMock, $this->redisMock);
     }
 
     private function createTestDominion(): Dominion
@@ -115,11 +130,11 @@ class TickServiceTest extends TestCase
         ]);
     }
 
-    public function testProcessGlobalTickUpdatesDominions(): void
+    public function testProcessTickJobUpdatesDominions(): void
     {
         $dominion = $this->createTestDominion();
 
-        $this->service->processGlobalTick();
+        $this->service->processTickJob([$dominion->id], '2026-05-27 12:00:00', 'test-tick');
 
         $dominion->refresh();
 
@@ -127,10 +142,10 @@ class TickServiceTest extends TestCase
         $this->assertEquals(100, $dominion->credits);
         $this->assertEquals(50, $dominion->citizens);
         $this->assertEquals(4, $dominion->turns);
-        $this->assertNotNull($dominion->last_tick);
+        $this->assertEquals('2026-05-27 12:00:00', $dominion->last_tick->format('Y-m-d H:i:s'));
     }
 
-    public function testProcessGlobalTickWithBuffs(): void
+    public function testProcessTickJobWithBuffs(): void
     {
         $dominion = $this->createTestDominion();
 
@@ -142,7 +157,7 @@ class TickServiceTest extends TestCase
         StructureLevel::create(['structure_id' => $housingStruct->id, 'level' => 1, 'buff_citizens_per_tick' => 25]);
         DominionStructure::create(['dominion_id' => $dominion->id, 'structure_id' => $housingStruct->id, 'level' => 1]);
 
-        $this->service->processGlobalTick();
+        $this->service->processTickJob([$dominion->id], '2026-05-27 12:00:00', 'test-tick');
 
         $dominion->refresh();
 
@@ -152,7 +167,7 @@ class TickServiceTest extends TestCase
         $this->assertEquals(75, $dominion->citizens);
     }
 
-    public function testProcessGlobalTickWithUnitProduction(): void
+    public function testProcessTickJobWithUnitProduction(): void
     {
         $dominion = $this->createTestDominion();
         
@@ -167,7 +182,7 @@ class TickServiceTest extends TestCase
             'total_quantity' => 5
         ]);
 
-        $this->service->processGlobalTick();
+        $this->service->processTickJob([$dominion->id], '2026-05-27 12:00:00', 'test-tick');
 
         $dominion->refresh();
 
@@ -177,21 +192,22 @@ class TickServiceTest extends TestCase
         $this->assertEquals(150, $dominion->credits);
     }
 
-    public function testProcessGlobalTickBatchesCorrectly(): void
+    public function testProcessTickJobBatchesCorrectly(): void
     {
+        $ids = [];
         for ($i = 1; $i <= 150; $i++) {
-            $this->createTestDominion();
+            $ids[] = $this->createTestDominion()->id;
         }
 
-        $this->service->processGlobalTick();
+        $this->service->processTickJob($ids, '2026-05-27 12:00:00', 'test-tick');
 
         $count = Dominion::where('turns', 4)->count();
         $this->assertEquals(150, $count);
     }
 
-    public function testProcessGlobalTickEmptyDatabase(): void
+    public function testProcessTickJobEmptyDatabase(): void
     {
-        $this->service->processGlobalTick();
+        $this->service->processTickJob([], '2026-05-27 12:00:00', 'test-tick');
         $this->assertEquals(0, Dominion::count());
     }
 
@@ -208,9 +224,64 @@ class TickServiceTest extends TestCase
             'turns' => 200,
         ]);
 
-        $this->service->processGlobalTick();
+        $this->service->processTickJob([$dominion->id], '2026-05-27 12:00:00', 'test-tick');
 
         $dominion->refresh();
         $this->assertEquals(204, $dominion->turns);
+    }
+
+    public function testProcessTickJobWithNegativeBuffs(): void
+    {
+        $dominion = $this->createTestDominion();
+
+        $curseStruct = Structure::create(['slug' => 'curse', 'name' => 'Curse']);
+        // Buff so negative it would normally result in negative gains
+        StructureLevel::create(['structure_id' => $curseStruct->id, 'level' => 1, 'buff_economy' => -200, 'buff_citizens_per_tick' => -200]);
+        DominionStructure::create(['dominion_id' => $dominion->id, 'structure_id' => $curseStruct->id, 'level' => 1]);
+
+        $this->service->processTickJob([$dominion->id], '2026-05-27 12:00:00', 'test-tick');
+
+        $dominion->refresh();
+
+        // Should be bounded at 0, not subtract resources
+        $this->assertEquals(0, $dominion->credits);
+        $this->assertEquals(0, $dominion->citizens);
+    }
+
+    public function testProcessTickJobWithMissingBuffData(): void
+    {
+        $dominion = $this->createTestDominion();
+        
+        // Structure exists but no level record
+        $ghostStruct = Structure::create(['slug' => 'ghost', 'name' => 'Ghost']);
+        DominionStructure::create(['dominion_id' => $dominion->id, 'structure_id' => $ghostStruct->id, 'level' => 5]);
+
+        $this->service->processTickJob([$dominion->id], '2026-05-27 12:00:00', 'test-tick');
+
+        $dominion->refresh();
+
+        // Should still get baseline resources
+        $this->assertEquals(100, $dominion->credits);
+        $this->assertEquals(50, $dominion->citizens);
+    }
+
+    public function testDispatchTickJobsPushesToRedis(): void
+    {
+        $this->createTestDominion();
+        $this->createTestDominion();
+
+        // Expect 1 XADD call (since batch size is 100 and we only have 2)
+        $this->redisMock->expects($this->once())
+            ->method('executeRaw')
+            ->with($this->callback(function($args) {
+                return $args[0] === 'XADD' && $args[1] === TickService::STREAM_KEY;
+            }));
+
+        $this->service->dispatchTickJobs();
+
+        $log = \sdo\Models\TickLog::first();
+        $this->assertNotNull($log);
+        $this->assertEquals(2, $log->total_sectors);
+        $this->assertEquals('dispatched', $log->metadata['status']);
     }
 }

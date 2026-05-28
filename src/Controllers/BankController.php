@@ -8,6 +8,7 @@ use sdo\Services\AdvisorService;
 use sdo\Services\BankService;
 use sdo\Services\AuthService;
 use sdo\Services\ConfigService;
+use sdo\Dto\Bank\BankTransactionRequest;
 
 class BankController extends BaseController
 {
@@ -42,27 +43,25 @@ class BankController extends BaseController
 
     public function deposit(): string
     {
-        header('Content-Type: application/json');
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
-        $amount = (int)($_POST['amount'] ?? 0);
-
-        try {
-            return json_encode($this->bankService->deposit($dominion->id, $amount));
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
+            $request = new BankTransactionRequest($_POST);
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            return $this->bankService->deposit($dominion->id, $request->amount);
+        });
     }
 
     public function withdraw(): string
     {
-        header('Content-Type: application/json');
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
-        $amount = (int)($_POST['amount'] ?? 0);
-
-        try {
-            return json_encode($this->bankService->withdraw($dominion->id, $amount));
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
+            $request = new BankTransactionRequest($_POST);
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            return $this->bankService->withdraw($dominion->id, $request->amount);
+        });
     }
 }

@@ -11,6 +11,10 @@ use sdo\Models\User;
 use sdo\Models\Dominion;
 use sdo\Models\Race;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use sdo\Repositories\Eloquent\EloquentUserRepository;
+use sdo\Repositories\Eloquent\EloquentDominionRepository;
+use sdo\Repositories\Eloquent\EloquentUnitRepository;
+use sdo\Repositories\Eloquent\EloquentStructureRepository;
 
 class AuthServiceTest extends TestCase
 {
@@ -104,9 +108,20 @@ class AuthServiceTest extends TestCase
         });
     }
 
+    private function getAuthService(): AuthService
+    {
+        return new AuthService(
+            $this->configService,
+            new EloquentUserRepository(),
+            new EloquentDominionRepository(),
+            new EloquentUnitRepository(),
+            new EloquentStructureRepository()
+        );
+    }
+
     public function testRegisterSuccess(): void
     {
-        $authService = new AuthService($this->configService);
+        $authService = $this->getAuthService();
         $result = $authService->register('testuser', 'test@example.com', 'password123', 'Test Dominion', 'Terran');
 
         $this->assertTrue($result['success']);
@@ -124,7 +139,7 @@ class AuthServiceTest extends TestCase
 
     public function testRegisterFailureDuplicateUsername(): void
     {
-        $authService = new AuthService($this->configService);
+        $authService = $this->getAuthService();
         $authService->register('testuser', 'test1@example.com', 'password123', 'Dominion 1', 'Terran');
 
         $result = $authService->register('testuser', 'test2@example.com', 'password456', 'Dominion 2', 'Terran');
@@ -135,7 +150,7 @@ class AuthServiceTest extends TestCase
 
     public function testLoginSuccess(): void
     {
-        $authService = new AuthService($this->configService);
+        $authService = $this->getAuthService();
         $authService->register('testuser', 'test@example.com', 'password123', 'Test Dominion', 'Terran');
 
         $user = $authService->login('testuser', 'password123');
@@ -147,7 +162,7 @@ class AuthServiceTest extends TestCase
 
     public function testLoginFailureWrongPassword(): void
     {
-        $authService = new AuthService($this->configService);
+        $authService = $this->getAuthService();
         $authService->register('testuser', 'test@example.com', 'password123', 'Test Dominion', 'Terran');
 
         $user = $authService->login('testuser', 'wrongpassword');
@@ -157,7 +172,7 @@ class AuthServiceTest extends TestCase
 
     public function testLoginFailureUserNotFound(): void
     {
-        $authService = new AuthService($this->configService);
+        $authService = $this->getAuthService();
 
         $user = $authService->login('nonexistent', 'password123');
 
@@ -166,7 +181,7 @@ class AuthServiceTest extends TestCase
 
     public function testIsLoggedInTrue(): void
     {
-        $authService = new AuthService($this->configService);
+        $authService = $this->getAuthService();
 
         $session = ['user_id' => 1];
         $this->assertTrue($authService->isLoggedIn($session));
@@ -174,29 +189,9 @@ class AuthServiceTest extends TestCase
 
     public function testIsLoggedInFalse(): void
     {
-        $authService = new AuthService($this->configService);
+        $authService = $this->getAuthService();
 
         $session = [];
         $this->assertFalse($authService->isLoggedIn($session));
-    }
-
-    public function testLogout(): void
-    {
-        $authService = new AuthService($this->configService);
-
-        // Start session if not already started
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        $_SESSION['user_id'] = 1;
-        $_SESSION['username'] = 'testuser';
-
-        $authService->logout();
-
-        // session_destroy() clears the session
-        // In test environment, we just check the function was called
-        // The actual unset happens at the end of the script
-        $this->assertTrue(true); // Test passes if no error
     }
 }

@@ -1,10 +1,13 @@
 <?php
+
 declare(strict_types=1);
 
 namespace sdo\Services;
 
 use sdo\Models\User;
 use sdo\Models\Dominion;
+use sdo\Dto\Settings\UpdateIdentityRequest;
+use sdo\Dto\Settings\UpdateCipherRequest;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 use DateTime;
@@ -16,14 +19,14 @@ class SettingsService
     private const MAX_DIMENSION = 500;
     private const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-    public function updateIdentity(int $userId, string $newHandle, string $newEmail): array
+    public function updateIdentity(int $userId, UpdateIdentityRequest $request): array
     {
         $user = User::findOrFail($userId);
         $dominion = $user->dominion;
 
-        if ($user->username !== $newHandle) {
-            if (User::where('username', $newHandle)->exists()) {
-                throw new Exception("Identity handle '{$newHandle}' is already claimed.");
+        if ($user->username !== $request->username) {
+            if (User::where('username', $request->username)->exists()) {
+                throw new Exception("Identity handle '{$request->username}' is already claimed.");
             }
             
             if ($dominion->credits < self::HANDLE_CHANGE_COST) {
@@ -31,15 +34,15 @@ class SettingsService
             }
 
             $dominion->credits -= self::HANDLE_CHANGE_COST;
-            $user->username = $newHandle;
+            $user->username = $request->username;
             $user->handle_last_changed = new DateTime();
         }
 
-        if ($user->email !== $newEmail) {
-            if (User::where('email', $newEmail)->exists()) {
-                throw new Exception("Comms frequency '{$newEmail}' is already monitored.");
+        if ($user->email !== $request->email) {
+            if (User::where('email', $request->email)->exists()) {
+                throw new Exception("Comms frequency '{$request->email}' is already monitored.");
             }
-            $user->email = $newEmail;
+            $user->email = $request->email;
         }
 
         Capsule::transaction(function() use ($user, $dominion) {
@@ -50,23 +53,19 @@ class SettingsService
         return ['success' => true, 'message' => "Identity profiles synchronized."];
     }
 
-    public function updateCipher(int $userId, string $current, string $new, string $confirm): array
+    public function updateCipher(int $userId, UpdateCipherRequest $request): array
     {
         $user = User::findOrFail($userId);
 
-        if (!password_verify($current, $user->password)) {
+        if (!password_verify($request->current_password, $user->password)) {
             throw new Exception("Current authorization cipher is incorrect.");
         }
 
-        if ($new !== $confirm) {
+        if ($request->new_password !== $request->confirm_password) {
             throw new Exception("New cipher verification mismatch.");
         }
 
-        if (strlen($new) < 8) {
-            throw new Exception("Cipher complexity insufficient. Minimum 8 characters.");
-        }
-
-        $user->password = $new;
+        $user->password = $request->new_password;
         $user->save();
 
         return ['success' => true, 'message' => "Encryption ciphers rotated successfully."];

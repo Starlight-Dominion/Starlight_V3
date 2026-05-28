@@ -9,6 +9,7 @@ use sdo\Services\AdvisorService;
 use sdo\Services\TrainingService;
 use sdo\Services\AuthService;
 use sdo\Services\ConfigService;
+use sdo\Dto\Combat\TrainingRequest;
 
 class TrainingController extends BaseController
 {
@@ -37,20 +38,15 @@ class TrainingController extends BaseController
 
     public function train(): string
     {
-        header('Content-Type: application/json');
-        if (!$this->authService->isLoggedIn($_SESSION)) {
-            return json_encode(['success' => false, 'message' => 'Unauthorized']);
-        }
+        return $this->jsonResponse(function() {
+            if (!$this->authService->isLoggedIn($_SESSION)) {
+                throw new \Exception('Unauthorized');
+            }
 
-        $unitType = (string)($_POST['unit_type'] ?? '');
-        $quantity = (int)($_POST['quantity'] ?? 0);
-        $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
+            $request = new TrainingRequest($_POST);
+            $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
 
-        try {
-            $res = $this->trainingService->train($dominion->id, $unitType, $quantity);
-            return json_encode($res);
-        } catch (\Exception $e) {
-            return json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
+            return $this->trainingService->train($dominion->id, $request->unit_type, $request->quantity);
+        });
     }
 }

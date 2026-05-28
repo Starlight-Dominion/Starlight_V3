@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 interface DominionRepositoryInterface
 {
     public function findById(int $id): ?Dominion;
+    public function findByName(string $name): ?Dominion;
     public function findByUserId(int $userId): ?Dominion;
     public function lockForUpdate(int $id): ?Dominion;
     public function update(int $id, array $data): bool;

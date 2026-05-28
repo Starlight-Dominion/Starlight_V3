@@ -13,6 +13,10 @@ use sdo\Services\ConfigService;
 use sdo\Services\DiscordLinkService;
 use sdo\Services\GameService;
 use sdo\Services\SettingsService;
+use sdo\Repositories\Interfaces\UserRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\UnitRepositoryInterface;
+use sdo\Repositories\Interfaces\StructureRepositoryInterface;
 
 class SettingsControllerTest extends TestCase
 {
@@ -26,10 +30,22 @@ class SettingsControllerTest extends TestCase
         $gameService = $this->createMock(GameService::class);
         $advisorService = $this->createMock(AdvisorService::class);
         $configService = $this->createMock(ConfigService::class);
-        $this->authService = new class($configService) extends AuthService {
-            public function __construct(ConfigService $configService)
+        
+        $userRepo = $this->createMock(UserRepositoryInterface::class);
+        $dominionRepo = $this->createMock(DominionRepositoryInterface::class);
+        $unitRepo = $this->createMock(UnitRepositoryInterface::class);
+        $structureRepo = $this->createMock(StructureRepositoryInterface::class);
+
+        $this->authService = new class(
+            $configService,
+            $userRepo,
+            $dominionRepo,
+            $unitRepo,
+            $structureRepo
+        ) extends AuthService {
+            public function __construct($c, $u, $d, $un, $s)
             {
-                parent::__construct($configService);
+                parent::__construct($c, $u, $d, $un, $s);
             }
 
             public function isLoggedIn(array $session): bool

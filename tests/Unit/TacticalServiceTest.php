@@ -52,6 +52,10 @@ class TacticalServiceTest extends TestCase
             $table->increments('id');
             $table->string('slug')->unique();
             $table->string('name');
+            $table->integer('power_offense')->default(0);
+            $table->integer('power_defense')->default(0);
+            $table->integer('power_spy_offense')->default(0);
+            $table->integer('power_spy_defense')->default(0);
         });
 
         $schema->create('dominion_manpower', function ($table): void {
@@ -91,10 +95,10 @@ class TacticalServiceTest extends TestCase
 
     private function seedUnits(): void
     {
-        Unit::create(['slug' => 'soldiers', 'name' => 'Soldiers']);
-        Unit::create(['slug' => 'guards', 'name' => 'Guards']);
-        Unit::create(['slug' => 'spies', 'name' => 'Spies']);
-        Unit::create(['slug' => 'sentries', 'name' => 'Sentries']);
+        Unit::create(['slug' => 'soldiers', 'name' => 'Soldiers', 'power_offense' => 10]);
+        Unit::create(['slug' => 'guards', 'name' => 'Guards', 'power_defense' => 10]);
+        Unit::create(['slug' => 'spies', 'name' => 'Spies', 'power_spy_offense' => 10]);
+        Unit::create(['slug' => 'sentries', 'name' => 'Sentries', 'power_spy_defense' => 10]);
     }
 
     public function testCalculateTacticalRatingsIncludesDeterministicSpyAndSentryValues(): void
