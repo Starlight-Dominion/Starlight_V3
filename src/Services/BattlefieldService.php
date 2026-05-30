@@ -3,12 +3,13 @@ declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Models\Dominion;
-use sdo\Models\DominionManpower;
-use sdo\Models\Unit;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\UnitRepositoryInterface;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Repositories\Interfaces\CombatRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use sdo\Services\LogService;
 use sdo\Services\ConfigService;
-use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 use DateTime;
 
@@ -19,7 +20,13 @@ class BattlefieldService
     public function __construct(
         private TacticalService $tacticalService,
         private LogService $logService,
-        private ConfigService $configService
+        private ConfigService $configService,
+        private GameService $gameService,
+        private DominionRepositoryInterface $dominionRepository,
+        private UnitRepositoryInterface $unitRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private CombatRepositoryInterface $combatRepository,
+        private TransactionManager $transactionManager
     ) {}
 
     public function getBattlefieldList(): array
@@ -27,25 +34,22 @@ class BattlefieldService
         $configuredLimit = (int)$this->configService->get('battlefield_list_limit', self::DEFAULT_BATTLEFIELD_LIST_LIMIT);
         $limit = max(1, min(1000, $configuredLimit));
 
-        return Dominion::with('user')
-            ->orderBy('credits', 'desc')
-            ->orderBy('id', 'asc')
-            ->limit($limit)
-            ->get()
+        return $this->dominionRepository->getBattlefieldList()
+            ->take($limit)
             ->map(fn($d) => [
                 'kingdom_id' => $d->id,
                 'name' => $d->name,
-                'username' => $d->user->username,
+                'username' => $d->user->username ?? 'Unknown',
                 'gold' => $d->credits,
-                'level' => $d->getPlayerLevel()
+                'level' => $this->gameService->calculateLevel((int)$d->xp)
             ])->toArray();
     }
 
     public function executeAttack(int $attackerId, int $targetId, int $turns): array
     {
-        return Capsule::transaction(function() use ($attackerId, $targetId, $turns) {
-            $atkDom = Dominion::lockForUpdate()->find($attackerId);
-            $defDom = Dominion::lockForUpdate()->find($targetId);
+        return $this->transactionManager->transaction(function() use ($attackerId, $targetId, $turns) {
+            $atkDom = $this->dominionRepository->lockForUpdate($attackerId);
+            $defDom = $this->dominionRepository->lockForUpdate($targetId);
 
             if (!$atkDom || !$defDom) throw new Exception("Targeting uplink lost.");
             if ($atkDom->turns < $turns) throw new Exception("Insufficient strike capacity.");
@@ -62,12 +66,7 @@ class BattlefieldService
             $reducedLootMax = (int)$this->configService->get('battle_hourly_reduced_loot_max', 10);
 
             // 1. Anti-Farm & Fatigue Checks
-            $hourAgo = (new DateTime('-1 hour'))->format('Y-m-d H:i:s');
-            $hourlyCount = Capsule::table('battle_logs')
-                ->where('attacker_id', $attackerId)
-                ->where('defender_id', $targetId)
-                ->where('battle_time', '>', $hourAgo)
-                ->count();
+            $hourlyCount = $this->combatRepository->countRecentBattlesBetween($attackerId, $targetId, 1);
 
             $lootFactor = 1.0;
             if ($hourlyCount >= $fullLootCap) $lootFactor = 0.25;
@@ -114,22 +113,24 @@ class BattlefieldService
             }
 
             // 5. XP
-            $lvlDiff = $defDom->getPlayerLevel() - $atkDom->getPlayerLevel();
+            $lvlDiff = $this->gameService->calculateLevel((int)$defDom->xp) - $this->gameService->calculateLevel((int)$atkDom->xp);
             $xpGained = (int)(($attackerWins ? mt_rand(150, 200) : mt_rand(40, 60)) * $turns * max(0.1, 1 + ($lvlDiff * 0.07)));
 
             // 6. Persistence
-            $atkDom->credits += $stolen;
-            $atkDom->turns -= $turns;
-            $atkDom->xp += $xpGained;
-            $atkDom->save();
+            $this->dominionRepository->update($attackerId, [
+                'credits' => $atkDom->credits + $stolen,
+                'turns' => $atkDom->turns - $turns,
+                'xp' => $atkDom->xp + $xpGained
+            ]);
 
-            $defDom->credits -= $stolen;
-            $defDom->save();
+            $this->dominionRepository->update($targetId, [
+                'credits' => $defDom->credits - $stolen
+            ]);
 
             $this->deductUnits($attackerId, 'soldiers', $fatigueLoss);
             $this->deductUnits($targetId, 'guards', $guardsLost);
 
-            $logId = Capsule::table('battle_logs')->insertGetId([
+            $logId = $this->combatRepository->logBattle([
                 'attacker_id' => $attackerId,
                 'defender_id' => $targetId,
                 'attacker_name' => $atkDom->name,
@@ -175,16 +176,14 @@ class BattlefieldService
     {
         if ($qty <= 0) return;
         
-        $unit = Unit::where('slug', $slug)->first();
+        $unit = $this->unitRepository->findBySlug($slug);
         if (!$unit) return;
 
-        DominionManpower::where('dominion_id', $domId)
-            ->where('unit_id', $unit->id)
-            ->decrement('total_quantity', $qty);
+        $this->manpowerRepository->updateQuantity($domId, (int)$unit->id, -$qty);
     }
 
     public function getBattleLog(int $id): ?object
     {
-        return Capsule::table('battle_logs')->find($id);
+        return $this->combatRepository->findLogById($id);
     }
 }

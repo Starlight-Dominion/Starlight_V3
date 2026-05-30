@@ -4,6 +4,16 @@
 
     const user = $derived(game.user);
     const kingdom = $derived(user?.kingdom || {});
+
+    // Reactive XP Calculations
+    const level = $derived(Math.floor(Math.sqrt(resources.xp / 100)) + 1);
+    const currentThreshold = $derived(Math.pow(level - 1, 2) * 100);
+    const nextThreshold = $derived(Math.pow(level, 2) * 100);
+    const xpProgress = $derived(
+        nextThreshold > currentThreshold 
+            ? Math.max(0, Math.min(100, ((resources.xp - currentThreshold) / (nextThreshold - currentThreshold)) * 100))
+            : 0
+    );
 </script>
 
 <aside class="lg:col-span-1 space-y-6">
@@ -25,6 +35,20 @@
             <h2 class="text-gray-500 font-title text-[10px] font-black uppercase tracking-[3px]">Sector Vitals</h2>
         </header>
         <div class="p-6 space-y-4 font-mono text-[11px]">
+            <!-- Commander Level & XP Progression -->
+            <div class="mb-6">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-cyan-400 font-bold uppercase tracking-widest text-[10px]">Level {level}</span>
+                    <span class="text-gray-500 text-[9px] uppercase tracking-widest">{resources.xp.toLocaleString()} XP</span>
+                </div>
+                <div class="w-full bg-black/60 rounded-full h-1.5 border border-white/5 overflow-hidden">
+                    <div 
+                        class="bg-cyan-500 h-1.5 rounded-full shadow-[0_0_8px_#00ffff] transition-all duration-1000 ease-out" 
+                        style="width: {xpProgress}%"
+                    ></div>
+                </div>
+            </div>
+
             <div class="flex justify-between items-center group">
                 <span class="text-gray-600 uppercase">Credits</span>
                 <span class="text-white font-bold group-hover:text-cyan-400 transition-colors">{resources.credits.toLocaleString()}</span>

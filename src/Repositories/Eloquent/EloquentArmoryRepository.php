@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace sdo\Repositories\Eloquent;
 
+use Illuminate\Database\Capsule\Manager as Capsule;
 use sdo\Models\ArmoryItem;
 use sdo\Models\ArmoryCategory;
 use sdo\Models\ArmoryUnitType;
@@ -41,6 +42,11 @@ class EloquentArmoryRepository implements ArmoryRepositoryInterface
     public function delete(int $id): bool
     {
         return ArmoryItem::where('id', $id)->delete() > 0;
+    }
+
+    public function getColumns(): array
+    {
+        return Capsule::schema()->getColumnListing('armory_items');
     }
 
     public function allCategories(): Collection

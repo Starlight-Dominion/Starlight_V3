@@ -30,7 +30,11 @@ class DiscordLinkServiceTest extends TestCase
 
         $this->createTables();
 
-        $this->service = new DiscordLinkService();
+        $this->service = new DiscordLinkService(
+            new \sdo\Repositories\Eloquent\EloquentUserRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDiscordLinkRepository(),
+            new \sdo\Infrastructure\TransactionManager()
+        );
     }
 
     private function createTables(): void

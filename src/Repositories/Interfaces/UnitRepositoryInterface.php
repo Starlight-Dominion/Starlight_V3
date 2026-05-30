@@ -15,4 +15,5 @@ interface UnitRepositoryInterface
     public function create(array $data): Unit;
     public function update(int $id, array $data): bool;
     public function delete(int $id): bool;
+    public function getColumns(): array;
 }

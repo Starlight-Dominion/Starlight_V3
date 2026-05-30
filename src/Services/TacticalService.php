@@ -4,26 +4,26 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
-use sdo\Models\DominionManpower;
-use sdo\Models\DominionStructure;
-use sdo\Models\DominionArmoryItem;
-use sdo\Models\StructureLevel;
-use sdo\Models\ArmoryItem;
-use sdo\Models\Unit;
-use Illuminate\Database\Capsule\Manager as Capsule;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionStructureRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionArmoryRepositoryInterface;
 
 class TacticalService
 {
-    private const AVG_UNIT_POWER = 10;
+    public function __construct(
+        private DominionRepositoryInterface $dominionRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private DominionStructureRepositoryInterface $dominionStructureRepository,
+        private DominionArmoryRepositoryInterface $dominionArmoryRepository
+    ) {}
 
     public function calculateTacticalRatings(int $dominionId): array
     {
-        $dom = Dominion::findOrFail($dominionId);
+        $dom = $this->dominionRepository->findById($dominionId);
+        if (!$dom) return [];
         
-        $manpower = DominionManpower::with('unit')
-            ->where('dominion_id', $dominionId)
-            ->get();
-
+        $manpower = $this->manpowerRepository->getManpowerByDominion($dominionId);
         $manpowerMap = $manpower->mapWithKeys(fn($m) => [$m->unit->slug => $m->total_quantity]);
 
         // Attribute Multipliers (1% per point)
@@ -47,21 +47,18 @@ class TacticalService
             }
         }
 
-        // 1:1 Equipping Logic (Assuming only specific units get armory bonuses for now)
+        // 1:1 Equipping Logic
         $atkArmoryBonus = $this->getArmoryBonus($dominionId, 'soldiers', (int)($manpowerMap['soldiers'] ?? 0), 'attack_bonus');
         $defArmoryBonus = $this->getArmoryBonus($dominionId, 'guards', (int)($manpowerMap['guards'] ?? 0), 'defense_bonus');
 
-        // Structural Multipliers (From dominion_structures table)
-        $structs = DominionStructure::join('structure_levels', function($j) {
-                $j->on('dominion_structures.structure_id', '=', 'structure_levels.structure_id')
-                  ->on('dominion_structures.level', '=', 'structure_levels.level');
-            })
-            ->where('dominion_structures.dominion_id', $dominionId)
-            ->selectRaw('SUM(buff_offense) as off, SUM(buff_defense) as def')
-            ->first();
+        // Structural Multipliers
+        $buffs = $this->dominionStructureRepository->sumMultipleStructureLevelBuffs($dominionId, [
+            'off' => 'buff_offense',
+            'def' => 'buff_defense'
+        ]);
 
-        $offenseUpgradeMult = 1 + (($structs->off ?? 0) / 100.0);
-        $defenseUpgradeMult = 1 + (($structs->def ?? 0) / 100.0);
+        $offenseUpgradeMult = 1 + (($buffs['off'] ?? 0) / 100.0);
+        $defenseUpgradeMult = 1 + (($buffs['def'] ?? 0) / 100.0);
 
         // Final Aggregate Ratings
         $rawAttack = ($rawAttack * $strengthMult + $atkArmoryBonus) * $offenseUpgradeMult;
@@ -82,19 +79,13 @@ class TacticalService
     {
         if ($unitCount <= 0) return 0.0;
 
-        // Fetch equipped items for this unit type, sorted by the bonus field descending
-        $items = DominionArmoryItem::with('item')
-            ->where('kingdom_id', $domId)
-            ->where('is_equipped', true)
-            ->whereHas('item', fn($q) => $q->where('unit_type', $type))
-            ->get()
+        $items = $this->dominionArmoryRepository->getEquippedItemsByType($domId, $type)
             ->sortByDesc(fn($m) => $m->item->$field);
 
         $bonus = 0.0;
         $remainingCapacity = $unitCount;
 
         foreach ($items as $item) {
-            // Apply items up to the unit limit
             $effectiveQty = min($remainingCapacity, $item->quantity);
             $bonus += ($effectiveQty * (float)$item->item->$field);
             
@@ -108,11 +99,10 @@ class TacticalService
     public function getTacticalOverview(int $dominionId): array
     {
         $res = $this->calculateTacticalRatings($dominionId);
-        $dom = Dominion::find($dominionId);
+        $dom = $this->dominionRepository->findById($dominionId);
+        if (!$dom) return [];
 
-        $manpowerDetails = DominionManpower::with('unit')
-            ->where('dominion_id', $dominionId)
-            ->get()
+        $manpowerDetails = $this->manpowerRepository->getManpowerByDominion($dominionId)
             ->map(fn($m) => [
                 'slug' => $m->unit->slug,
                 'name' => $m->unit->name,

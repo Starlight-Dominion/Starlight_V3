@@ -21,4 +21,6 @@ interface StructureRepositoryInterface
     public function allLevels(int $structureId): Collection;
     public function updateLevel(int $structureId, int $level, array $data): bool;
     public function addLevel(array $data): bool;
+    public function getColumns(): array;
+    public function getLevelColumns(): array;
 }

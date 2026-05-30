@@ -23,9 +23,10 @@ class AdminArmoryTest extends TestCase
         $this->createTables();
         
         $this->service = new AdminGameDataService(
-            new EloquentUnitRepository(),
-            new EloquentStructureRepository(),
-            new EloquentArmoryRepository()
+            new \sdo\Repositories\Eloquent\EloquentUnitRepository(),
+            new \sdo\Repositories\Eloquent\EloquentStructureRepository(),
+            new \sdo\Repositories\Eloquent\EloquentArmoryRepository(),
+            new \sdo\Repositories\Eloquent\EloquentRaceRepository()
         );
     }
 

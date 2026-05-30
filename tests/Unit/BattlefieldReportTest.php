@@ -44,9 +44,15 @@ class BattlefieldReportTest extends TestCase
         $this->configMock = $this->createMock(ConfigService::class);
         
         $this->service = new BattlefieldService(
-            $this->tacticalMock,
-            $this->logMock,
-            $this->configMock
+            $this->createMock(\sdo\Services\TacticalService::class),
+            $this->createMock(\sdo\Services\LogService::class),
+            $this->createMock(\sdo\Services\ConfigService::class),
+            $this->createMock(\sdo\Services\GameService::class),
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentUnitRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Repositories\Eloquent\EloquentCombatRepository(),
+            new \sdo\Infrastructure\TransactionManager()
         );
     }
 

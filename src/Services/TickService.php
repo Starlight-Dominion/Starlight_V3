@@ -3,11 +3,10 @@ declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Models\Dominion;
-use sdo\Models\TickLog;
+use sdo\Repositories\Interfaces\TickRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use sdo\Services\GameService;
 use sdo\Services\ConfigService;
-use Illuminate\Database\Capsule\Manager as Capsule;
 use Predis\Client as Redis;
 use DateTime;
 
@@ -19,7 +18,9 @@ class TickService
 
     public function __construct(
         private ConfigService $configService,
-        private Redis $redis
+        private Redis $redis,
+        private TickRepositoryInterface $tickRepository,
+        private TransactionManager $transactionManager
     ) {}
 
     /**
@@ -31,9 +32,7 @@ class TickService
         $tickId = bin2hex(random_bytes(8));
         $metricsKey = self::METRICS_KEY_PREFIX . $tickId;
 
-        echo "Dispatching Global Tick [ID: {$tickId}] at {$now}...\n";
-
-        $dominionIds = Dominion::pluck('id')->toArray();
+        $dominionIds = $this->tickRepository->getAllDominionIds();
         $totalSectors = count($dominionIds);
         $chunks = array_chunk($dominionIds, self::BATCH_SIZE);
 
@@ -44,7 +43,6 @@ class TickService
                 'dominion_ids' => $chunk
             ]);
             
-            // XADD stream * data payload
             $this->redis->executeRaw(['XADD', self::STREAM_KEY, '*', 'data', $payload]);
         }
 
@@ -56,7 +54,7 @@ class TickService
         $this->redis->expire($metricsKey, 3600); // 1 hour TTL
 
         // Create initial TickLog entry
-        TickLog::create([
+        $this->tickRepository->createTickLog([
             'tick_time' => $now,
             'total_sectors' => $totalSectors,
             'total_credits_granted' => 0,
@@ -70,8 +68,6 @@ class TickService
                 'chunk_count' => count($chunks)
             ]
         ]);
-
-        echo "Dispatched " . count($chunks) . " jobs for {$totalSectors} sectors.\n";
     }
 
     /**
@@ -86,46 +82,14 @@ class TickService
         $baseCredits = (int)$this->configService->get('baseline_credits_per_tick', 100);
         $baseTurns = GameService::BASE_TURNS_PER_TICK;
 
-        $hasProductionColumn = Capsule::schema()->hasColumn('units', 'production_credits');
-
-        $query = Dominion::whereIn('id', $dominionIds)
-            ->select(['dominions.*'])
-            ->selectSub(function ($query) {
-                $query->selectRaw('SUM(sl.buff_economy)')
-                    ->from('dominion_structures as ds')
-                    ->join('structure_levels as sl', function ($join) {
-                        $join->on('ds.structure_id', '=', 'sl.structure_id')
-                             ->on('ds.level', '=', 'sl.level');
-                    })
-                    ->whereColumn('ds.dominion_id', 'dominions.id');
-            }, 'total_economy_buff')
-            ->selectSub(function ($query) {
-                $query->selectRaw('SUM(sl.buff_citizens_per_tick)')
-                    ->from('dominion_structures as ds')
-                    ->join('structure_levels as sl', function ($join) {
-                        $join->on('ds.structure_id', '=', 'sl.structure_id')
-                             ->on('ds.level', '=', 'sl.level');
-                    })
-                    ->whereColumn('ds.dominion_id', 'dominions.id');
-            }, 'total_citizen_buff');
-
-        if ($hasProductionColumn) {
-            $query->selectSub(function ($query) {
-                $query->selectRaw('SUM(dm.total_quantity * u.production_credits)')
-                    ->from('dominion_manpower as dm')
-                    ->join('units as u', 'dm.unit_id', '=', 'u.id')
-                    ->whereColumn('dm.dominion_id', 'dominions.id');
-            }, 'total_unit_production');
-        }
-
         $localMetrics = [
             'credits' => 0,
             'citizens' => 0,
             'turns' => 0
         ];
 
-        Capsule::transaction(function () use ($query, $baseCitizens, $baseCredits, $baseTurns, $tickTime, &$localMetrics) {
-            $dominions = $query->get();
+        $this->transactionManager->transaction(function () use ($dominionIds, $baseCitizens, $baseCredits, $baseTurns, $tickTime, &$localMetrics) {
+            $dominions = $this->tickRepository->getTickData($dominionIds);
             foreach ($dominions as $dom) {
                 $multiplier = 1 + ((float)($dom->total_economy_buff ?? 0) / 100);
                 $basePlusUnit = $baseCredits + (int)($dom->total_unit_production ?? 0);
@@ -133,14 +97,13 @@ class TickService
                 
                 $citizenGained = max(0, $baseCitizens + (int)($dom->total_citizen_buff ?? 0));
 
-                Capsule::table('dominions')
-                    ->where('id', $dom->id)
-                    ->update([
-                        'credits'   => Capsule::raw('credits + ' . (int)$creditsGained),
-                        'citizens'  => Capsule::raw('citizens + ' . (int)$citizenGained),
-                        'turns'     => Capsule::raw('turns + ' . (int)$baseTurns),
-                        'last_tick' => $tickTime
-                    ]);
+                $this->tickRepository->applyTickResults(
+                    (int)$dom->id,
+                    $creditsGained,
+                    $citizenGained,
+                    $baseTurns,
+                    $tickTime
+                );
 
                 $localMetrics['credits'] += $creditsGained;
                 $localMetrics['citizens'] += $citizenGained;
@@ -152,9 +115,6 @@ class TickService
         $this->redis->hincrby($metricsKey, 'total_credits', $localMetrics['credits']);
         $this->redis->hincrby($metricsKey, 'total_citizens', $localMetrics['citizens']);
         $this->redis->hincrby($metricsKey, 'total_turns', $localMetrics['turns']);
-
-        $durationMs = (microtime(true) - $startTime) * 1000;
-        echo "[Chunk processed in " . round($durationMs, 2) . "ms]\n";
     }
 
     /**
@@ -166,26 +126,24 @@ class TickService
         $data = $this->redis->hgetall($metricsKey);
 
         if (empty($data)) {
-            echo "Warning: No metrics found for Tick ID {$tickId}.\n";
             return;
         }
 
-        $log = TickLog::where('metadata->tick_id', $tickId)->first();
+        $log = $this->tickRepository->findTickLogByTickId($tickId);
         if ($log) {
-            $log->total_credits_granted = (int)($data['total_credits'] ?? 0);
-            $log->total_citizens_born = (int)($data['total_citizens'] ?? 0);
-            $log->total_turns_granted = (int)($data['total_turns'] ?? 0);
-            $log->execution_time_ms = $executionTimeMs;
-            
             $meta = $log->metadata;
             $meta['status'] = 'completed';
-            $log->metadata = $meta;
-            
-            $log->save();
+
+            $this->tickRepository->updateTickLogByTickId($tickId, [
+                'total_credits_granted' => (int)($data['total_credits'] ?? 0),
+                'total_citizens_born' => (int)($data['total_citizens'] ?? 0),
+                'total_turns_granted' => (int)($data['total_turns'] ?? 0),
+                'execution_time_ms' => $executionTimeMs,
+                'metadata' => $meta
+            ]);
         }
 
         $this->redis->del($metricsKey);
-        echo "Tick ID {$tickId} finalized.\n";
     }
 
     /**

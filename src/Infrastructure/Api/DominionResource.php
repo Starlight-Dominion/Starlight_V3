@@ -20,7 +20,7 @@ class DominionResource extends BaseResource
             ],
             'stats' => [
                 'xp' => (int)$this->resource->xp,
-                'level' => $this->resource->getPlayerLevel(),
+                'level' => (int)floor(sqrt((int)$this->resource->xp / 100)) + 1,
                 'hp' => (int)$this->resource->foundation_hp,
                 'max_hp' => (int)$this->resource->foundation_max_hp,
             ],

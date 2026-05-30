@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace sdo\Repositories\Eloquent;
 
+use Illuminate\Database\Capsule\Manager as Capsule;
 use sdo\Models\Structure;
 use sdo\Models\StructureLevel;
 use sdo\Repositories\Interfaces\StructureRepositoryInterface;
@@ -66,5 +67,15 @@ class EloquentStructureRepository implements StructureRepositoryInterface
     public function addLevel(array $data): bool
     {
         return StructureLevel::create($data)->exists;
+    }
+
+    public function getColumns(): array
+    {
+        return Capsule::schema()->getColumnListing('structures');
+    }
+
+    public function getLevelColumns(): array
+    {
+        return Capsule::schema()->getColumnListing('structure_levels');
     }
 }

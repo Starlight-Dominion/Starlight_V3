@@ -26,7 +26,7 @@ readonly class GameStateViewModel
         $this->secondsToNextTick = $gameService->getSecondsToNextTick();
         
         // Calculate based on normalized Dominion data
-        $this->level = $dominion->getPlayerLevel();
+        $this->level = $gameService->calculateLevel((int)$dominion->xp);
         $this->xpProgress = $gameService->calculateXpProgress((int)$dominion->xp);
         
         $this->kingdomName = (string)$dominion->name;

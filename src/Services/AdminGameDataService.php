@@ -4,17 +4,10 @@ declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Models\Unit;
-use sdo\Models\Structure;
-use sdo\Models\StructureLevel;
-use sdo\Models\ArmoryItem;
-use sdo\Models\ArmoryUnitType;
-use sdo\Models\ArmoryCategory;
-use sdo\Models\Race;
 use sdo\Repositories\Interfaces\UnitRepositoryInterface;
 use sdo\Repositories\Interfaces\StructureRepositoryInterface;
 use sdo\Repositories\Interfaces\ArmoryRepositoryInterface;
-use Illuminate\Database\Capsule\Manager as Capsule;
+use sdo\Repositories\Interfaces\RaceRepositoryInterface;
 use Exception;
 
 class AdminGameDataService
@@ -22,7 +15,8 @@ class AdminGameDataService
     public function __construct(
         private UnitRepositoryInterface $unitRepository,
         private StructureRepositoryInterface $structureRepository,
-        private ArmoryRepositoryInterface $armoryRepository
+        private ArmoryRepositoryInterface $armoryRepository,
+        private RaceRepositoryInterface $raceRepository
     ) {}
 
     // --- Units ---
@@ -33,10 +27,7 @@ class AdminGameDataService
 
     public function updateUnit(int $id, array $data): bool
     {
-        $unit = $this->unitRepository->findById($id);
-        if (!$unit) return false;
-        
-        $unitColumns = Capsule::schema()->getColumnListing('units');
+        $unitColumns = $this->unitRepository->getColumns();
         $filteredData = array_filter($data, fn($key) => in_array($key, $unitColumns), ARRAY_FILTER_USE_KEY);
 
         return $this->unitRepository->update($id, $filteredData);
@@ -72,7 +63,7 @@ class AdminGameDataService
 
     public function updateStructure(int $id, array $data): bool
     {
-        $columns = Capsule::schema()->getColumnListing('structures');
+        $columns = $this->structureRepository->getColumns();
         $filteredData = array_filter($data, fn($key) => in_array($key, $columns), ARRAY_FILTER_USE_KEY);
         return $this->structureRepository->update($id, $filteredData);
     }
@@ -84,7 +75,7 @@ class AdminGameDataService
 
     public function updateStructureLevel(int $structureId, int $level, array $data): bool
     {
-        $columns = Capsule::schema()->getColumnListing('structure_levels');
+        $columns = $this->structureRepository->getLevelColumns();
         $filteredData = array_filter($data, fn($key) => in_array($key, $columns), ARRAY_FILTER_USE_KEY);
         return $this->structureRepository->updateLevel($structureId, $level, $filteredData);
     }
@@ -102,7 +93,7 @@ class AdminGameDataService
 
     public function updateArmoryItem(int $id, array $data): bool
     {
-        $armoryColumns = Capsule::schema()->getColumnListing('armory_items');
+        $armoryColumns = $this->armoryRepository->getColumns();
         $filteredData = array_filter($data, fn($key) => in_array($key, $armoryColumns), ARRAY_FILTER_USE_KEY);
         return $this->armoryRepository->update($id, $filteredData);
     }
@@ -131,14 +122,13 @@ class AdminGameDataService
     // --- Races ---
     public function getAllRaces(): array
     {
-        return Race::all()->toArray();
+        return $this->raceRepository->all()->toArray();
     }
 
     public function updateRace(int $id, array $data): bool
     {
-        $race = Race::findOrFail($id);
-        $raceColumns = Capsule::schema()->getColumnListing('races');
+        $raceColumns = $this->raceRepository->getColumns();
         $filteredData = array_filter($data, fn($key) => in_array($key, $raceColumns), ARRAY_FILTER_USE_KEY);
-        return $race->update($filteredData);
+        return $this->raceRepository->update($id, $filteredData);
     }
 }

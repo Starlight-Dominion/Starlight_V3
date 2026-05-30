@@ -5,9 +5,11 @@ namespace sdo\Services;
 
 use sdo\Models\Dominion;
 use sdo\Models\RecruitmentSession;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\RecruitmentRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use sdo\Services\ConfigService;
 use sdo\Services\LogService;
-use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 use DateTime;
 
@@ -15,7 +17,10 @@ class RecruitmentService
 {
     public function __construct(
         private ConfigService $configService,
-        private LogService $logService
+        private LogService $logService,
+        private DominionRepositoryInterface $dominionRepository,
+        private RecruitmentRepositoryInterface $recruitmentRepository,
+        private TransactionManager $transactionManager
     ) {}
 
     /**
@@ -23,20 +28,13 @@ class RecruitmentService
      */
     public function getStatus(int $domId): array
     {
-        $activeSession = RecruitmentSession::where('dominion_id', $domId)
-            ->where('is_active', true)
-            ->first();
+        $activeSession = $this->recruitmentRepository->findActiveSession($domId);
 
         $dailyLimit = (int)$this->configService->get('recruitment_sessions_per_day', 2);
         $threeDayLimit = (int)$this->configService->get('recruitment_sessions_per_3days', 5);
 
-        $dailyCount = RecruitmentSession::where('dominion_id', $domId)
-            ->where('created_at', '>=', date('Y-m-d H:i:s', strtotime('-24 hours')))
-            ->count();
-
-        $threeDayCount = RecruitmentSession::where('dominion_id', $domId)
-            ->where('created_at', '>=', date('Y-m-d H:i:s', strtotime('-72 hours')))
-            ->count();
+        $dailyCount = $this->recruitmentRepository->countRecentSessions($domId, 24);
+        $threeDayCount = $this->recruitmentRepository->countRecentSessions($domId, 72);
 
         return [
             'active_session' => $activeSession,
@@ -61,7 +59,7 @@ class RecruitmentService
             throw new Exception("Recruitment authorization denied. Frequency limit reached.");
         }
 
-        $session = RecruitmentSession::create([
+        $session = $this->recruitmentRepository->createSession([
             'dominion_id' => $domId,
             'clicks_count' => 0,
             'is_active' => true
@@ -78,12 +76,8 @@ class RecruitmentService
      */
     public function processClick(int $domId, int $sessionId): array
     {
-        return Capsule::transaction(function() use ($domId, $sessionId) {
-            $session = RecruitmentSession::where('id', $sessionId)
-                ->where('dominion_id', $domId)
-                ->where('is_active', true)
-                ->lockForUpdate()
-                ->first();
+        return $this->transactionManager->transaction(function() use ($domId, $sessionId) {
+            $session = $this->recruitmentRepository->lockActiveSession($sessionId, $domId);
 
             if (!$session) {
                 throw new Exception("Recruitment session invalid or expired.");
@@ -92,21 +86,25 @@ class RecruitmentService
             $maxClicks = (int)$this->configService->get('recruitment_clicks_per_session', 150);
             
             if ($session->clicks_count >= $maxClicks) {
-                $session->update(['is_active' => false, 'completed_at' => date('Y-m-d H:i:s')]);
+                $this->recruitmentRepository->updateSession($sessionId, [
+                    'is_active' => false,
+                    'completed_at' => date('Y-m-d H:i:s')
+                ]);
                 return ['success' => false, 'message' => "Mobilization complete."];
             }
 
             // 1. Increment progress
-            $session->increment('clicks_count');
-            $newCount = $session->clicks_count;
+            $newCount = $this->recruitmentRepository->incrementClicks($sessionId);
 
             // 2. Grant Citizen
-            $dom = Dominion::lockForUpdate()->find($domId);
-            $dom->increment('citizens');
+            $this->dominionRepository->incrementStats($domId, ['citizens' => 1]);
 
             // 3. Finalize if reached max
             if ($newCount >= $maxClicks) {
-                $session->update(['is_active' => false, 'completed_at' => date('Y-m-d H:i:s')]);
+                $this->recruitmentRepository->updateSession($sessionId, [
+                    'is_active' => false,
+                    'completed_at' => date('Y-m-d H:i:s')
+                ]);
                 
                 $this->logService->log(
                     $domId,

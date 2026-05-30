@@ -42,7 +42,11 @@ class DiscordLinkApiStatusTest extends TestCase
         $authService = $this->createMock(AuthService::class);
         $battlefieldService = $this->createMock(BattlefieldService::class);
         $foundationService = $this->createMock(FoundationService::class);
-        $discordLinkService = new DiscordLinkService();
+        $discordLinkService = new DiscordLinkService(
+            new \sdo\Repositories\Eloquent\EloquentUserRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDiscordLinkRepository(),
+            new \sdo\Infrastructure\TransactionManager()
+        );
 
         $this->controller = new ApiController(
             $gameService,
@@ -52,6 +56,8 @@ class DiscordLinkApiStatusTest extends TestCase
             $battlefieldService,
             $foundationService,
             $discordLinkService,
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionStructureRepository()
         );
     }
 

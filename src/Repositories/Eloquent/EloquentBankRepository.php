@@ -22,19 +22,18 @@ class EloquentBankRepository implements BankRepositoryInterface
 
     public function getTransactionsPaginated(int $kingdomId, int $page, int $perPage): LengthAwarePaginator
     {
-        return Capsule::table('bank_transactions')
-            ->where('kingdom_id', $kingdomId)
+        return \sdo\Models\BankTransaction::where('kingdom_id', $kingdomId)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage, ['*'], 'page', $page);
     }
 
     public function resetDailyLimits(int $kingdomId): void
     {
-        Capsule::table('kingdoms')
+        Capsule::table('dominions')
             ->where('id', $kingdomId)
             ->update([
                 'deposits_today' => 0,
-                'last_deposit_recharge' => date('Y-m-d H:i:s')
+                'last_deposit_timestamp' => date('Y-m-d H:i:s')
             ]);
     }
 }

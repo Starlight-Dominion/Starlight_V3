@@ -1,19 +1,18 @@
 # 🛡️ High Command: Admin Suite User Guide
 
-Welcome to the **Starlight Dominion Command Center**. This guide details the operational procedures for managing the game's core mechanics, economic balance, and sovereign oversight.
+Welcome to the **Starlight Dominion Command Center**. This terminal provides High Command with total oversight and granular control over every sector, evolutionary strain, and tactical parameter within the Dominion.
 
 ---
 
 ## 🔐 Authorization & Access
 
-Access to the Command Center is restricted to authorized High Command personnel only.
+Access to the Command Center is strictly restricted to authorized High Command personnel.
 
 ### 1. Environment-Based Override (Preferred)
 For local development or emergency oversight, you can grant yourself administrative privileges via the `.env` file:
 ```bash
 ADMIN_USERNAME=your_username
 ```
-*Note: Restart your Docker containers (`docker-compose up -d`) after modifying the `.env` file.*
 
 ### 2. Database Authorization
 To manually authorize an account via the database:
@@ -26,100 +25,123 @@ Once authorized, a **"High Command"** block will appear at the bottom of your **
 
 ---
 
-## ⚙️ Global Mechanics
+## ◈ Command Overview
 
-The **Global Mechanics** module allows for real-time tuning of the game's baseline parameters. Changes here affect all sectors immediately.
-
-*   **Baseline Citizens/Tick:** Sets the standard population growth rate (Default: 50).
-*   **Baseline Credits/Tick:** Sets the standard income rate before building multipliers (Default: 100).
-*   **Starting Resources:** Configures the `Credits` and `Citizens` a new commander receives upon sector initialization.
-*   **Tick Interval:** Adjusts the global heartbeat frequency in seconds (900 = 15 minutes).
-*   **Recruitment Limits:** Configure the frequency and magnitude of the Neural Recruitment tool (Sessions per day/3-days and clicks per session).
-
-**Operational Note:** Click **"UPDATE"** on any row to synchronize the new value with the live environment.
+The Command Overview provides a real-time telemetry snapshot of the entire Dominion.
+- **Total Sovereigns:** Total registered user accounts.
+- **Active Sectors:** Total initialized dominions.
+- **Total Wealth:** Aggregate Credits (CP) across all sectors.
+- **Total Population:** Aggregate Citizens across all sectors.
+- **System Status:** Heartbeat synchronization and database connectivity status.
 
 ---
 
-## ⚔️ War Doctrine Calibration
+## ⚙️ Global Mechanics
 
-The **Battle Doctrine** module provides high-level control over the mathematical foundations of combat.
+Adjust the baseline parameters that govern the Dominion's economy and growth.
+- **Baseline Citizens/Tick:** Standard population growth rate.
+- **Baseline Credits/Tick:** Standard income rate before multipliers.
+- **Starting Resources:** Initial Credits/Citizens for new sectors.
+- **Tick Interval:** Global heartbeat frequency in seconds.
+- **Global Broadcast:** Transmit a high-priority message to all commanders via the UI.
 
-*   **Atk Turns Soft Exp:** Adjusts the scaling of damage based on turn expenditure.
-*   **Atk Turns Max Mult:** Caps the maximum damage multiplier for massive turn-dumps.
-*   **Underdog Min Ratio:** The threshold at which a significantly weaker attacker can still potentially breach defenses.
-*   **Random Noise (Min/Max):** Controls the "fog of war" variance applied to every strike.
-*   **Guard Floor:** Sets the population threshold that is protected from casualty calculations.
-*   **Loot Caps (Full/Reduced):** Configure the anti-farm thresholds for repeat attacks on the same target.
+---
+
+## ⚔️ Battle Doctrine Calibration
+
+Tune the mathematical foundations of the Dominion's war engine.
+- **Atk Turns Soft Exp/Max Mult:** Adjust scaling and caps for massive turn-expenditure attacks.
+- **Underdog Min Ratio:** Threshold for weaker attackers to breach defenses.
+- **Random Noise:** Fog of war variance applied to all strikes.
+- **Loot Caps:** Configure anti-farm thresholds for repeated engagements.
+
+---
+
+## 👁️ Sovereign Oversight & Impersonation
+
+Manage player accounts and investigate sectors directly.
+
+### 1. Search & Search Results
+Use the targeting array to find kingdoms by ID, name, or handle.
+- **Impersonate:** Initiate a **Neural Link** to view the game from that commander's perspective. This is used for direct audit and troubleshooting.
+- **Sovereign Inspector:** Launch a deep-dive modal for granular sector modification.
+
+### 2. The Sovereign Inspector
+- **Core Identity:** Manage account metadata (username, email) and security clearance (Admin/Bot flags).
+- **Dominion Stats:** Direct adjustment of Credits, XP, Turns, Population, and Attribute points.
+- **Military:** Adjust specific unit quantities (Fielded vs. Stabled).
+- **Structures:** Set the exact rank of any building in the sector.
+- **Armory:** Manage item inventory and equipment status.
+
+---
+
+## 👥 War Room (Units)
+
+Full lifecycle management of the Dominion's military assets.
+- **Enlist New Class:** Create entirely new unit archetypes.
+- **Tactical Calibration:**
+    - **Combat Power:** Set Offense, Defense, Spy Offense, and Spy Defense.
+    - **Requisition Costs:** Set Credits, Citizens, and Turns required for training.
+    - **Economic Yield:** Set the Credits produced per unit per tick.
+    - **Prerequisites:** Configure Foundation level or specific tech requirements.
 
 ---
 
 ## 🛠️ Armory Forge
 
-The **Armory Forge** provides granular control over all military equipment.
-
-*   **Item Identity:** Edit names and internal slugs for all equipment.
-*   **Stat Modification:** Adjust the **Offense (ATK)** and **Defense (DEF)** bonuses provided by each item.
-*   **Requisition Cost:** Set the purchase price in Credits (CP).
-*   **Prerequisites:** Manage technical dependencies:
-    *   **NO PREREQ:** The item is available immediately.
-    *   **ITEM PREREQ:** Requires another specific item to be owned first.
-    *   **RANK REQ:** Requires a specific Armory Tech Rank (Structures) to unlock.
-
----
-
-## 👥 Sovereign Oversight
-
-Search and manage individual player sectors.
-
-1.  **Search:** Use the targeting array to find kingdoms by name or commander handle.
-2.  **Identity Management:** Directly edit a sector's **Dominion Designation** (Kingdom Name) or **Commander Handle** (Username).
-3.  **Resource Adjustment:** Manually adjust a commander's **Credits, XP, Turns,** or **Citizens**.
-4.  **Commit Directives:** Click **"SAVE DIRECTIVES"** to apply changes to the live sector.
-
----
-
-## 📝 Sector Documentation
-
-The **Documentation** module allows for real-time management of public-facing content.
-
-*   **Official Rules:** A large-scale Markdown editor for the **Protocols** page (`/rules`). 
-*   **Markdown Support:** Supports standard headers (`#`, `##`), bullet points, and emphasis.
-
-**Commit Protocol:** Click **"COMMIT CHANGES"** to synchronize the documentation with the public sector protocols immediately.
-
----
-
-## 📡 Neural API Gate
-
-The **API Gate** provides secure external access to Dominion telemetry and tactical data.
-
-*   **Key Matrix:** View all active access tokens, their owners, and current frequency thresholds.
-*   **Issue Key:** Grant new API access by providing a Commander's User ID. New keys are generated with a default limit of 60 RPM.
-*   **Real-time Tuning:** Directly edit the **Rate Limit (RPM)** for any specific key. Changes take effect on the next request.
-*   **Revocation:** Permanently decommission an asset's access via the **"Permanent Revoke"** (✕) action.
-*   **Audit Trail:** A dedicated log of every API interaction, including status codes, response times, and origin IPs.
+Granular control over all military equipment.
+- **Calibrate Asset:**
+    - **Identity:** Edit names and slugs.
+    - **Combat Bonuses:** Adjust raw ATK/DEF multipliers provided to the user.
+    - **Costs:** Requisition price in CP.
+    - **Tech Requirements:** Manage rank requirements or item dependencies.
 
 ---
 
 ## 🏛️ Structural Engineering
 
-Manage the archetypes of all dominion buildings and their evolution paths.
+Manage the blueprints and evolution paths for all Dominion buildings.
+- **Commission New Blueprint:** Create new structure types.
+- **Rank Evolution Matrix:** For each structure, define the cost, HP buffs, economic multipliers, and capacity bonuses for every rank.
 
-*   **Building Designation:** Edit names and descriptions of structures (Foundation, Armory, Mines, etc.).
-*   **Rank Evolution Matrix:** For each structure rank, you can define:
-    *   **Cost:** Price to upgrade to this rank.
-    *   **Integrity (HP):** Maximum HP provided (primarily for Foundation).
-    *   **Buffs:** Offensive/Defensive power multipliers or Economic percentage bonuses.
-    *   **Capacity:** Citizen housing or resource storage limits.
+---
+
+## 🧬 Evolutionary Strains (Barracks)
+
+Manage the genetic traits of the various races in the Dominion.
+- **Genetic Calibration:** Edit race descriptions and their specific neural multipliers (e.g., population growth bonuses, combat power boosts).
+
+---
+
+## 📡 Neural API Gate
+
+Secure external access management for third-party tools and telemetry.
+- **Key Matrix:** Manage active access tokens, rate limits (RPM), and scopes.
+- **Pending Requests:** Review and Approve/Reject applications from developers.
+- **Audit Trail:** Real-time log of every API interaction, including status codes and response times.
+
+---
+
+## 🕵️ Audit Trail
+
+A centralized record of every administrative directive issued within the Command Center.
+- **Directive Logs:** Every change is logged with the Admin's ID, the operation type, and detailed metadata.
+- **Neural Export:** Download the entire audit trail as a JSON file for external processing.
+
+---
+
+## 📝 Documentation
+
+Real-time management of the Dominion's public-facing protocols.
+- **Official Rules:** A full-scale Markdown editor for the public `/rules` page.
+- **Commit Protocol:** Changes are synchronized with the public sector immediately upon "Commit".
 
 ---
 
 ## 📜 Battle Records
 
-View a real-time audit trail of all tactical engagements across the Dominion.
-*   **Engagement:** Identities of the Attacker and Defender.
-*   **Outcome:** Victory or Repel status.
-*   **Credits Siphoned:** Total loot plundered during the strike.
+A live audit of all tactical engagements across the Dominion.
+- **Telemetry:** Attacker/Defender identities, outcome, and total CP plundered.
 
 ---
 

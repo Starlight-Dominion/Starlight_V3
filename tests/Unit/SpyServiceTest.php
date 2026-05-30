@@ -34,7 +34,14 @@ class SpyServiceTest extends TestCase
         $this->seedData();
 
         $this->tacticalMock = $this->createMock(TacticalService::class);
-        $this->service = new SpyService(new EloquentDominionRepository(), $this->tacticalMock);
+        $this->service = new SpyService(
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentUnitRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            $this->tacticalMock ?? $this->createMock(\sdo\Services\TacticalService::class),
+            $this->createMock(\sdo\Services\GameService::class),
+            new \sdo\Infrastructure\TransactionManager()
+        );
     }
 
     private function createSchema(): void

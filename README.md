@@ -1,6 +1,6 @@
 # Starlight Dominion
 
-Starlight Dominion is a high-performance, strategic military RPG built for deep tactical gameplay. It features a robust PHP 8.4 backend and a highly reactive Svelte 5 frontend, designed to handle complex economic and military simulations with precision.
+Starlight Dominion is a high-performance, strategic military RPG built for deep tactical gameplay. It adheres to a strict **Model-View-Controller (MVC)** architecture, designed for maximum maintainability and high-volume scalability.
 
 ## 🚀 Core Mechanics
 
@@ -25,11 +25,11 @@ The world of Starlight Dominion evolves every hour on the hour, synchronized to 
 ## 🛠️ Tech Stack
 
 ### Backend: PHP 8.4+
-- **Architecture:** Clean Service-Repository pattern with strict typing.
+- **Architecture:** Strict MVC utilizing a Service-Repository pattern for clear separation of concerns and deterministic business logic.
+- **Scalability:** Stateless backend designed for horizontal expansion, utilizing Redis for session management and distributed caching.
 - **Dependency Injection:** PHP-DI for decoupled service management.
 - **ORM:** Eloquent for fluid, type-safe database interactions.
 - **Routing:** FastRoute for high-performance request handling.
-- **Session:** Redis-backed session management for stateless scalability.
 
 ### Frontend: Svelte 5 (Runes)
 - **Reactivity:** Full migration to Svelte 5 Runes (`$state`, `$derived`, `$props`) for granular reactivity.
@@ -52,12 +52,16 @@ The world of Starlight Dominion evolves every hour on the hour, synchronized to 
 ├── db/                 # Database migrations and seeders
 ├── public/             # Entry point and static assets
 ├── src/
-│   ├── Controllers/    # HTTP Request handling
-│   ├── Models/         # Eloquent database models
+│   ├── Controllers/    # HTTP Request handling (MVC: Controller)
+│   ├── Dto/            # Data Transfer Objects
+│   ├── Exceptions/     # Custom Exception classes
+│   ├── Infrastructure/ # Core framework, DB setup, and Middleware
+│   ├── Models/         # Eloquent database models (MVC: Model)
 │   ├── Repositories/   # Data access abstraction
 │   ├── Services/       # Core business logic (Armory, Bank, Combat)
 │   ├── Resources/      # Svelte components, JS stores, and CSS
-│   └── ViewModels/     # Frontend-focused data transformers
+│   ├── ViewModels/     # Frontend-focused data transformers
+│   └── Views/          # Main application layout and view files (MVC: View)
 └── tests/              # PHPUnit tests and Architecture guards
 ```
 
@@ -77,7 +81,8 @@ vendor/bin/phinx seed:run -s InitialDataSeeder
 ### Background Workers
 ```bash
 # Process a game tick manually
-php bin/tick-worker.php
+php bin/tick-dispatcher.php # Queues the tick
+php bin/tick-processor.php  # Processes the queued tick logic
 
 # Process Discord link/unlink action requests from Redis streams
 php bin/discord-action-worker.php
@@ -117,6 +122,14 @@ docker compose exec -T app php vendor/bin/phinx seed:run -e development -s Armor
 # Run Playwright against the already-running containerized app
 PLAYWRIGHT_USE_EXTERNAL_SERVER=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080 npm run test:e2e
 ```
+
+---
+
+## 📚 Additional Documentation
+For deeper dives into the system's design and features, refer to:
+- [Architecture Overview](ARCHITECTURE.md) - Deep dive into layers and request flow.
+- [OpenAPI Specification](OPEN_API.md) - Detailed documentation of the game's API endpoints.
+- [Admin Suite Guide](admin_suite_readme.md) - Documentation for the administrative management tools.
 
 ---
 

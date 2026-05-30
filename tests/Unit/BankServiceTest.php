@@ -33,11 +33,18 @@ class BankServiceTest extends TestCase
         $this->createTables();
 
         $this->logServiceMock = $this->createMock(LogService::class);
-        $this->bankService = new BankService($this->logServiceMock);
+        $this->bankService = new BankService(
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentBankRepository(),
+            new \sdo\Infrastructure\TransactionManager(),
+            $this->logServiceMock
+        );
     }
 
     private function createTables(): void
     {
+        Capsule::schema()->create('game_settings', function ($table) { $table->string('setting_key')->unique(); $table->text('setting_value')->nullable(); });
+        Capsule::schema()->create('races', function ($table) { $table->increments('id'); $table->string('name'); $table->string('slug'); $table->text('description')->nullable(); });
         Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id')->default(1);

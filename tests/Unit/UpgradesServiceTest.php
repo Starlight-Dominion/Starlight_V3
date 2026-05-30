@@ -33,7 +33,14 @@ class UpgradesServiceTest extends TestCase
         $this->seedData();
 
         $this->logMock = $this->createMock(LogService::class);
-        $this->service = new UpgradesService($this->logMock);
+        $this->service = new UpgradesService(
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentUnitRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Repositories\Eloquent\EloquentStructureRepository(),
+            new \sdo\Infrastructure\TransactionManager(),
+            $this->logMock ?? $logMock
+        );
     }
 
     private function createSchema(): void

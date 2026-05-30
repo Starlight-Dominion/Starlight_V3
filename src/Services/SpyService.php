@@ -5,36 +5,39 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
-use sdo\Models\DominionManpower;
-use sdo\Models\Unit;
 use sdo\Repositories\Interfaces\DominionRepositoryInterface;
-use Illuminate\Database\Capsule\Manager as Capsule;
+use sdo\Repositories\Interfaces\UnitRepositoryInterface;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use Exception;
 
 class SpyService
 {
     public function __construct(
         private DominionRepositoryInterface $dominionRepository,
-        private TacticalService $tacticalService
+        private UnitRepositoryInterface $unitRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private TacticalService $tacticalService,
+        private GameService $gameService,
+        private TransactionManager $transactionManager
     ) {}
 
     public function executeReconnaissance(int $attackerDominionId, int $targetDominionId): array
     {
-        return Capsule::transaction(function() use ($attackerDominionId, $targetDominionId) {
+        return $this->transactionManager->transaction(function() use ($attackerDominionId, $targetDominionId) {
             $attacker = $this->dominionRepository->lockForUpdate($attackerDominionId);
+            if (!$attacker) throw new Exception('Attacker sector not found.');
             
-            $spyUnit = Unit::where('slug', 'spies')->first();
+            $spyUnit = $this->unitRepository->findBySlug('spies');
             if (!$spyUnit) throw new Exception('Spy unit configuration not found.');
 
-            $attackerSpies = DominionManpower::where('dominion_id', $attackerDominionId)
-                ->where('unit_id', $spyUnit->id)
-                ->first();
+            $manpower = $this->manpowerRepository->getManpowerBySlugMap($attackerDominionId);
+            $spyCount = (int)($manpower['spies'] ?? 0);
 
-            if (!$attackerSpies || $attackerSpies->total_quantity <= 0) {
+            if ($spyCount <= 0) {
                 throw new Exception('No active spies available for reconnaissance.');
             }
 
-            $spyCount = $attackerSpies->total_quantity;
             $missionCostCredits = (int)($spyCount * 0.8);
             $missionCostCitizens = (int)floor($spyCount / 3);
             $missionCostTurns = 5;
@@ -62,13 +65,14 @@ class SpyService
                 $spiesLost = max(1, (int)floor($spyCount * $lossFactor));
             }
 
-            $attacker->credits -= $missionCostCredits;
-            $attacker->citizens -= $missionCostCitizens;
-            $attacker->turns -= $missionCostTurns;
-            $attacker->save();
+            $this->dominionRepository->update($attackerDominionId, [
+                'credits' => $attacker->credits - $missionCostCredits,
+                'citizens' => $attacker->citizens - $missionCostCitizens,
+                'turns' => $attacker->turns - $missionCostTurns
+            ]);
 
             if ($spiesLost > 0) {
-                $attackerSpies->decrement('total_quantity', $spiesLost);
+                $this->manpowerRepository->updateQuantity($attackerDominionId, (int)$spyUnit->id, -$spiesLost);
             }
 
             if (!$isSuccess) {
@@ -78,11 +82,8 @@ class SpyService
                 ];
             }
 
-            // Gather Intel using Eloquent
-            $targetManpower = DominionManpower::with('unit')
-                ->where('dominion_id', $targetDominionId)
-                ->get()
-                ->pluck('total_quantity', 'unit.slug');
+            // Gather Intel
+            $targetManpower = $this->manpowerRepository->getManpowerBySlugMap($targetDominionId);
 
             $intel = [
                 'name' => $target->name,
@@ -96,7 +97,7 @@ class SpyService
                     'total' => $targetManpower->sum(),
                 ],
                 'foundation_hp' => (int)$target->foundation_hp,
-                'level' => $target->getPlayerLevel(),
+                'level' => $this->gameService->calculateLevel((int)$target->xp),
             ];
 
             return [
@@ -110,13 +111,8 @@ class SpyService
 
     public function getSpyIntel(int $dominionId): array
     {
-        $spyUnit = Unit::where('slug', 'spies')->first();
-        $spyCount = 0;
-        if ($spyUnit) {
-            $spyCount = DominionManpower::where('dominion_id', $dominionId)
-                ->where('unit_id', $spyUnit->id)
-                ->value('total_quantity') ?? 0;
-        }
+        $manpower = $this->manpowerRepository->getManpowerBySlugMap($dominionId);
+        $spyCount = (int)($manpower['spies'] ?? 0);
 
         return [
             'success' => true,
@@ -128,13 +124,8 @@ class SpyService
 
     public function getAvailableSpies(int $dominionId): array
     {
-        $spyUnit = Unit::where('slug', 'spies')->first();
-        $spyCount = 0;
-        if ($spyUnit) {
-            $spyCount = DominionManpower::where('dominion_id', $dominionId)
-                ->where('unit_id', $spyUnit->id)
-                ->value('total_quantity') ?? 0;
-        }
+        $manpower = $this->manpowerRepository->getManpowerBySlugMap($dominionId);
+        $spyCount = (int)($manpower['spies'] ?? 0);
 
         return [
             'success' => true,

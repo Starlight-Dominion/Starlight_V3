@@ -3,16 +3,18 @@ declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Models\GameSetting;
+use sdo\Repositories\Interfaces\ConfigRepositoryInterface;
 
 class ConfigService
 {
+    public function __construct(private ConfigRepositoryInterface $configRepository) {}
+
     /**
      * Get a setting value by key.
      */
     public function get(string $key, mixed $default = null): mixed
     {
-        $setting = GameSetting::find($key);
+        $setting = $this->configRepository->find($key);
         
         if (!$setting) {
             return $default;
@@ -33,10 +35,7 @@ class ConfigService
      */
     public function set(string $key, mixed $value): void
     {
-        GameSetting::updateOrCreate(
-            ['setting_key' => $key],
-            ['setting_value' => (string)$value]
-        );
+        $this->configRepository->updateOrCreate($key, (string)$value);
     }
 
     /**
@@ -44,6 +43,6 @@ class ConfigService
      */
     public function getAll(): array
     {
-        return GameSetting::all()->toArray();
+        return $this->configRepository->all()->toArray();
     }
 }

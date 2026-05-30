@@ -10,8 +10,8 @@ use sdo\Services\AuthService;
 use sdo\Services\BattlefieldService;
 use sdo\Services\DiscordLinkService;
 use sdo\Services\FoundationService;
-use sdo\Models\DominionManpower;
-use sdo\Models\DominionStructure;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionStructureRepositoryInterface;
 use sdo\Infrastructure\Api\DominionResource;
 use sdo\Infrastructure\Api\ManpowerResource;
 use sdo\Infrastructure\Api\StructureResource;
@@ -25,7 +25,9 @@ class ApiController extends BaseController
         AuthService $authService,
         private BattlefieldService $battlefieldService,
         private FoundationService $foundationService,
-        private DiscordLinkService $discordLinkService
+        private DiscordLinkService $discordLinkService,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private DominionStructureRepositoryInterface $dominionStructureRepository
     ) {
         parent::__construct($gameService, $advisorService, $configService, $authService);
     }
@@ -79,9 +81,7 @@ class ApiController extends BaseController
         $dom = $this->getDominion($vars);
         if (!$dom) return json_encode(['success' => false, 'message' => 'Sector not found.']);
 
-        $manpower = DominionManpower::with('unit')
-            ->where('dominion_id', $dom->id)
-            ->get();
+        $manpower = $this->manpowerRepository->getManpowerByDominion($dom->id);
 
         return json_encode([
             'success' => true,
@@ -98,9 +98,7 @@ class ApiController extends BaseController
         $dom = $this->getDominion($vars);
         if (!$dom) return json_encode(['success' => false, 'message' => 'Sector not found.']);
 
-        $structures = DominionStructure::with(['structure', 'levelData'])
-            ->where('dominion_id', $dom->id)
-            ->get();
+        $structures = $this->dominionStructureRepository->getStructuresByDominion($dom->id);
 
         return json_encode([
             'success' => true,

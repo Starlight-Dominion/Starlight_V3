@@ -10,6 +10,8 @@ use sdo\Models\StructureLevel;
 use sdo\Models\DominionStructure;
 use sdo\Services\TickService;
 use sdo\Services\ConfigService;
+use sdo\Infrastructure\TransactionManager;
+use sdo\Repositories\Eloquent\EloquentTickRepository;
 use Illuminate\Database\Capsule\Manager as Capsule;
 use Predis\Client as Redis;
 
@@ -40,6 +42,8 @@ class TickServiceTest extends TestCase
             $table->timestamps();
         });
 
+        Capsule::schema()->create('game_settings', function ($table) { $table->string('setting_key')->unique(); $table->text('setting_value')->nullable(); });
+        Capsule::schema()->create('races', function ($table) { $table->increments('id'); $table->string('name'); $table->string('slug'); $table->text('description')->nullable(); });
         Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id')->unsigned();
@@ -109,9 +113,14 @@ class TickServiceTest extends TestCase
             ['baseline_credits_per_tick', 100, 100],
         ]);
 
-        $this->redisMock = $this->createMock(Redis::class);
+        $this->redisMock = $this->getMockBuilder(Redis::class)->disableOriginalConstructor()->getMock();
 
-        $this->service = new TickService($this->configMock, $this->redisMock);
+        $this->service = new TickService(
+            $this->configMock ?? $this->createMock(\sdo\Services\ConfigService::class),
+            $this->redisMock ?? $this->getMockBuilder(\Predis\Client::class)->disableOriginalConstructor()->getMock(),
+            new \sdo\Repositories\Eloquent\EloquentTickRepository(),
+            new \sdo\Infrastructure\TransactionManager()
+        );
     }
 
     private function createTestDominion(): Dominion

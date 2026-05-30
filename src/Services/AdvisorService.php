@@ -8,6 +8,8 @@ use sdo\Models\Dominion;
 
 class AdvisorService
 {
+    public function __construct(private GameService $gameService) {}
+
     private const ADVICE = [
         "Your Treasury grows with each tick. Consider investing in infrastructure to boost your income.",
         "A large population is the backbone of a strong army. Protect your Citizens.",
@@ -54,7 +56,7 @@ class AdvisorService
     {
         if ($dominion) {
             $xp = (int)$dominion->xp;
-            $level = $dominion->getPlayerLevel();
+            $level = $this->gameService->calculateLevel($xp);
             return $this->getContextualAdvice($level, $xp);
         }
         return $this->getAdvice();

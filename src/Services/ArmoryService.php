@@ -3,35 +3,40 @@ declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Models\Dominion;
-use sdo\Models\ArmoryItem;
-use sdo\Models\ArmoryUnitType;
-use sdo\Models\ArmoryCategory;
-use sdo\Models\DominionArmoryItem;
-use sdo\Models\DominionManpower;
-use sdo\Models\StructureLevel;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\ArmoryRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionArmoryRepositoryInterface;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Repositories\Interfaces\StructureRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use sdo\Services\LogService;
-use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class ArmoryService
 {
-    public function __construct(private LogService $logService) {}
+    public function __construct(
+        private DominionRepositoryInterface $dominionRepository,
+        private ArmoryRepositoryInterface $armoryRepository,
+        private DominionArmoryRepositoryInterface $dominionArmoryRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private StructureRepositoryInterface $structureRepository,
+        private TransactionManager $transactionManager,
+        private LogService $logService
+    ) {}
 
     public function getArmoryData(int $domId): array
     {
-        $dom = Dominion::findOrFail($domId);
+        $dom = $this->dominionRepository->findById($domId);
+        if (!$dom) {
+            throw new Exception("Dominion not found.");
+        }
 
-        $unitTypes = ArmoryUnitType::all();
-        $categoriesByUnitType = ArmoryCategory::all()->groupBy('unit_type_id');
-        $itemsByCategory = ArmoryItem::all()->groupBy('category_id');
-        $inventory = DominionArmoryItem::where('kingdom_id', $domId)
-            ->get()
-            ->keyBy('item_id');
+        $unitTypes = $this->armoryRepository->allUnitTypes();
+        $categoriesByUnitType = $this->armoryRepository->allCategories()->groupBy('unit_type_id');
+        $itemsByCategory = $this->armoryRepository->all()->groupBy('category_id');
+        $inventory = $this->dominionArmoryRepository->getInventory($domId)->keyBy('item_id');
 
-        $manpowerBySlug = DominionManpower::join('units', 'dominion_manpower.unit_id', '=', 'units.id')
-            ->where('dominion_manpower.dominion_id', $domId)
-            ->pluck('dominion_manpower.total_quantity', 'units.slug');
+        $manpowerBySlug = $this->manpowerRepository->getManpowerBySlugMap($domId);
 
         $loadouts = [];
         foreach ($unitTypes as $uType) {
@@ -63,9 +68,7 @@ class ArmoryService
         }
 
         $nextLevel = $dom->armory_level + 1;
-        $upgrade = StructureLevel::where('structure_id', 3) 
-            ->where('level', $nextLevel)
-            ->first();
+        $upgrade = $this->structureRepository->findLevel(3, $nextLevel); // Structure 3 is Armory
 
         return [
             'loadouts' => $loadouts,
@@ -76,22 +79,17 @@ class ArmoryService
 
     public function toggleEquip(int $domId, int $itemId): array
     {
-        return Capsule::transaction(function() use ($domId, $itemId) {
-            $inv = DominionArmoryItem::where('kingdom_id', $domId)
-                ->where('item_id', $itemId)
-                ->first();
+        return $this->transactionManager->transaction(function() use ($domId, $itemId) {
+            $inv = $this->dominionArmoryRepository->findItem($domId, $itemId);
 
             if (!$inv || $inv->quantity <= 0) {
                 throw new Exception("Item not found in inventory.");
             }
 
             $newState = !$inv->is_equipped;
-            
-            DominionArmoryItem::where('kingdom_id', $domId)
-                ->where('item_id', $itemId)
-                ->update(['is_equipped' => $newState]);
+            $this->dominionArmoryRepository->toggleEquip($domId, $itemId, $newState);
 
-            $item = ArmoryItem::find($itemId);
+            $item = $this->armoryRepository->findById($itemId);
             $status = $newState ? "equipped" : "unequipped";
 
             $this->logService->log(
@@ -108,9 +106,9 @@ class ArmoryService
 
     public function upgradeItem(int $domId, int $itemId, int $qty): array
     {
-        return Capsule::transaction(function() use ($domId, $itemId, $qty) {
-            $dom = Dominion::lockForUpdate()->find($domId);
-            $targetItem = ArmoryItem::find($itemId);
+        return $this->transactionManager->transaction(function() use ($domId, $itemId, $qty) {
+            $dom = $this->dominionRepository->lockForUpdate($domId);
+            $targetItem = $this->armoryRepository->findById($itemId);
 
             if (!$targetItem || !$targetItem->requirement_slug) {
                 throw new Exception("Invalid upgrade target.");
@@ -120,12 +118,10 @@ class ArmoryService
                 throw new Exception("Tech requirement not met.");
             }
 
-            $reqItem = ArmoryItem::where('slug', $targetItem->requirement_slug)->first();
+            $reqItem = $this->armoryRepository->findBySlug($targetItem->requirement_slug);
             if (!$reqItem) throw new Exception("Requirement data missing.");
 
-            $invReq = DominionArmoryItem::where('kingdom_id', $domId)
-                ->where('item_id', $reqItem->id)
-                ->first();
+            $invReq = $this->dominionArmoryRepository->findItem($domId, $reqItem->id);
 
             if (!$invReq || $invReq->quantity < $qty) {
                 throw new Exception("Insufficient {$reqItem->name} for upgrade.");
@@ -135,41 +131,13 @@ class ArmoryService
             if ($dom->credits < $totalCost) throw new Exception("Insufficient credits.");
 
             // Process Upgrade
-            $dom->credits -= $totalCost;
-            $dom->save();
+            $this->dominionRepository->update($domId, ['credits' => $dom->credits - $totalCost]);
 
-            // Consume Req via Query Builder
-            DominionArmoryItem::where('kingdom_id', $domId)
-                ->where('item_id', $reqItem->id)
-                ->decrement('quantity', $qty);
-            
-            $remaining = DominionArmoryItem::where('kingdom_id', $domId)
-                ->where('item_id', $reqItem->id)
-                ->value('quantity');
+            // Consume Req
+            $this->dominionArmoryRepository->updateQuantity($domId, $reqItem->id, -$qty);
 
-            if ($remaining <= 0) {
-                DominionArmoryItem::where('kingdom_id', $domId)
-                    ->where('item_id', $reqItem->id)
-                    ->delete();
-            }
-
-            // Add Target via Query Builder
-            $exists = DominionArmoryItem::where('kingdom_id', $domId)
-                ->where('item_id', $itemId)
-                ->exists();
-
-            if ($exists) {
-                DominionArmoryItem::where('kingdom_id', $domId)
-                    ->where('item_id', $itemId)
-                    ->increment('quantity', $qty);
-            } else {
-                DominionArmoryItem::insert([
-                    'kingdom_id' => $domId,
-                    'item_id' => $itemId,
-                    'quantity' => $qty,
-                    'is_equipped' => false
-                ]);
-            }
+            // Add Target
+            $this->dominionArmoryRepository->updateQuantity($domId, $itemId, $qty);
 
             $this->logService->log(
                 $domId,
@@ -185,9 +153,9 @@ class ArmoryService
 
     public function buyItem(int $domId, int $itemId, int $qty): array
     {
-        return Capsule::transaction(function() use ($domId, $itemId, $qty) {
-            $dom = Dominion::lockForUpdate()->find($domId);
-            $item = ArmoryItem::find($itemId);
+        return $this->transactionManager->transaction(function() use ($domId, $itemId, $qty) {
+            $dom = $this->dominionRepository->lockForUpdate($domId);
+            $item = $this->armoryRepository->findById($itemId);
 
             if (!$item || $dom->armory_level < $item->armory_level_req) {
                 throw new Exception("Tech requirement not met.");
@@ -196,25 +164,8 @@ class ArmoryService
             $totalCost = $item->cost * $qty;
             if ($dom->credits < $totalCost) throw new Exception("Insufficient credits.");
 
-            $dom->credits -= $totalCost;
-            $dom->save();
-
-            $exists = DominionArmoryItem::where('kingdom_id', $domId)
-                ->where('item_id', $itemId)
-                ->exists();
-
-            if ($exists) {
-                DominionArmoryItem::where('kingdom_id', $domId)
-                    ->where('item_id', $itemId)
-                    ->increment('quantity', $qty);
-            } else {
-                DominionArmoryItem::insert([
-                    'kingdom_id' => $domId,
-                    'item_id' => $itemId,
-                    'quantity' => $qty,
-                    'is_equipped' => false
-                ]);
-            }
+            $this->dominionRepository->update($domId, ['credits' => $dom->credits - $totalCost]);
+            $this->dominionArmoryRepository->updateQuantity($domId, $itemId, $qty);
 
             $this->logService->log(
                 $domId,
@@ -230,33 +181,17 @@ class ArmoryService
 
     public function sellItem(int $domId, int $itemId, int $qty): array
     {
-        return Capsule::transaction(function() use ($domId, $itemId, $qty) {
-            $dom = Dominion::lockForUpdate()->find($domId);
-            $inv = DominionArmoryItem::where('kingdom_id', $domId)
-                ->where('item_id', $itemId)
-                ->first();
+        return $this->transactionManager->transaction(function() use ($domId, $itemId, $qty) {
+            $dom = $this->dominionRepository->lockForUpdate($domId);
+            $inv = $this->dominionArmoryRepository->findItem($domId, $itemId);
 
             if (!$inv || $inv->quantity < $qty) throw new Exception("Insufficient stock.");
 
-            $item = ArmoryItem::find($itemId);
+            $item = $this->armoryRepository->findById($itemId);
             $refund = (int)($item->cost * 0.5 * $qty);
 
-            $dom->credits += $refund;
-            $dom->save();
-
-            DominionArmoryItem::where('kingdom_id', $domId)
-                ->where('item_id', $itemId)
-                ->decrement('quantity', $qty);
-            
-            $remaining = DominionArmoryItem::where('kingdom_id', $domId)
-                ->where('item_id', $itemId)
-                ->value('quantity');
-
-            if ($remaining <= 0) {
-                DominionArmoryItem::where('kingdom_id', $domId)
-                    ->where('item_id', $itemId)
-                    ->delete();
-            }
+            $this->dominionRepository->update($domId, ['credits' => $dom->credits + $refund]);
+            $this->dominionArmoryRepository->updateQuantity($domId, $itemId, -$qty);
 
             $this->logService->log(
                 $domId,
@@ -272,20 +207,19 @@ class ArmoryService
 
     public function upgradeArmory(int $domId): array
     {
-        return Capsule::transaction(function() use ($domId) {
-            $dom = Dominion::lockForUpdate()->find($domId);
+        return $this->transactionManager->transaction(function() use ($domId) {
+            $dom = $this->dominionRepository->lockForUpdate($domId);
             $next = $dom->armory_level + 1;
             
-            $levelData = StructureLevel::where('structure_id', 3)
-                ->where('level', $next)
-                ->first();
+            $levelData = $this->structureRepository->findLevel(3, $next);
 
             if (!$levelData) throw new Exception("Maximum tech level reached.");
             if ($dom->credits < $levelData->cost) throw new Exception("Insufficient credits.");
 
-            $dom->credits -= $levelData->cost;
-            $dom->armory_level = $next;
-            $dom->save();
+            $this->dominionRepository->update($domId, [
+                'credits' => $dom->credits - $levelData->cost,
+                'armory_level' => $next
+            ]);
 
             $this->logService->log(
                 $domId,

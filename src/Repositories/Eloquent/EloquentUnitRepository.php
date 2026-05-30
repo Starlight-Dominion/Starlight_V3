@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace sdo\Repositories\Eloquent;
 
+use Illuminate\Database\Capsule\Manager as Capsule;
 use sdo\Models\Unit;
 use sdo\Repositories\Interfaces\UnitRepositoryInterface;
 use Illuminate\Support\Collection;
@@ -39,5 +40,10 @@ class EloquentUnitRepository implements UnitRepositoryInterface
     public function delete(int $id): bool
     {
         return Unit::where('id', $id)->delete() > 0;
+    }
+
+    public function getColumns(): array
+    {
+        return Capsule::schema()->getColumnListing('units');
     }
 }

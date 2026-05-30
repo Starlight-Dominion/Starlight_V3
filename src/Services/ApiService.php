@@ -6,19 +6,23 @@ namespace sdo\Services;
 use sdo\Models\ApiKey;
 use sdo\Models\ApiLog;
 use sdo\Models\ApiApplication;
-use Illuminate\Database\Capsule\Manager as Capsule;
+use sdo\Repositories\Interfaces\ApiRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use Exception;
 
 class ApiService
 {
+    public function __construct(
+        private ApiRepositoryInterface $apiRepository,
+        private TransactionManager $transactionManager
+    ) {}
+
     /**
      * Authenticate an API token and return the key model.
      */
     public function authenticate(string $token): ?ApiKey
     {
-        return ApiKey::where('api_token', $token)
-            ->where('is_active', true)
-            ->first();
+        return $this->apiRepository->findKeyByToken($token);
     }
 
     /**
@@ -40,7 +44,7 @@ class ApiService
             unset($payload['password'], $payload['cipher'], $payload['token']);
         }
 
-        ApiLog::create([
+        $this->apiRepository->createLog([
             'api_key_id' => $apiKeyId,
             'endpoint' => $endpoint,
             'method' => $method,
@@ -59,16 +63,11 @@ class ApiService
      */
     public function submitApplication(int $userId, string $projectName, string $justification): array
     {
-        // Check for existing pending application
-        $existing = ApiApplication::where('user_id', $userId)
-            ->where('status', 'pending')
-            ->exists();
-
-        if ($existing) {
+        if ($this->apiRepository->hasPendingApplication($userId)) {
             throw new Exception("You already have an active request pending review by High Command.");
         }
 
-        ApiApplication::create([
+        $this->apiRepository->createApplication([
             'user_id' => $userId,
             'project_name' => $projectName,
             'justification' => $justification,
@@ -83,9 +82,7 @@ class ApiService
      */
     public function getUserApplication(int $userId): ?ApiApplication
     {
-        return ApiApplication::where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->first();
+        return $this->apiRepository->getLatestApplicationByUser($userId);
     }
 
     /**
@@ -93,7 +90,7 @@ class ApiService
      */
     public function getUserKeys(int $userId): array
     {
-        return ApiKey::where('user_id', $userId)->get()->toArray();
+        return $this->apiRepository->getKeysByUser($userId);
     }
 
     /**
@@ -101,11 +98,7 @@ class ApiService
      */
     public function getPendingApplications(): array
     {
-        return ApiApplication::with('user')
-            ->where('status', 'pending')
-            ->orderBy('created_at', 'asc')
-            ->get()
-            ->toArray();
+        return $this->apiRepository->getPendingApplications();
     }
 
     /**
@@ -113,8 +106,8 @@ class ApiService
      */
     public function processApplication(int $appId, string $action, int $rateLimit = 60, string $notes = ''): array
     {
-        return Capsule::transaction(function() use ($appId, $action, $rateLimit, $notes) {
-            $app = ApiApplication::lockForUpdate()->find($appId);
+        return $this->transactionManager->transaction(function() use ($appId, $action, $rateLimit, $notes) {
+            $app = $this->apiRepository->lockApplicationForUpdate($appId);
             if (!$app || $app->status !== 'pending') {
                 throw new Exception("Application not found or already processed.");
             }
@@ -126,7 +119,7 @@ class ApiService
                 $status = 'rejected';
             }
 
-            $app->update([
+            $this->apiRepository->updateApplication($appId, [
                 'status' => $status,
                 'admin_notes' => $notes
             ]);
@@ -140,7 +133,7 @@ class ApiService
      */
     public function issueKey(int $userId, int $rateLimit = 60, string $scopes = '*'): ApiKey
     {
-        return ApiKey::create([
+        return $this->apiRepository->createKey([
             'user_id' => $userId,
             'api_token' => bin2hex(random_bytes(32)),
             'rate_limit_per_minute' => $rateLimit,
@@ -154,7 +147,7 @@ class ApiService
      */
     public function getAllKeys(): array
     {
-        return ApiKey::with('user')->orderBy('created_at', 'desc')->get()->toArray();
+        return $this->apiRepository->getAllKeys();
     }
 
     /**
@@ -162,8 +155,7 @@ class ApiService
      */
     public function updateKey(int $id, array $data): bool
     {
-        $key = ApiKey::findOrFail($id);
-        return $key->update($data);
+        return $this->apiRepository->updateKey($id, $data);
     }
 
     /**
@@ -171,7 +163,7 @@ class ApiService
      */
     public function deleteKey(int $id): bool
     {
-        return ApiKey::where('id', $id)->delete() > 0;
+        return $this->apiRepository->deleteKey($id);
     }
 
     /**
@@ -179,10 +171,6 @@ class ApiService
      */
     public function getRecentLogs(int $limit = 100): array
     {
-        return ApiLog::with('apiKey.user')
-            ->orderBy('created_at', 'desc')
-            ->limit($limit)
-            ->get()
-            ->toArray();
+        return $this->apiRepository->getRecentLogs($limit);
     }
 }

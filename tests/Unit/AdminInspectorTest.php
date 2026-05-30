@@ -36,11 +36,14 @@ class AdminInspectorTest extends TestCase
         $this->createTables();
 
         $this->service = new AdminPlayerService(
-            new EloquentDominionRepository(),
-            new EloquentUserRepository(),
-            new EloquentUnitRepository(),
-            new EloquentStructureRepository(),
-            new EloquentArmoryRepository()
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentUserRepository(),
+            new \sdo\Repositories\Eloquent\EloquentUnitRepository(),
+            new \sdo\Repositories\Eloquent\EloquentStructureRepository(),
+            new \sdo\Repositories\Eloquent\EloquentArmoryRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionStructureRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionArmoryRepository()
         );
         
         // Setup a test player
@@ -76,6 +79,7 @@ class AdminInspectorTest extends TestCase
             $table->timestamps();
         });
 
+        Capsule::schema()->create('game_settings', function ($table) { $table->string('setting_key')->unique(); $table->text('setting_value')->nullable(); });
         Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id')->unsigned();

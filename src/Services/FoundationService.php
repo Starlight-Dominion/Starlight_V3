@@ -4,27 +4,34 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
-use sdo\Models\Structure;
-use sdo\Models\StructureLevel;
-use sdo\Models\DominionStructure;
-use sdo\Models\DominionManpower;
-use sdo\Models\Unit;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\StructureRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionStructureRepositoryInterface;
+use sdo\Repositories\Interfaces\UnitRepositoryInterface;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use sdo\Services\LogService;
-use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class FoundationService
 {
-    public function __construct(private LogService $logService) {}
+    public function __construct(
+        private DominionRepositoryInterface $dominionRepository,
+        private StructureRepositoryInterface $structureRepository,
+        private DominionStructureRepositoryInterface $dominionStructureRepository,
+        private UnitRepositoryInterface $unitRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private TransactionManager $transactionManager,
+        private LogService $logService
+    ) {}
 
     public function getFoundationState(int $dominionId): array
     {
-        $dominion = Dominion::with(['user', 'race'])->findOrFail($dominionId);
+        $dominion = $this->dominionRepository->findById($dominionId);
+        if (!$dominion) throw new Exception("Dominion not found.");
         
-        $structures = Structure::all();
-        $progress = DominionStructure::where('dominion_id', $dominionId)
-            ->get()
-            ->keyBy('structure_id');
+        $structures = $this->structureRepository->all();
+        $progress = $this->dominionStructureRepository->getStructuresByDominion($dominionId)->keyBy('structure_id');
 
         $manifest = [];
         foreach ($structures as $s) {
@@ -33,14 +40,10 @@ class FoundationService
             
             $currentLevelData = null;
             if ($currentLevel > 0) {
-                $currentLevelData = StructureLevel::where('structure_id', $s->id)
-                    ->where('level', $currentLevel)
-                    ->first();
+                $currentLevelData = $this->structureRepository->findLevel((int)$s->id, $currentLevel);
             }
 
-            $levelData = StructureLevel::where('structure_id', $s->id)
-                ->where('level', $nextLevel)
-                ->first();
+            $levelData = $this->structureRepository->findLevel((int)$s->id, $nextLevel);
 
             $manifest[$s->slug] = [
                 'id' => $s->id,
@@ -63,17 +66,20 @@ class FoundationService
 
     public function repair(int $dominionId): array
     {
-        return Capsule::transaction(function() use ($dominionId) {
-            $dominion = Dominion::lockForUpdate()->find($dominionId);
+        return $this->transactionManager->transaction(function() use ($dominionId) {
+            $dominion = $this->dominionRepository->lockForUpdate($dominionId);
+            if (!$dominion) throw new Exception("Dominion not found.");
+
             $needed = $dominion->foundation_max_hp - $dominion->foundation_hp;
             if ($needed <= 0) throw new Exception("Integrity is already at 100%.");
 
             $cost = $needed * 10;
             if ($dominion->credits < $cost) throw new Exception("Insufficient credits for nano-repair.");
 
-            $dominion->credits -= $cost;
-            $dominion->foundation_hp = $dominion->foundation_max_hp;
-            $dominion->save();
+            $this->dominionRepository->update($dominionId, [
+                'credits' => $dominion->credits - $cost,
+                'foundation_hp' => $dominion->foundation_max_hp
+            ]);
 
             $this->logService->log(
                 $dominionId,
@@ -89,8 +95,9 @@ class FoundationService
 
     public function upgrade(int $dominionId, int $structureId): array
     {
-        return Capsule::transaction(function() use ($dominionId, $structureId) {
-            $dominion = Dominion::lockForUpdate()->find($dominionId);
+        return $this->transactionManager->transaction(function() use ($dominionId, $structureId) {
+            $dominion = $this->dominionRepository->lockForUpdate($dominionId);
+            if (!$dominion) throw new Exception("Dominion not found.");
             
             // 1. Ensure Foundation is repaired before any structural changes
             if ($dominion->foundation_hp < $dominion->foundation_max_hp) {
@@ -98,39 +105,33 @@ class FoundationService
             }
 
             // 2. Determine next level
-            $current = DominionStructure::where('dominion_id', $dominionId)
-                ->where('structure_id', $structureId)
-                ->first();
-            
+            $current = $this->dominionStructureRepository->findByDominionAndStructure($dominionId, $structureId);
             $nextLevel = ($current ? $current->level : 0) + 1;
 
-            $levelData = StructureLevel::where('structure_id', $structureId)
-                ->where('level', $nextLevel)
-                ->first();
+            $levelData = $this->structureRepository->findLevel($structureId, $nextLevel);
 
             if (!$levelData) throw new Exception("Maximum tier reached for this structure.");
             if ($dominion->credits < $levelData->cost) throw new Exception("Insufficient credits.");
 
             // 3. Apply Upgrade
-            $dominion->credits -= $levelData->cost;
+            $this->dominionRepository->update($dominionId, [
+                'credits' => $dominion->credits - $levelData->cost
+            ]);
             
-            DominionStructure::updateOrInsert(
-                ['dominion_id' => $dominionId, 'structure_id' => $structureId],
-                ['level' => $nextLevel]
-            );
+            $this->dominionStructureRepository->updateLevel($dominionId, $structureId, $nextLevel);
 
             // 4. Process Structural Buffs
             
             // Foundation logic
             if ($structureId == 1) { 
-                $dominion->foundation_max_hp = $levelData->buff_hp;
-                $dominion->foundation_hp = $levelData->buff_hp;
+                $this->dominionRepository->update($dominionId, [
+                    'foundation_max_hp' => $levelData->buff_hp,
+                    'foundation_hp' => $levelData->buff_hp
+                ]);
             }
 
             // Unit Rewards (e.g., Mercenary Market)
             $this->grantUnitBuffs($dominionId, $levelData);
-
-            $dominion->save();
 
             $this->logService->log(
                 $dominionId,
@@ -155,11 +156,9 @@ class FoundationService
 
         foreach ($mapping as $slug => $qty) {
             if ($qty > 0) {
-                $unit = Unit::where('slug', $slug)->first();
+                $unit = $this->unitRepository->findBySlug($slug);
                 if ($unit) {
-                    DominionManpower::where('dominion_id', $domId)
-                        ->where('unit_id', $unit->id)
-                        ->increment('total_quantity', $qty);
+                    $this->manpowerRepository->updateQuantity($domId, (int)$unit->id, $qty);
                 }
             }
         }

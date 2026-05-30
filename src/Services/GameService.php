@@ -7,9 +7,10 @@ use DateTime;
 use DateTimeZone;
 use InvalidArgumentException;
 use sdo\Models\Dominion;
-use sdo\Models\DominionStructure;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionStructureRepositoryInterface;
 use sdo\Services\ConfigService;
-use Illuminate\Database\Capsule\Manager as Capsule;
 
 class GameService
 {
@@ -23,7 +24,12 @@ class GameService
 
     public const BASE_TURNS_PER_TICK = 4;
 
-    public function __construct(private ConfigService $configService) {}
+    public function __construct(
+        private ConfigService $configService,
+        private DominionRepositoryInterface $dominionRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private DominionStructureRepositoryInterface $dominionStructureRepository
+    ) {}
 
     public function getRealmTime(): DateTime
     {
@@ -44,17 +50,22 @@ class GameService
 
     public function getDominionByUserId(int $userId): ?Dominion
     {
-        return Dominion::with(['user', 'race'])->where('user_id', $userId)->first();
+        return $this->dominionRepository->findByUserId($userId);
     }
 
     public function getDominionById(int $id): ?Dominion
     {
-        return Dominion::with(['user', 'race'])->find($id);
+        return $this->dominionRepository->findById($id);
+    }
+
+    public function calculateLevel(int $xp): int
+    {
+        return (int)floor(sqrt($xp / 100)) + 1;
     }
 
     public function calculateXpProgress(int $xp): int
     {
-        $level = (int)floor(sqrt($xp / 100)) + 1;
+        $level = $this->calculateLevel($xp);
         $currentThreshold = (int)pow($level - 1, 2) * 100;
         $nextThreshold = (int)pow($level, 2) * 100;
 
@@ -79,30 +90,20 @@ class GameService
     {
         $baseCredits = (int)$this->configService->get('baseline_credits_per_tick', 100);
         
-        // Defensive check: Verify column exists before querying
-        static $hasProductionColumn = null;
-        if ($hasProductionColumn === null) {
-            $hasProductionColumn = Capsule::schema()->hasColumn('units', 'production_credits');
-        }
-
         $unitProductionList = [];
         $totalUnitProduction = 0;
         
-        if ($hasProductionColumn) {
-            $manpower = \sdo\Models\DominionManpower::with('unit')
-                ->where('dominion_id', $dominionId)
-                ->get();
+        $manpower = $this->manpowerRepository->getManpowerByDominion($dominionId);
                 
-            foreach ($manpower as $m) {
-                if ($m->total_quantity > 0 && ($m->unit->production_credits ?? 0) > 0) {
-                    $prod = $m->total_quantity * $m->unit->production_credits;
-                    $totalUnitProduction += $prod;
-                    $unitProductionList[] = [
-                        'name' => $m->unit->name,
-                        'quantity' => $m->total_quantity,
-                        'production' => $prod
-                    ];
-                }
+        foreach ($manpower as $m) {
+            if ($m->total_quantity > 0 && ($m->unit->production_credits ?? 0) > 0) {
+                $prod = $m->total_quantity * $m->unit->production_credits;
+                $totalUnitProduction += $prod;
+                $unitProductionList[] = [
+                    'name' => $m->unit->name,
+                    'quantity' => $m->total_quantity,
+                    'production' => $prod
+                ];
             }
         }
 
@@ -148,11 +149,6 @@ class GameService
             throw new InvalidArgumentException('Invalid structure level buff column specified.');
         }
 
-        return (float)DominionStructure::join('structure_levels', function($join) {
-                $join->on('dominion_structures.structure_id', '=', 'structure_levels.structure_id')
-                    ->on('dominion_structures.level', '=', 'structure_levels.level');
-            })
-            ->where('dominion_structures.dominion_id', $dominionId)
-            ->sum("structure_levels.$column");
+        return $this->dominionStructureRepository->sumStructureLevelBuff($dominionId, $column);
     }
 }
