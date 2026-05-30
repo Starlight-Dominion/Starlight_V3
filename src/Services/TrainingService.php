@@ -4,29 +4,36 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
-use sdo\Models\Unit;
-use sdo\Models\DominionManpower;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\UnitRepositoryInterface;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use sdo\Services\LogService;
-use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 
 class TrainingService
 {
-    public function __construct(private LogService $logService) {}
+    public function __construct(
+        private DominionRepositoryInterface $dominionRepository,
+        private UnitRepositoryInterface $unitRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private TransactionManager $transactionManager,
+        private LogService $logService
+    ) {}
 
     public function getUnitConfig(): array
     {
-        return Unit::orderBy('cost_credits', 'asc')->get()->keyBy('slug')->toArray();
+        return $this->unitRepository->all()->keyBy('slug')->toArray();
     }
 
     public function train(int $dominionId, string $unitSlug, int $quantity): array
     {
-        $units = $this->getUnitConfig();
-        if (!isset($units[$unitSlug]) || $quantity <= 0) return ['success' => false, 'message' => 'Invalid parameters.'];
+        $unit = $this->unitRepository->findBySlug($unitSlug);
+        if (!$unit || $quantity <= 0) return ['success' => false, 'message' => 'Invalid parameters.'];
 
-        return Capsule::transaction(function() use ($dominionId, $unitSlug, $quantity, $units) {
-            $dom = Dominion::lockForUpdate()->find($dominionId);
-            $unit = (object)$units[$unitSlug]; // Cast to object for property access if keyBy returns array of arrays
+        return $this->transactionManager->transaction(function() use ($dominionId, $unit, $quantity) {
+            $dom = $this->dominionRepository->lockForUpdate($dominionId);
+            if (!$dom) throw new Exception("Dominion not found.");
 
             $cost = $unit->cost_credits * $quantity;
             $citizens = $unit->cost_citizens * $quantity;
@@ -35,32 +42,19 @@ class TrainingService
                 throw new Exception("Insufficient resources for mobilization.");
             }
 
-            $dom->credits -= $cost;
-            $dom->citizens -= $citizens;
-            $dom->save();
+            $this->dominionRepository->update($dominionId, [
+                'credits' => $dom->credits - $cost,
+                'citizens' => $dom->citizens - $citizens
+            ]);
 
-            $exists = DominionManpower::where('dominion_id', $dominionId)
-                ->where('unit_id', $unit->id)
-                ->exists();
-
-            if ($exists) {
-                DominionManpower::where('dominion_id', $dominionId)
-                    ->where('unit_id', $unit->id)
-                    ->increment('total_quantity', $quantity);
-            } else {
-                DominionManpower::create([
-                    'dominion_id' => $dominionId,
-                    'unit_id' => $unit->id,
-                    'total_quantity' => $quantity
-                ]);
-            }
+            $this->manpowerRepository->updateQuantity($dominionId, (int)$unit->id, $quantity);
 
             $this->logService->log(
                 $dominionId,
                 'training_enlist',
                 "Commander enlisted {$quantity} {$unit->name}.",
                 $cost,
-                ['unit' => $unitSlug, 'quantity' => $quantity]
+                ['unit' => $unit->slug, 'quantity' => $quantity]
             );
 
             return ['success' => true, 'message' => "Enlisted {$quantity} {$unit->name}."];

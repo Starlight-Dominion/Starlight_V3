@@ -3,10 +3,12 @@ declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Models\GameLog;
+use sdo\Repositories\Interfaces\LogRepositoryInterface;
 
 class LogService
 {
+    public function __construct(private LogRepositoryInterface $logRepository) {}
+
     /**
      * Log a comprehensive game action.
      */
@@ -17,7 +19,7 @@ class LogService
         ?int $amount = null, 
         array $metadata = []
     ): void {
-        GameLog::create([
+        $this->logRepository->log([
             'dominion_id' => $dominionId,
             'action' => $action,
             'description' => $description,

@@ -1,30 +1,37 @@
 <?php
-
 declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Models\Dominion;
-use sdo\Models\Unit;
-use sdo\Models\DominionManpower;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\UnitRepositoryInterface;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Repositories\Interfaces\StructureRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use sdo\Services\LogService;
 use Exception;
-use Illuminate\Database\Capsule\Manager as Capsule;
 
 class UpgradesService
 {
     private array $housingConfig;
     private array $mercenaryMarketConfig;
 
-    public function __construct(private LogService $logService)
-    {
+    public function __construct(
+        private DominionRepositoryInterface $dominionRepository,
+        private UnitRepositoryInterface $unitRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private StructureRepositoryInterface $structureRepository,
+        private TransactionManager $transactionManager,
+        private LogService $logService
+    ) {
         $this->housingConfig = require __DIR__ . '/../../config/housing.php';
         $this->mercenaryMarketConfig = require __DIR__ . '/../../config/mercenary_market.php';
     }
 
     public function getUpgradeData(int $dominionId): array
     {
-        $dominion = Dominion::findOrFail($dominionId);
+        $dominion = $this->dominionRepository->findById($dominionId);
+        if (!$dominion) throw new Exception("Dominion not found.");
 
         return [
             'dominion' => $dominion,
@@ -36,8 +43,9 @@ class UpgradesService
     public function upgradeHousing(int $dominionId): array
     {
         try {
-            return Capsule::transaction(function() use ($dominionId) {
-                $dominion = Dominion::lockForUpdate()->find($dominionId);
+            return $this->transactionManager->transaction(function() use ($dominionId) {
+                $dominion = $this->dominionRepository->lockForUpdate($dominionId);
+                if (!$dominion) throw new Exception("Dominion not found.");
                 
                 $currentLevel = (int)($dominion->housing_level ?? 1);
                 $nextLevel = $currentLevel + 1;
@@ -52,9 +60,10 @@ class UpgradesService
                     throw new Exception("Insufficient credits for housing expansion.");
                 }
 
-                $dominion->decrement('credits', $cost);
-                $dominion->housing_level = $nextLevel;
-                $dominion->save();
+                $this->dominionRepository->update($dominionId, [
+                    'credits' => $dominion->credits - $cost,
+                    'housing_level' => $nextLevel
+                ]);
 
                 $this->logService->log(
                     $dominionId,
@@ -73,8 +82,9 @@ class UpgradesService
     public function upgradeMercenaryMarket(int $dominionId): array
     {
         try {
-            return Capsule::transaction(function() use ($dominionId) {
-                $dominion = Dominion::lockForUpdate()->find($dominionId);
+            return $this->transactionManager->transaction(function() use ($dominionId) {
+                $dominion = $this->dominionRepository->lockForUpdate($dominionId);
+                if (!$dominion) throw new Exception("Dominion not found.");
                 
                 $currentLevel = (int)($dominion->mercenary_market_level ?? 0);
                 $nextLevel = $currentLevel + 1;
@@ -90,9 +100,10 @@ class UpgradesService
                     throw new Exception("Insufficient credits to secure new mercenary contracts.");
                 }
 
-                $dominion->decrement('credits', $cost);
-                $dominion->mercenary_market_level = $nextLevel;
-                $dominion->save();
+                $this->dominionRepository->update($dominionId, [
+                    'credits' => $dominion->credits - $cost,
+                    'mercenary_market_level' => $nextLevel
+                ]);
 
                 // Grant units
                 $unitsToGrant = [
@@ -104,23 +115,9 @@ class UpgradesService
 
                 foreach ($unitsToGrant as $slug => $qty) {
                     if ($qty > 0) {
-                        $unit = Unit::where('slug', $slug)->first();
+                        $unit = $this->unitRepository->findBySlug($slug);
                         if ($unit) {
-                            $exists = DominionManpower::where('dominion_id', $dominionId)
-                                ->where('unit_id', $unit->id)
-                                ->exists();
-
-                            if ($exists) {
-                                DominionManpower::where('dominion_id', $dominionId)
-                                    ->where('unit_id', $unit->id)
-                                    ->increment('total_quantity', $qty);
-                            } else {
-                                DominionManpower::create([
-                                    'dominion_id' => $dominionId,
-                                    'unit_id' => $unit->id,
-                                    'total_quantity' => $qty
-                                ]);
-                            }
+                            $this->manpowerRepository->updateQuantity($dominionId, (int)$unit->id, $qty);
                         }
                     }
                 }

@@ -7,20 +7,22 @@ use DateInterval;
 use DateTimeImmutable;
 use DateTimeZone;
 use Exception;
-use Illuminate\Database\Capsule\Manager as Capsule;
+use sdo\Repositories\Interfaces\UserRepositoryInterface;
+use sdo\Repositories\Interfaces\DiscordLinkRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use sdo\Models\DiscordAccountLink;
-use sdo\Models\DiscordLinkChallenge;
-use sdo\Models\User;
 
 class DiscordLinkService
 {
-    public function __construct()
-    {
-    }
+    public function __construct(
+        private UserRepositoryInterface $userRepository,
+        private DiscordLinkRepositoryInterface $discordLinkRepository,
+        private TransactionManager $transactionManager
+    ) {}
 
     public function createChallengeForUser(int $userId): array
     {
-        $user = User::find($userId);
+        $user = $this->userRepository->findById($userId);
         if (!$user) {
             throw new Exception('User not found.');
         }
@@ -29,12 +31,10 @@ class DiscordLinkService
         $codeHash = $this->hashCode($code);
         $expiresAt = (new DateTimeImmutable('now', new DateTimeZone('UTC')))->add(new DateInterval('PT10M'));
 
-        Capsule::transaction(function () use ($userId, $codeHash, $expiresAt): void {
-            DiscordLinkChallenge::where('user_id', $userId)
-                ->whereNull('consumed_at')
-            ->update(['consumed_at' => gmdate('Y-m-d H:i:s')]);
+        $this->transactionManager->transaction(function () use ($userId, $codeHash, $expiresAt): void {
+            $this->discordLinkRepository->invalidateActiveChallenges($userId);
 
-            DiscordLinkChallenge::create([
+            $this->discordLinkRepository->createChallenge([
                 'user_id' => $userId,
                 'code_hash' => $codeHash,
                 'expires_at' => $expiresAt->format('Y-m-d H:i:s'),
@@ -71,9 +71,7 @@ class DiscordLinkService
 
     public function getActiveLinkForUser(int $userId): ?DiscordAccountLink
     {
-        return DiscordAccountLink::where('user_id', $userId)
-            ->where('is_active', true)
-            ->first();
+        return $this->discordLinkRepository->findLinkByUser($userId);
     }
 
     public function getActiveLinkForDiscordUser(string $discordUserID): ?DiscordAccountLink
@@ -83,9 +81,7 @@ class DiscordLinkService
             return null;
         }
 
-        return DiscordAccountLink::where('discord_user_id', $discordUserID)
-            ->where('is_active', true)
-            ->first();
+        return $this->discordLinkRepository->findLinkByDiscordUser($discordUserID);
     }
 
     private function handleLinkRequested(array $envelope, array $payload): array
@@ -97,12 +93,8 @@ class DiscordLinkService
             return $this->rejectionEnvelope($envelope, 'missing_fields', 'Missing discord user id or link code.');
         }
 
-        return Capsule::transaction(function () use ($envelope, $discordUserID, $linkCode): array {
-            $challenge = DiscordLinkChallenge::where('code_hash', $this->hashCode($linkCode))
-                ->whereNull('consumed_at')
-                ->where('expires_at', '>', gmdate('Y-m-d H:i:s'))
-                ->lockForUpdate()
-                ->first();
+        return $this->transactionManager->transaction(function () use ($envelope, $discordUserID, $linkCode): array {
+            $challenge = $this->discordLinkRepository->lockChallengeByHash($this->hashCode($linkCode));
 
             if (!$challenge) {
                 return $this->rejectionEnvelope($envelope, 'invalid_or_expired_code', 'That link code is invalid or expired.');
@@ -110,38 +102,35 @@ class DiscordLinkService
 
             $userID = (int)$challenge->user_id;
 
-            $existingDiscord = DiscordAccountLink::where('discord_user_id', $discordUserID)
-                ->lockForUpdate()
-                ->first();
+            $existingDiscord = $this->discordLinkRepository->lockLinkByDiscordUser($discordUserID);
             if ($existingDiscord && (bool)$existingDiscord->is_active && (int)$existingDiscord->user_id !== $userID) {
                 return $this->rejectionEnvelope($envelope, 'discord_already_linked', 'This Discord account is already linked to another commander.');
             }
 
-            $existingUser = DiscordAccountLink::where('user_id', $userID)
-                ->lockForUpdate()
-                ->first();
+            $existingUser = $this->discordLinkRepository->lockLinkByUser($userID);
             if ($existingUser && (bool)$existingUser->is_active && $existingUser->discord_user_id !== $discordUserID) {
                 return $this->rejectionEnvelope($envelope, 'sdo_user_already_linked', 'This commander is already linked to a different Discord account.');
             }
 
-            $challenge->consumed_at = gmdate('Y-m-d H:i:s');
-            $challenge->save();
+            $this->discordLinkRepository->updateChallenge((int)$challenge->id, [
+                'consumed_at' => gmdate('Y-m-d H:i:s')
+            ]);
 
             if ($existingUser && $existingDiscord && (int)$existingUser->id !== (int)$existingDiscord->id) {
-                // Keep the row keyed by user_id and drop stale discord-only history.
-                $existingDiscord->delete();
+                $this->discordLinkRepository->deleteLink((int)$existingDiscord->id);
             }
 
             $link = $existingUser ?? $existingDiscord;
             if ($link) {
-                $link->user_id = $userID;
-                $link->discord_user_id = $discordUserID;
-                $link->linked_at = gmdate('Y-m-d H:i:s');
-                $link->unlinked_at = null;
-                $link->is_active = true;
-                $link->save();
+                $this->discordLinkRepository->updateLink((int)$link->id, [
+                    'user_id' => $userID,
+                    'discord_user_id' => $discordUserID,
+                    'linked_at' => gmdate('Y-m-d H:i:s'),
+                    'unlinked_at' => null,
+                    'is_active' => true,
+                ]);
             } else {
-                $link = DiscordAccountLink::create([
+                $link = $this->discordLinkRepository->createLink([
                     'user_id' => $userID,
                     'discord_user_id' => $discordUserID,
                     'is_active' => true,
@@ -169,19 +158,17 @@ class DiscordLinkService
             return $this->rejectionEnvelope($envelope, 'missing_discord_user_id', 'Missing discord user id.');
         }
 
-        return Capsule::transaction(function () use ($envelope, $discordUserID): array {
-            $link = DiscordAccountLink::where('discord_user_id', $discordUserID)
-                ->where('is_active', true)
-                ->lockForUpdate()
-                ->first();
+        return $this->transactionManager->transaction(function () use ($envelope, $discordUserID): array {
+            $link = $this->discordLinkRepository->lockLinkByDiscordUser($discordUserID);
 
-            if (!$link) {
+            if (!$link || !$link->is_active) {
                 return $this->rejectionEnvelope($envelope, 'not_linked', 'No active account link exists for this Discord user.');
             }
 
-            $link->is_active = false;
-            $link->unlinked_at = gmdate('Y-m-d H:i:s');
-            $link->save();
+            $this->discordLinkRepository->updateLink((int)$link->id, [
+                'is_active' => false,
+                'unlinked_at' => gmdate('Y-m-d H:i:s')
+            ]);
 
             return $this->resultEnvelope(
                 $envelope,
@@ -201,11 +188,9 @@ class DiscordLinkService
             return $this->rejectionEnvelope($envelope, 'missing_discord_user_id', 'Missing discord user id.');
         }
 
-        $link = DiscordAccountLink::where('discord_user_id', $discordUserID)
-            ->where('is_active', true)
-            ->first();
+        $link = $this->discordLinkRepository->findLinkByDiscordUser($discordUserID);
 
-        if (!$link) {
+        if (!$link || !$link->is_active) {
             return $this->resultEnvelope(
                 $envelope,
                 'account_link.status_reported',

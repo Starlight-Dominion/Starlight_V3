@@ -66,4 +66,44 @@ class EloquentDominionRepository implements DominionRepositoryInterface
             ->orderBy('name', 'asc')
             ->get();
     }
+
+    public function count(): int
+    {
+        return Dominion::count();
+    }
+
+    public function sum(string $column): float
+    {
+        return (float)Dominion::sum($column);
+    }
+
+    public function search(string $query, int $limit = 20): Collection
+    {
+        return Dominion::with('user')
+            ->where('name', 'LIKE', "%{$query}%")
+            ->orWhereHas('user', function($q) use ($query) {
+                $q->where('username', 'LIKE', "%{$query}%");
+            })
+            ->limit($limit)
+            ->get();
+    }
+
+    public function getAll(int $limit = 50): Collection
+    {
+        return Dominion::with('user')
+            ->orderBy('id', 'asc')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function findFullProfile(int $id): ?Dominion
+    {
+        return Dominion::with(['user', 'manpower.unit', 'structures.structure', 'race'])
+            ->find($id);
+    }
+
+    public function getColumns(): array
+    {
+        return Capsule::schema()->getColumnListing('dominions');
+    }
 }

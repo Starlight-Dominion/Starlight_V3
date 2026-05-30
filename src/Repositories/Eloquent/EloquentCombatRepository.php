@@ -48,4 +48,20 @@ class EloquentCombatRepository implements CombatRepositoryInterface
     {
         return Capsule::table('battle_logs')->find($id);
     }
+
+    public function countRecentBattles(int $hours): int
+    {
+        return Capsule::table('battle_logs')
+            ->where('battle_time', '>=', date('Y-m-d H:i:s', strtotime("-$hours hours")))
+            ->count();
+    }
+
+    public function countRecentBattlesBetween(int $attackerId, int $defenderId, int $hours): int
+    {
+        return Capsule::table('battle_logs')
+            ->where('attacker_id', $attackerId)
+            ->where('defender_id', $defenderId)
+            ->where('battle_time', '>=', date('Y-m-d H:i:s', strtotime("-$hours hours")))
+            ->count();
+    }
 }

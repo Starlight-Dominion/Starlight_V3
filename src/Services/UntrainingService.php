@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
-use sdo\Models\DominionManpower;
-use sdo\Models\Unit;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\UnitRepositoryInterface;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use Exception;
 use DateTime;
 
@@ -16,8 +18,12 @@ class UntrainingService
     private float $holdFactor;
     private array $minesConfig;
 
-    public function __construct()
-    {
+    public function __construct(
+        private DominionRepositoryInterface $dominionRepository,
+        private UnitRepositoryInterface $unitRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private TransactionManager $transactionManager
+    ) {
         $this->minesConfig = require __DIR__ . '/../../config/mines.php';
         $this->holdFactor = 0.5 + (count($this->minesConfig['unlocks'])) * 0.01; // Slight bonus based on mine count
     }
@@ -27,7 +33,7 @@ class UntrainingService
      */
     public function canUntrainCitizens(int $dominionId): array
     {
-        $dominion = Dominion::find($dominionId);
+        $dominion = $this->dominionRepository->findById($dominionId);
 
         if (!$dominion || $dominion->last_untrained === null) {
             return [
@@ -64,7 +70,7 @@ class UntrainingService
      */
     public function getHoldTimeRemaining(int $dominionId): ?int
     {
-        $dominion = Dominion::find($dominionId);
+        $dominion = $this->dominionRepository->findById($dominionId);
 
         if (!$dominion || !$dominion->last_untrained) return null;
 
@@ -83,7 +89,7 @@ class UntrainingService
      */
     public function releaseHeldCitizens(int $dominionId): array
     {
-        $dominion = Dominion::find($dominionId);
+        $dominion = $this->dominionRepository->findById($dominionId);
 
         if (!$dominion) {
             return ['success' => false, 'message' => 'Sector not found.'];
@@ -95,9 +101,10 @@ class UntrainingService
             return ['success' => true, 'message' => 'No citizens held to release.',];
         }
 
-        $dominion->increment('citizens', $heldCitizens);
-        $dominion->held_citizens = 0;
-        $dominion->save();
+        $this->dominionRepository->update($dominionId, [
+            'citizens' => $dominion->citizens + $heldCitizens,
+            'held_citizens' => 0
+        ]);
 
         return [
             'success' => true,
@@ -111,24 +118,23 @@ class UntrainingService
      */
     public function untrain(int $dominionId, string $unitSlug, int $quantity): array
     {
-        $unit = Unit::where('slug', $unitSlug)->first();
+        $unit = $this->unitRepository->findBySlug($unitSlug);
         if (!$unit) {
             return ['success' => false, 'message' => "Invalid unit type: {$unitSlug}"];
         }
 
-        return \Illuminate\Database\Capsule\Manager::transaction(function() use ($dominionId, $unit, $quantity) {
-            $dominion = Dominion::lockForUpdate()->find($dominionId);
+        return $this->transactionManager->transaction(function() use ($dominionId, $unit, $quantity) {
+            $dominion = $this->dominionRepository->lockForUpdate($dominionId);
             if (!$dominion) throw new Exception('Sector not found.');
 
-            $manpower = DominionManpower::where('dominion_id', $dominionId)
-                ->where('unit_id', $unit->id)
-                ->first();
+            $manpower = $this->manpowerRepository->getManpowerBySlugMap($dominionId);
+            $currentQty = (int)($manpower[$unit->slug] ?? 0);
 
-            if (!$manpower || $manpower->total_quantity <= 0) {
+            if ($currentQty <= 0) {
                 return ['success' => false, 'message' => "No {$unit->name} available for untraining."];
             }
 
-            $actualQuantity = min($manpower->total_quantity, $quantity);
+            $actualQuantity = min($currentQty, $quantity);
 
             // Check cooldown period
             $cooldownCheck = $this->canUntrainCitizens($dominionId);
@@ -146,13 +152,14 @@ class UntrainingService
             $rewardTurns = (int)(8 * $actualQuantity * $this->holdFactor / 2.5);
 
             // Deduct units and apply rewards
-            $manpower->decrement('total_quantity', $actualQuantity);
+            $this->manpowerRepository->updateQuantity($dominionId, (int)$unit->id, -$actualQuantity);
             
-            $dominion->increment('credits', (int)$rewardCredits);
-            $dominion->increment('citizens', $rewardCitizens);
-            $dominion->increment('turns', $rewardTurns);
-            $dominion->last_untrained = new DateTime();
-            $dominion->save();
+            $this->dominionRepository->update($dominionId, [
+                'credits' => $dominion->credits + (int)$rewardCredits,
+                'citizens' => $dominion->citizens + $rewardCitizens,
+                'turns' => $dominion->turns + $rewardTurns,
+                'last_untrained' => new DateTime()
+            ]);
 
             return [
                 'success' => true,

@@ -5,19 +5,24 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
-use sdo\Models\DominionManpower;
-use sdo\Models\Unit;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\UnitRepositoryInterface;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use Exception;
-use Illuminate\Database\Capsule\Manager as Capsule;
 
 class MinesService
 {
-    private UntrainingService $untrainingService;
     private array $minesConfig;
 
-    public function __construct(UntrainingService $untrainingService)
-    {
-        $this->untrainingService = $untrainingService;
+    public function __construct(
+        private UntrainingService $untrainingService,
+        private GameService $gameService,
+        private DominionRepositoryInterface $dominionRepository,
+        private UnitRepositoryInterface $unitRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private TransactionManager $transactionManager
+    ) {
         $this->minesConfig = require __DIR__ . '/../../config/mines.php';
     }
 
@@ -32,13 +37,8 @@ class MinesService
         $level = (int)($dominion->current_mine_level ?? 1);
         $productionPerMiner = $this->minesConfig['mines'][$tier][$level]['production_per_miner'] ?? 0;
         
-        $workerUnit = Unit::where('slug', 'workers')->first();
-        $minersCount = 0;
-        if ($workerUnit) {
-            $minersCount = DominionManpower::where('dominion_id', $dominion->id)
-                ->where('unit_id', $workerUnit->id)
-                ->value('total_quantity') ?? 0;
-        }
+        $manpower = $this->manpowerRepository->getManpowerBySlugMap((int)$dominion->id);
+        $minersCount = (int)($manpower['workers'] ?? 0);
         
         return (float)($productionPerMiner * $minersCount);
     }
@@ -50,11 +50,11 @@ class MinesService
         }
 
         try {
-            return Capsule::transaction(function() use ($dominionId, $quantity) {
-                $dominion = Dominion::lockForUpdate()->find($dominionId);
+            return $this->transactionManager->transaction(function() use ($dominionId, $quantity) {
+                $dominion = $this->dominionRepository->lockForUpdate($dominionId);
                 if (!$dominion) throw new Exception('Sector not found.');
 
-                $workerUnit = Unit::where('slug', 'workers')->first();
+                $workerUnit = $this->unitRepository->findBySlug('workers');
                 if (!$workerUnit) throw new Exception('Worker unit configuration not found.');
 
                 $totalCreditsCost = 200 * $quantity;
@@ -67,25 +67,12 @@ class MinesService
                     throw new Exception('Insufficient citizens.');
                 }
 
-                $dominion->decrement('credits', $totalCreditsCost);
-                $dominion->decrement('citizens', $totalCitizenCost);
-                $dominion->save();
+                $this->dominionRepository->update($dominionId, [
+                    'credits' => $dominion->credits - $totalCreditsCost,
+                    'citizens' => $dominion->citizens - $totalCitizenCost
+                ]);
 
-                $exists = DominionManpower::where('dominion_id', $dominionId)
-                    ->where('unit_id', $workerUnit->id)
-                    ->exists();
-
-                if ($exists) {
-                    DominionManpower::where('dominion_id', $dominionId)
-                        ->where('unit_id', $workerUnit->id)
-                        ->increment('total_quantity', $quantity);
-                } else {
-                    DominionManpower::create([
-                        'dominion_id' => $dominionId,
-                        'unit_id' => $workerUnit->id,
-                        'total_quantity' => $quantity
-                    ]);
-                }
+                $this->manpowerRepository->updateQuantity($dominionId, (int)$workerUnit->id, $quantity);
 
                 return ['success' => true, 'message' => "Assigned {$quantity} utility workers to extraction duty."];
             });
@@ -105,8 +92,8 @@ class MinesService
     public function upgradeMineTier(int $dominionId): array
     {
         try {
-            return Capsule::transaction(function() use ($dominionId) {
-                $dominion = Dominion::lockForUpdate()->find($dominionId);
+            return $this->transactionManager->transaction(function() use ($dominionId) {
+                $dominion = $this->dominionRepository->lockForUpdate($dominionId);
                 if (!$dominion) throw new Exception('Sector not found.');
 
                 $currentTier = (int)($dominion->current_mine_tier ?? 1);
@@ -117,7 +104,7 @@ class MinesService
                     throw new Exception("Maximum extraction depth reached for current tech.");
                 }
 
-                $playerLevel = $dominion->getPlayerLevel();
+                $playerLevel = $this->gameService->calculateLevel((int)$dominion->xp);
                 $requiredLevel = $this->minesConfig['unlocks'][$nextTier];
                 if ($playerLevel < $requiredLevel) {
                     throw new Exception("Commander level {$requiredLevel} required for next extraction tier.");
@@ -125,9 +112,10 @@ class MinesService
 
                 $newLevel = (int)floor($currentLevel / 2);
 
-                $dominion->current_mine_tier = $nextTier;
-                $dominion->current_mine_level = $newLevel;
-                $dominion->save();
+                $this->dominionRepository->update($dominionId, [
+                    'current_mine_tier' => $nextTier,
+                    'current_mine_level' => $newLevel
+                ]);
 
                 return ['success' => true, 'message' => "Upgraded to Extraction Tier {$nextTier}! Previous efforts translated to Level {$newLevel}."];
             });
@@ -139,8 +127,8 @@ class MinesService
     public function upgradeCurrentMine(int $dominionId): array
     {
         try {
-            return Capsule::transaction(function() use ($dominionId) {
-                $dominion = Dominion::lockForUpdate()->find($dominionId);
+            return $this->transactionManager->transaction(function() use ($dominionId) {
+                $dominion = $this->dominionRepository->lockForUpdate($dominionId);
                 if (!$dominion) throw new Exception('Sector not found.');
 
                 $currentTier = (int)($dominion->current_mine_tier ?? 1);
@@ -157,9 +145,10 @@ class MinesService
                     throw new Exception("Insufficient credits for infrastructure upgrade.");
                 }
 
-                $dominion->decrement('credits', $cost);
-                $dominion->current_mine_level = $nextLevel;
-                $dominion->save();
+                $this->dominionRepository->update($dominionId, [
+                    'credits' => $dominion->credits - $cost,
+                    'current_mine_level' => $nextLevel
+                ]);
 
                 return ['success' => true, 'message' => "Extraction Tier {$currentTier} upgraded to Level {$nextLevel}."];
             });

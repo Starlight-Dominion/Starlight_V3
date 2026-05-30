@@ -43,6 +43,11 @@ class EloquentArmoryRepository implements ArmoryRepositoryInterface
         return ArmoryItem::where('id', $id)->delete() > 0;
     }
 
+    public function getColumns(): array
+    {
+        return Capsule::schema()->getColumnListing('armory_items');
+    }
+
     public function allCategories(): Collection
     {
         return ArmoryCategory::orderBy('id', 'asc')->get();

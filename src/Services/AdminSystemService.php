@@ -4,22 +4,29 @@ declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Models\User;
-use sdo\Models\Dominion;
-use sdo\Models\BattleLog;
-use sdo\Models\GameLog;
+use sdo\Repositories\Interfaces\UserRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Repositories\Interfaces\LogRepositoryInterface;
 use DateTime;
 use DateTimeZone;
 
 class AdminSystemService
 {
+    public function __construct(
+        private UserRepositoryInterface $userRepository,
+        private DominionRepositoryInterface $dominionRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private LogRepositoryInterface $logRepository
+    ) {}
+
     public function getSystemStats(): array
     {
-        $playerCount = User::count();
-        $kingdomCount = Dominion::count();
-        $totalCredits = (float)Dominion::sum('credits');
-        $totalCitizens = (float)Dominion::sum('citizens');
-        $totalManpower = (float)\sdo\Models\DominionManpower::sum('total_quantity');
+        $playerCount = $this->userRepository->count();
+        $kingdomCount = $this->dominionRepository->count();
+        $totalCredits = $this->dominionRepository->sum('credits');
+        $totalCitizens = $this->dominionRepository->sum('citizens');
+        $totalManpower = $this->manpowerRepository->sumTotalQuantity();
         
         return [
             'total_users' => $playerCount,
@@ -33,7 +40,7 @@ class AdminSystemService
 
     public function logAdminAction(int $adminId, string $action, string $description, array $metadata = []): void
     {
-        GameLog::create([
+        $this->logRepository->log([
             'dominion_id' => $adminId,
             'action' => 'ADMIN_' . strtoupper($action),
             'description' => $description,
@@ -43,18 +50,11 @@ class AdminSystemService
 
     public function getAuditLogs(int $limit = 100): array
     {
-        return GameLog::where('action', 'LIKE', 'ADMIN_%')
-            ->orderBy('id', 'desc')
-            ->limit($limit)
-            ->get()
-            ->toArray();
+        return $this->logRepository->getAuditLogs($limit);
     }
 
     public function getRecentBattleLogs(int $limit = 50): array
     {
-        return BattleLog::orderBy('battle_time', 'desc')
-            ->limit($limit)
-            ->get()
-            ->toArray();
+        return $this->logRepository->getRecentBattleLogs($limit);
     }
 }

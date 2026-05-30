@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\User;
-use sdo\Models\Dominion;
 use sdo\Dto\Settings\UpdateIdentityRequest;
 use sdo\Dto\Settings\UpdateCipherRequest;
-use Illuminate\Database\Capsule\Manager as Capsule;
+use sdo\Repositories\Interfaces\UserRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use Exception;
 use DateTime;
 
@@ -19,13 +20,25 @@ class SettingsService
     private const MAX_DIMENSION = 500;
     private const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+    public function __construct(
+        private UserRepositoryInterface $userRepository,
+        private DominionRepositoryInterface $dominionRepository,
+        private TransactionManager $transactionManager
+    ) {}
+
     public function updateIdentity(int $userId, UpdateIdentityRequest $request): array
     {
-        $user = User::findOrFail($userId);
-        $dominion = $user->dominion;
+        $user = $this->userRepository->findById($userId);
+        if (!$user) throw new Exception("Commander not found.");
+
+        $dominion = $this->dominionRepository->findByUserId($userId);
+        if (!$dominion) throw new Exception("Dominion not found.");
+
+        $userChanges = [];
+        $dominionChanges = [];
 
         if ($user->username !== $request->username) {
-            if (User::where('username', $request->username)->exists()) {
+            if ($this->userRepository->findByUsername($request->username)) {
                 throw new Exception("Identity handle '{$request->username}' is already claimed.");
             }
             
@@ -33,29 +46,36 @@ class SettingsService
                 throw new Exception("Insufficient credits for handle re-assignment. Required: 1,000,000 CP.");
             }
 
-            $dominion->credits -= self::HANDLE_CHANGE_COST;
-            $user->username = $request->username;
-            $user->handle_last_changed = new DateTime();
+            $dominionChanges['credits'] = $dominion->credits - self::HANDLE_CHANGE_COST;
+            $userChanges['username'] = $request->username;
+            $userChanges['handle_last_changed'] = new DateTime();
         }
 
         if ($user->email !== $request->email) {
-            if (User::where('email', $request->email)->exists()) {
+            if ($this->userRepository->findByEmail($request->email)) {
                 throw new Exception("Comms frequency '{$request->email}' is already monitored.");
             }
-            $user->email = $request->email;
+            $userChanges['email'] = $request->email;
         }
 
-        Capsule::transaction(function() use ($user, $dominion) {
-            $user->save();
-            $dominion->save();
-        });
+        if (!empty($userChanges) || !empty($dominionChanges)) {
+            $this->transactionManager->transaction(function() use ($userId, $userChanges, $dominion, $dominionChanges) {
+                if (!empty($userChanges)) {
+                    $this->userRepository->update($userId, $userChanges);
+                }
+                if (!empty($dominionChanges)) {
+                    $this->dominionRepository->update((int)$dominion->id, $dominionChanges);
+                }
+            });
+        }
 
         return ['success' => true, 'message' => "Identity profiles synchronized."];
     }
 
     public function updateCipher(int $userId, UpdateCipherRequest $request): array
     {
-        $user = User::findOrFail($userId);
+        $user = $this->userRepository->findById($userId);
+        if (!$user) throw new Exception("Commander not found.");
 
         if (!password_verify($request->current_password, $user->password)) {
             throw new Exception("Current authorization cipher is incorrect.");
@@ -65,8 +85,7 @@ class SettingsService
             throw new Exception("New cipher verification mismatch.");
         }
 
-        $user->password = $request->new_password;
-        $user->save();
+        $this->userRepository->update($userId, ['password' => $request->new_password]);
 
         return ['success' => true, 'message' => "Encryption ciphers rotated successfully."];
     }
@@ -76,7 +95,8 @@ class SettingsService
      */
     public function processAvatarUpload(int $userId, array $file): array
     {
-        $user = User::findOrFail($userId);
+        $user = $this->userRepository->findById($userId);
+        if (!$user) throw new Exception("Commander not found.");
 
         // 1. Basic Upload Validation
         if ($file['error'] !== UPLOAD_ERR_OK) {
@@ -122,8 +142,7 @@ class SettingsService
 
         // 7. Update User Profile
         $dbPath = '/uploads/avatars/' . $fileName;
-        $user->avatar_path = $dbPath;
-        $user->save();
+        $this->userRepository->update($userId, ['avatar_path' => $dbPath]);
 
         return [
             'success' => true, 
@@ -134,18 +153,18 @@ class SettingsService
 
     public function toggleStasis(int $userId): array
     {
-        $user = User::findOrFail($userId);
+        $user = $this->userRepository->findById($userId);
+        if (!$user) throw new Exception("Commander not found.");
+
         $now = new DateTime();
 
-        if ($user->stasis_until && new DateTime($user->stasis_until->format('Y-m-d H:i:s')) > $now) {
-            $user->stasis_until = null;
-            $user->save();
+        if ($user->stasis_until && $user->stasis_until > $now) {
+            $this->userRepository->update($userId, ['stasis_until' => null]);
             return ['success' => true, 'message' => "Stasis interrupted. Life support at 100%."];
         }
 
         $future = (new DateTime())->modify('+14 days');
-        $user->stasis_until = $future;
-        $user->save();
+        $this->userRepository->update($userId, ['stasis_until' => $future]);
 
         return ['success' => true, 'message' => "Stasis engaged until " . $future->format('Y-m-d H:i')];
     }

@@ -67,4 +67,14 @@ class EloquentStructureRepository implements StructureRepositoryInterface
     {
         return StructureLevel::create($data)->exists;
     }
+
+    public function getColumns(): array
+    {
+        return Capsule::schema()->getColumnListing('structures');
+    }
+
+    public function getLevelColumns(): array
+    {
+        return Capsule::schema()->getColumnListing('structure_levels');
+    }
 }

@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace sdo\Services;
 
-use sdo\Models\Dominion;
-use sdo\Models\User;
 use sdo\Repositories\Interfaces\DominionRepositoryInterface;
 use sdo\Repositories\Interfaces\UserRepositoryInterface;
 use sdo\Repositories\Interfaces\UnitRepositoryInterface;
 use sdo\Repositories\Interfaces\StructureRepositoryInterface;
 use sdo\Repositories\Interfaces\ArmoryRepositoryInterface;
-use Illuminate\Database\Capsule\Manager as Capsule;
+use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionStructureRepositoryInterface;
+use sdo\Repositories\Interfaces\DominionArmoryRepositoryInterface;
 use Exception;
 use DateTime;
 
@@ -22,39 +22,28 @@ class AdminPlayerService
         private UserRepositoryInterface $userRepository,
         private UnitRepositoryInterface $unitRepository,
         private StructureRepositoryInterface $structureRepository,
-        private ArmoryRepositoryInterface $armoryRepository
+        private ArmoryRepositoryInterface $armoryRepository,
+        private ManpowerRepositoryInterface $manpowerRepository,
+        private DominionStructureRepositoryInterface $dominionStructureRepository,
+        private DominionArmoryRepositoryInterface $dominionArmoryRepository
     ) {}
 
     public function searchDominions(string $query): array
     {
-        return Dominion::with('user')
-            ->where('name', 'LIKE', "%{$query}%")
-            ->orWhereHas('user', function($q) use ($query) {
-                $q->where('username', 'LIKE', "%{$query}%");
-            })
-            ->limit(20)
-            ->get()
-            ->toArray();
+        return $this->dominionRepository->search($query)->toArray();
     }
 
     public function getAllDominions(int $limit = 50): array
     {
-        return Dominion::with('user')
-            ->orderBy('id', 'asc')
-            ->limit($limit)
-            ->get()
-            ->toArray();
+        return $this->dominionRepository->getAll($limit)->toArray();
     }
 
     public function getKingdomFullProfile(int $dominionId): array
     {
-        $dominion = Dominion::with(['user', 'manpower.unit', 'structures.structure', 'race'])
-            ->findOrFail($dominionId);
+        $dominion = $this->dominionRepository->findFullProfile($dominionId);
+        if (!$dominion) throw new Exception("Dominion not found.");
 
-        $armory = \sdo\Models\DominionArmoryItem::with('item')
-            ->where('kingdom_id', $dominionId)
-            ->get()
-            ->toArray();
+        $armory = $this->dominionArmoryRepository->getInventory($dominionId)->toArray();
 
         return [
             'dominion' => $dominion->toArray(),
@@ -67,62 +56,52 @@ class AdminPlayerService
 
     public function updateDominionStats(int $dominionId, array $stats): bool
     {
-        $dominion = Dominion::with('user')->findOrFail($dominionId);
+        $dominion = $this->dominionRepository->findById($dominionId);
+        if (!$dominion) throw new Exception("Dominion not found.");
         
-        $domColumns = Capsule::schema()->getColumnListing('dominions');
-        $userColumns = Capsule::schema()->getColumnListing('users');
+        $domColumns = $this->dominionRepository->getColumns();
+        $userColumns = $this->userRepository->getColumns();
         
-        $normalize = function($model, $field, $value) {
-            $casts = $model->getCasts();
-            $type = $casts[$field] ?? null;
-
-            if ($type === 'datetime' && (empty($value) || $value === 'null')) {
-                return null;
-            }
-            if ($type === 'boolean') {
-                return ($value === 'true' || $value === '1' || $value === 1 || $value === true);
-            }
-            return $value;
-        };
+        $domChanges = [];
+        $userChanges = [];
 
         foreach ($stats as $field => $value) {
             if (in_array($field, $domColumns)) {
-                $dominion->$field = $normalize($dominion, $field, $value);
-            } elseif (in_array($field, $userColumns) && $dominion->user) {
-                if ($field === 'password') {
-                    if (!empty($value)) {
-                        $dominion->user->password = $value;
-                    }
+                $domChanges[$field] = $value;
+            } elseif (in_array($field, $userColumns)) {
+                if ($field === 'password' && empty($value)) {
                     continue;
                 }
-                $dominion->user->$field = $normalize($dominion->user, $field, $value);
+                $userChanges[$field] = $value;
             }
         }
 
-        return $dominion->push();
+        $success = true;
+        if (!empty($domChanges)) {
+            $success = $success && $this->dominionRepository->update($dominionId, $domChanges);
+        }
+        if (!empty($userChanges) && $dominion->user_id) {
+            $success = $success && $this->userRepository->update((int)$dominion->user_id, $userChanges);
+        }
+
+        return $success;
     }
 
     public function updateKingdomManpower(int $dominionId, int $unitId, int $total, int $stabled): bool
     {
-        return \sdo\Models\DominionManpower::updateOrCreate(
-            ['dominion_id' => $dominionId, 'unit_id' => $unitId],
-            ['total_quantity' => $total, 'stabled_quantity' => $stabled]
-        )->exists;
+        return $this->manpowerRepository->setQuantityWithStable($dominionId, $unitId, $total, $stabled);
     }
 
     public function updateKingdomStructure(int $dominionId, int $structureId, int $level): bool
     {
-        return \sdo\Models\DominionStructure::updateOrCreate(
-            ['dominion_id' => $dominionId, 'structure_id' => $structureId],
-            ['level' => $level]
-        )->exists;
+        return $this->dominionStructureRepository->updateOrCreate($dominionId, $structureId, ['level' => $level]);
     }
 
     public function updateKingdomArmory(int $dominionId, int $itemId, int $quantity, bool $equipped): bool
     {
-        return \sdo\Models\DominionArmoryItem::updateOrCreate(
-            ['kingdom_id' => $dominionId, 'item_id' => $itemId],
-            ['quantity' => $quantity, 'is_equipped' => $equipped]
-        )->exists;
+        return $this->dominionArmoryRepository->updateOrCreate($dominionId, $itemId, [
+            'quantity' => $quantity, 
+            'is_equipped' => $equipped
+        ]);
     }
 }

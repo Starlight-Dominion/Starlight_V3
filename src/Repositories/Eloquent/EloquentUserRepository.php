@@ -42,4 +42,14 @@ class EloquentUserRepository implements UserRepositoryInterface
         
         return $user->update($data);
     }
+
+    public function count(): int
+    {
+        return User::count();
+    }
+
+    public function getColumns(): array
+    {
+        return \Illuminate\Database\Capsule\Manager::schema()->getColumnListing('users');
+    }
 }

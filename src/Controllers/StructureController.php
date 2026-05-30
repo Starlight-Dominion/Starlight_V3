@@ -47,7 +47,7 @@ class StructureController extends BaseController
         return $this->render('structures/index', [
             'title' => 'Dominion Structures',
             'structures' => $structureList,
-            'player_level' => $dominion->getPlayerLevel()
+            'player_level' => $this->gameService->calculateLevel((int)$dominion->xp)
         ]);
     }
 }

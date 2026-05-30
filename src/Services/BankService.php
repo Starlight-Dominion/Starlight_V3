@@ -4,9 +4,10 @@ declare(strict_types=1);
 namespace sdo\Services;
 
 use sdo\Models\Dominion;
-use sdo\Models\BankTransaction;
+use sdo\Repositories\Interfaces\DominionRepositoryInterface;
+use sdo\Repositories\Interfaces\BankRepositoryInterface;
+use sdo\Infrastructure\TransactionManager;
 use sdo\Services\LogService;
-use Illuminate\Database\Capsule\Manager as Capsule;
 use Exception;
 use DateTime;
 
@@ -15,27 +16,32 @@ class BankService
     private const MAX_DEPOSITS = 6;
     private const RECHARGE_SECONDS = 14400; // 4 Hours (6 slots in 24h)
 
-    public function __construct(private LogService $logService) {}
+    public function __construct(
+        private DominionRepositoryInterface $dominionRepository,
+        private BankRepositoryInterface $bankRepository,
+        private TransactionManager $transactionManager,
+        private LogService $logService
+    ) {}
 
     public function getTransactions(int $dominionId, int $page, int $limit): array
     {
-        $query = BankTransaction::where('kingdom_id', $dominionId)
-            ->orderBy('created_at', 'desc');
-
-        $total = $query->count();
-        $offset = ($page - 1) * $limit;
-        $items = $query->offset($offset)->limit($limit)->get();
+        $paginator = $this->bankRepository->getTransactionsPaginated($dominionId, $page, $limit);
 
         return [
-            'transactions' => $items,
-            'pagination' => ['total' => $total, 'page' => $page, 'limit' => $limit]
+            'transactions' => $paginator->items(),
+            'pagination' => [
+                'total' => $paginator->total(),
+                'page' => $paginator->currentPage(),
+                'limit' => $paginator->perPage()
+            ]
         ];
     }
 
     public function deposit(int $domId, int $amount): array
     {
-        return Capsule::transaction(function() use ($domId, $amount) {
-            $dom = Dominion::lockForUpdate()->find($domId);
+        return $this->transactionManager->transaction(function() use ($domId, $amount) {
+            $dom = $this->dominionRepository->lockForUpdate($domId);
+            if (!$dom) throw new Exception("Dominion not found.");
             
             // 1. 80% Rule
             if ($amount > ($dom->credits * 0.8)) {
@@ -49,17 +55,14 @@ class BankService
             }
 
             // 3. Execution
-            $dom->credits -= $amount;
-            $dom->credits_banked += $amount;
-            $dom->deposits_today += 1;
-            $dom->last_deposit_timestamp = new DateTime();
-            $dom->save();
-
-            BankTransaction::create([
-                'kingdom_id' => $domId,
-                'transaction_type' => 'deposit',
-                'amount' => $amount
+            $this->dominionRepository->update($domId, [
+                'credits' => $dom->credits - $amount,
+                'credits_banked' => $dom->credits_banked + $amount,
+                'deposits_today' => $dom->deposits_today + 1,
+                'last_deposit_timestamp' => new DateTime()
             ]);
+
+            $this->bankRepository->logTransaction($domId, 'deposit', $amount);
 
             // Comprehensive Logging
             $this->logService->log(
@@ -67,7 +70,7 @@ class BankService
                 'bank_deposit',
                 "Commander secured " . number_format($amount) . " credits in the deep-space vault.",
                 $amount,
-                ['credits_remaining' => $dom->credits, 'banked_total' => $dom->credits_banked]
+                ['credits_remaining' => $dom->credits - $amount, 'banked_total' => $dom->credits_banked + $amount]
             );
 
             return ['success' => true, 'message' => "Assets secured in deep-space vault."];
@@ -87,19 +90,18 @@ class BankService
 
     public function withdraw(int $domId, int $amount): array
     {
-        return Capsule::transaction(function() use ($domId, $amount) {
-            $dom = Dominion::lockForUpdate()->find($domId);
+        return $this->transactionManager->transaction(function() use ($domId, $amount) {
+            $dom = $this->dominionRepository->lockForUpdate($domId);
+            if (!$dom) throw new Exception("Dominion not found.");
+            
             if ($dom->credits_banked < $amount) throw new Exception("Insufficient vault reserves.");
 
-            $dom->credits_banked -= $amount;
-            $dom->credits += $amount;
-            $dom->save();
-
-            BankTransaction::create([
-                'kingdom_id' => $domId,
-                'transaction_type' => 'withdraw',
-                'amount' => $amount
+            $this->dominionRepository->update($domId, [
+                'credits_banked' => $dom->credits_banked - $amount,
+                'credits' => $dom->credits + $amount
             ]);
+
+            $this->bankRepository->logTransaction($domId, 'withdraw', $amount);
 
             // Comprehensive Logging
             $this->logService->log(
@@ -107,7 +109,7 @@ class BankService
                 'bank_withdraw',
                 "Commander liquidated " . number_format($amount) . " credits from the vault.",
                 $amount,
-                ['credits_total' => $dom->credits, 'banked_remaining' => $dom->credits_banked]
+                ['credits_total' => $dom->credits + $amount, 'banked_remaining' => $dom->credits_banked - $amount]
             );
 
             return ['success' => true, 'message' => "Credits liquidated for immediate use."];

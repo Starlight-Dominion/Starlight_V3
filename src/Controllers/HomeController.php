@@ -8,6 +8,8 @@ use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
 use sdo\Services\ConfigService;
 use sdo\Services\AuthService;
+use sdo\Repositories\Interfaces\UserRepositoryInterface;
+use sdo\Repositories\Interfaces\CombatRepositoryInterface;
 
 class HomeController extends BaseController
 {
@@ -15,7 +17,9 @@ class HomeController extends BaseController
         GameService $gameService,
         AdvisorService $advisorService,
         ConfigService $configService,
-        AuthService $authService
+        AuthService $authService,
+        private UserRepositoryInterface $userRepository,
+        private CombatRepositoryInterface $combatRepository
     ) {
         parent::__construct($gameService, $advisorService, $configService, $authService);
     }
@@ -30,12 +34,10 @@ class HomeController extends BaseController
             $this->redirect('/dashboard');
         }
 
-        $playerCount = \sdo\Models\User::count();
+        $playerCount = $this->userRepository->count();
         $tickInterval = (int)$this->configService->get('tick_interval_seconds', 900);
         
-        $battles24h = \Illuminate\Database\Capsule\Manager::table('battle_logs')
-            ->where('battle_time', '>=', date('Y-m-d H:i:s', strtotime('-24 hours')))
-            ->count();
+        $battles24h = $this->combatRepository->countRecentBattles(24);
 
         return $this->render('home', [
             'title' => 'Starlight Dominion | Strategic Sector Command',

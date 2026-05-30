@@ -40,4 +40,9 @@ class EloquentUnitRepository implements UnitRepositoryInterface
     {
         return Unit::where('id', $id)->delete() > 0;
     }
+
+    public function getColumns(): array
+    {
+        return Capsule::schema()->getColumnListing('units');
+    }
 }
