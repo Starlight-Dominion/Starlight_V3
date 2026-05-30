@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace sdo\Repositories\Eloquent;
 
+use Illuminate\Database\Capsule\Manager as Capsule;
 use sdo\Models\Structure;
 use sdo\Models\StructureLevel;
 use sdo\Repositories\Interfaces\StructureRepositoryInterface;

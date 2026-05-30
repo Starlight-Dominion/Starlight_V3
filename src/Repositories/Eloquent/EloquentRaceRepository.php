@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace sdo\Repositories\Eloquent;
 
+use Illuminate\Database\Capsule\Manager as Capsule;
 use sdo\Models\Race;
 use sdo\Repositories\Interfaces\RaceRepositoryInterface;
 use Illuminate\Support\Collection;

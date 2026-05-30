@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace sdo\Repositories\Eloquent;
 
+use Illuminate\Database\Capsule\Manager as Capsule;
 use sdo\Models\ArmoryItem;
 use sdo\Models\ArmoryCategory;
 use sdo\Models\ArmoryUnitType;

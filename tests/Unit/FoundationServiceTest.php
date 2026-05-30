@@ -34,7 +34,15 @@ class FoundationServiceTest extends TestCase
         $this->seedData();
 
         $this->logMock = $this->createMock(LogService::class);
-        $this->service = new FoundationService($this->logMock);
+        $this->service = new FoundationService(
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentStructureRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionStructureRepository(),
+            new \sdo\Repositories\Eloquent\EloquentUnitRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Infrastructure\TransactionManager(),
+            $this->logMock ?? $logMock
+        );
     }
 
     private function createSchema(): void

@@ -60,4 +60,9 @@ class Dominion extends Model
     {
         return $this->hasMany(DominionManpower::class, 'dominion_id');
     }
+
+    public function getPlayerLevel(): int
+    {
+        return (int)floor(sqrt($this->xp / 100)) + 1;
+    }
 }

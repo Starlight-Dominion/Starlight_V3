@@ -15,6 +15,10 @@ use sdo\Repositories\Eloquent\EloquentUserRepository;
 use sdo\Repositories\Eloquent\EloquentDominionRepository;
 use sdo\Repositories\Eloquent\EloquentUnitRepository;
 use sdo\Repositories\Eloquent\EloquentStructureRepository;
+use sdo\Repositories\Eloquent\EloquentDominionStructureRepository;
+use sdo\Repositories\Eloquent\EloquentManpowerRepository;
+use sdo\Repositories\Eloquent\EloquentRaceRepository;
+use sdo\Infrastructure\TransactionManager;
 
 class AuthServiceTest extends TestCase
 {
@@ -62,6 +66,11 @@ class AuthServiceTest extends TestCase
             $table->timestamps();
         });
 
+        Capsule::schema()->create('game_settings', function ($table) { 
+            $table->string('setting_key')->unique(); 
+            $table->text('setting_value')->nullable(); 
+        });
+
         Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id')->unsigned();
@@ -70,6 +79,7 @@ class AuthServiceTest extends TestCase
             $table->bigInteger('credits')->default(10000);
             $table->integer('citizens')->default(500);
             $table->integer('turns')->default(100);
+            $table->integer('xp')->default(0);
             $table->bigInteger('foundation_hp')->default(1000);
             $table->bigInteger('foundation_max_hp')->default(1000);
             $table->integer('armory_level')->default(0);
@@ -115,7 +125,11 @@ class AuthServiceTest extends TestCase
             new EloquentUserRepository(),
             new EloquentDominionRepository(),
             new EloquentUnitRepository(),
-            new EloquentStructureRepository()
+            new EloquentStructureRepository(),
+            new EloquentDominionStructureRepository(),
+            new EloquentManpowerRepository(),
+            new EloquentRaceRepository(),
+            new TransactionManager()
         );
     }
 

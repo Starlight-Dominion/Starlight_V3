@@ -38,6 +38,8 @@ class RecruitmentServiceTest extends TestCase
             $table->timestamps();
         });
 
+        Capsule::schema()->create('game_settings', function ($table) { $table->string('setting_key')->unique(); $table->text('setting_value')->nullable(); });
+        Capsule::schema()->create('races', function ($table) { $table->increments('id'); $table->string('name'); $table->string('slug'); $table->text('description')->nullable(); });
         Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id')->unsigned();
@@ -59,7 +61,13 @@ class RecruitmentServiceTest extends TestCase
 
         $this->configMock = $this->createMock(ConfigService::class);
         $this->logMock = $this->createMock(LogService::class);
-        $this->service = new RecruitmentService($this->configMock, $this->logMock);
+        $this->service = new RecruitmentService(
+            $this->configMock ?? $this->createMock(\sdo\Services\ConfigService::class),
+            $this->logMock ?? $this->createMock(\sdo\Services\LogService::class),
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentRecruitmentRepository(),
+            new \sdo\Infrastructure\TransactionManager()
+        );
     }
 
     private function createTestDominion(): Dominion

@@ -33,7 +33,13 @@ class TrainingServiceTest extends TestCase
         $this->seedData();
 
         $this->logMock = $this->createMock(LogService::class);
-        $this->service = new TrainingService($this->logMock);
+        $this->service = new TrainingService(
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentUnitRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Infrastructure\TransactionManager(),
+            $this->logMock ?? $logMock
+        );
     }
 
     private function createSchema(): void
@@ -46,6 +52,8 @@ class TrainingServiceTest extends TestCase
             $table->timestamps();
         });
 
+        Capsule::schema()->create('game_settings', function ($table) { $table->string('setting_key')->unique(); $table->text('setting_value')->nullable(); });
+        Capsule::schema()->create('races', function ($table) { $table->increments('id'); $table->string('name'); $table->string('slug'); $table->text('description')->nullable(); });
         Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id')->unsigned();

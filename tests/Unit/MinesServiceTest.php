@@ -15,6 +15,7 @@ class MinesServiceTest extends TestCase
 {
     private MinesService $service;
     private $untrainingMock;
+    private $gameServiceMock;
 
     protected function setUp(): void
     {
@@ -37,6 +38,8 @@ class MinesServiceTest extends TestCase
             $table->timestamps();
         });
 
+        Capsule::schema()->create('game_settings', function ($table) { $table->string('setting_key')->unique(); $table->text('setting_value')->nullable(); });
+        Capsule::schema()->create('races', function ($table) { $table->increments('id'); $table->string('name'); $table->string('slug'); $table->text('description')->nullable(); });
         Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id')->unsigned();
@@ -84,8 +87,16 @@ class MinesServiceTest extends TestCase
             'power_defense' => 2
         ]);
 
-        $this->untrainingMock = $this->createMock(UntrainingService::class);
-        $this->service = new MinesService($this->untrainingMock);
+        $this->untrainingMock = $this->createMock(\sdo\Services\UntrainingService::class);
+        $this->gameServiceMock = $this->createMock(\sdo\Services\GameService::class);
+        $this->service = new MinesService(
+            $this->untrainingMock,
+            $this->gameServiceMock,
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentUnitRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Infrastructure\TransactionManager()
+        );
     }
 
     private function createTestDominion(array $data = []): Dominion
@@ -176,12 +187,14 @@ class MinesServiceTest extends TestCase
         $dominion = $this->createTestDominion([
             'current_mine_tier' => 1,
             'current_mine_level' => 10,
-            'xp' => 10000, // Player level 11
+            'xp' => 10000,
         ]);
+
+        $this->gameServiceMock->method('calculateLevel')->willReturn(11);
 
         $result = $this->service->upgradeMineTier($dominion->id);
 
-        $this->assertTrue($result['success']);
+        $this->assertTrue($result['success'], $result['message'] ?? 'Failed without message');
         $this->assertStringContainsString('Upgraded to Extraction Tier 2', $result['message']);
 
         $dominion->refresh();

@@ -44,7 +44,14 @@ class HomeControllerTest extends TestCase
         $configService = $this->createMock(ConfigService::class);
         $authService = $this->createMock(AuthService::class);
 
-        $this->controller = new HomeController($gameService, $advisorService, $configService, $authService);
+        $this->controller = new HomeController(
+            $this->gameService ?? $this->createMock(\sdo\Services\GameService::class),
+            $this->advisorService ?? $this->createMock(\sdo\Services\AdvisorService::class),
+            $this->configService ?? $this->createMock(\sdo\Services\ConfigService::class),
+            $this->authService ?? $this->createMock(\sdo\Services\AuthService::class),
+            new \sdo\Repositories\Eloquent\EloquentUserRepository(),
+            new \sdo\Repositories\Eloquent\EloquentCombatRepository()
+        );
     }
 
     public function testIndexReturnsWelcomeMessage(): void

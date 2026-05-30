@@ -30,7 +30,12 @@ class TacticalServiceTest extends TestCase
         $this->createSchema();
         $this->seedUnits();
 
-        $this->service = new TacticalService();
+        $this->service = new TacticalService(
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionStructureRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionArmoryRepository()
+        );
     }
 
     private function createSchema(): void

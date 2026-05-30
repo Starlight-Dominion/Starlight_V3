@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace sdo\Repositories\Eloquent;
 
+use Illuminate\Database\Capsule\Manager as Capsule;
 use sdo\Models\Dominion;
 use sdo\Repositories\Interfaces\DominionRepositoryInterface;
 use Illuminate\Support\Collection;
@@ -63,7 +64,8 @@ class EloquentDominionRepository implements DominionRepositoryInterface
     public function getBattlefieldList(): Collection
     {
         return Dominion::with('user')
-            ->orderBy('name', 'asc')
+            ->orderBy('credits', 'desc')
+            ->orderBy('id', 'asc')
             ->get();
     }
 

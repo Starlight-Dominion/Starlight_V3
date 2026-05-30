@@ -35,37 +35,23 @@ class SettingsControllerTest extends TestCase
         $dominionRepo = $this->createMock(DominionRepositoryInterface::class);
         $unitRepo = $this->createMock(UnitRepositoryInterface::class);
         $structureRepo = $this->createMock(StructureRepositoryInterface::class);
+$this->authService = $this->createMock(AuthService::class);
+$this->authService->method('isLoggedIn')->willReturn(false);
 
-        $this->authService = new class(
-            $configService,
-            $userRepo,
-            $dominionRepo,
-            $unitRepo,
-            $structureRepo
-        ) extends AuthService {
-            public function __construct($c, $u, $d, $un, $s)
-            {
-                parent::__construct($c, $u, $d, $un, $s);
-            }
+$settingsService = $this->createMock(SettingsService::class);
+$apiService = $this->createMock(ApiService::class);
+$discordLinkService = $this->createMock(DiscordLinkService::class);
 
-            public function isLoggedIn(array $session): bool
-            {
-                return false;
-            }
-        };
-        $settingsService = $this->createMock(SettingsService::class);
-        $apiService = $this->createMock(ApiService::class);
-        $discordLinkService = $this->createMock(DiscordLinkService::class);
-
-        $this->controller = new SettingsController(
-            $gameService,
-            $advisorService,
-            $configService,
-            $this->authService,
-            $settingsService,
-            $apiService,
-            $discordLinkService
-        );
+$this->controller = new SettingsController(
+    $gameService,
+    $advisorService,
+    $configService,
+    $this->authService,
+    $settingsService,
+    $apiService,
+    $discordLinkService,
+    $this->createMock(\sdo\Infrastructure\Validator::class)
+);
     }
 
     public function testCreateDiscordLinkCodeRejectsAnonymousRequests(): void

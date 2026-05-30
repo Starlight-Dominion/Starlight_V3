@@ -38,11 +38,14 @@ class AdminPlayerServiceTest extends TestCase
         $this->createTables();
         
         $this->service = new AdminPlayerService(
-            $this->createMock(DominionRepositoryInterface::class),
-            $this->createMock(UserRepositoryInterface::class),
-            $this->createMock(UnitRepositoryInterface::class),
-            $this->createMock(StructureRepositoryInterface::class),
-            $this->createMock(ArmoryRepositoryInterface::class)
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentUserRepository(),
+            new \sdo\Repositories\Eloquent\EloquentUnitRepository(),
+            new \sdo\Repositories\Eloquent\EloquentStructureRepository(),
+            new \sdo\Repositories\Eloquent\EloquentArmoryRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionStructureRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionArmoryRepository()
         );
     }
 
@@ -58,6 +61,7 @@ class AdminPlayerServiceTest extends TestCase
             $table->timestamps();
         });
 
+        Capsule::schema()->create('game_settings', function ($table) { $table->string('setting_key')->unique(); $table->text('setting_value')->nullable(); });
         Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id')->unsigned();

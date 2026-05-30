@@ -37,7 +37,15 @@ class ArmoryServiceTest extends TestCase
         $this->seedData();
 
         $this->logMock = $this->createMock(LogService::class);
-        $this->armoryService = new ArmoryService($this->logMock);
+        $this->armoryService = new ArmoryService(
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentArmoryRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionArmoryRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Repositories\Eloquent\EloquentStructureRepository(),
+            new \sdo\Infrastructure\TransactionManager(),
+            $this->logMock ?? $logMock
+        );
     }
 
     private function createSchema(): void

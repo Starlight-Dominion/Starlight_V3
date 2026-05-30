@@ -36,6 +36,8 @@ class ArmoryDynamicTest extends TestCase
             $table->timestamps();
         });
 
+        Capsule::schema()->create('game_settings', function ($table) { $table->string('setting_key')->unique(); $table->text('setting_value')->nullable(); });
+        Capsule::schema()->create('races', function ($table) { $table->increments('id'); $table->string('name'); $table->string('slug'); $table->text('description')->nullable(); });
         Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id');
@@ -123,7 +125,15 @@ class ArmoryDynamicTest extends TestCase
         $user = User::create(['username' => 'u', 'email' => 'e', 'password' => 'p']);
         $dominion = $user->dominion()->create(['name' => 'K', 'armory_level' => 1]);
 
-        $service = new ArmoryService($this->logMock);
+        $service = new ArmoryService(
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentArmoryRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionArmoryRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Repositories\Eloquent\EloquentStructureRepository(),
+            new \sdo\Infrastructure\TransactionManager(),
+            $this->logMock
+        );
         $data = $service->getArmoryData($dominion->id);
 
         $this->assertArrayHasKey('soldiers', $data['loadouts']);
@@ -144,7 +154,15 @@ class ArmoryDynamicTest extends TestCase
         $user = User::create(['username' => 'u', 'email' => 'e', 'password' => 'p']);
         $dominion = $user->dominion()->create(['name' => 'K', 'armory_level' => 1]);
 
-        $service = new ArmoryService($this->logMock);
+        $service = new ArmoryService(
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentArmoryRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionArmoryRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Repositories\Eloquent\EloquentStructureRepository(),
+            new \sdo\Infrastructure\TransactionManager(),
+            $this->logMock
+        );
         
         // Initially, Advanced should be locked (Req 2, Level 1)
         $data = $service->getArmoryData($dominion->id);

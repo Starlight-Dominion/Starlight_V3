@@ -25,6 +25,8 @@ class GameServiceTest extends TestCase
 
     private function createTables(): void
     {
+        Capsule::schema()->create('game_settings', function ($table) { $table->string('setting_key')->unique(); $table->text('setting_value')->nullable(); });
+        Capsule::schema()->create('races', function ($table) { $table->increments('id'); $table->string('name'); $table->string('slug'); $table->text('description')->nullable(); });
         Capsule::schema()->create('dominions', function ($table) {
             $table->increments('id');
             $table->integer('user_id');
@@ -65,7 +67,12 @@ class GameServiceTest extends TestCase
         $config = $this->createMock(ConfigService::class);
         $config->method('get')->willReturn(100); // base stipend
         
-        $service = new GameService($config);
+        $service = new GameService(
+            new \sdo\Services\ConfigService(new \sdo\Repositories\Eloquent\EloquentConfigRepository()),
+            new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
+            new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
+            new \sdo\Repositories\Eloquent\EloquentDominionStructureRepository()
+        );
         
         // 1. Setup Dominion
         $domId = Capsule::table('dominions')->insertGetId([
