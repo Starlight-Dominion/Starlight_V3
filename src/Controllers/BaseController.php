@@ -48,7 +48,7 @@ abstract class BaseController
 
                 $userData = [
                     'username' => $vm->username,
-                    'dominionName' => $vm->kingdomName,
+                    'kingdomName' => $vm->kingdomName,
                     'raceName' => $vm->raceName,
                     'level' => $vm->level,
                     'xpProgress' => $vm->xpProgress,

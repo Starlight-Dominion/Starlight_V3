@@ -3,7 +3,6 @@
     import { fade, slide } from 'svelte/transition';
 
     const user = $derived(game.user);
-    const kingdom = $derived(user?.kingdom || {});
 
     // Reactive XP Calculations
     const level = $derived(Math.floor(Math.sqrt(resources.xp / 100)) + 1);
