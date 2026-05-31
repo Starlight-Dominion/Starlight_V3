@@ -25,9 +25,19 @@ class EloquentLogRepository implements LogRepositoryInterface
 
     public function getRecentBattleLogs(int $limit = 50): array
     {
-        return \sdo\Models\BattleLog::orderBy('battle_time', 'desc')
+        $logs = \sdo\Models\BattleLog::with(['attacker', 'defender'])
+            ->orderBy('battle_time', 'desc')
             ->limit($limit)
-            ->get()
-            ->toArray();
+            ->get();
+
+        return $logs->map(function ($log) {
+            return [
+                'created_at' => $log->battle_time->format('Y-m-d H:i:s'),
+                'attacker_name' => $log->attacker ? $log->attacker->name : 'Unknown',
+                'defender_name' => $log->defender ? $log->defender->name : 'Unknown',
+                'result' => $log->credits_stolen > 0 ? 'attacker' : 'defender',
+                'gold_looted' => $log->credits_stolen
+            ];
+        })->toArray();
     }
 }

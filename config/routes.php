@@ -82,6 +82,14 @@ return function (RouteCollector $r) {
     $r->addRoute('POST', '/admin/impersonate', [\sdo\Controllers\AdminController::class, 'impersonate']);
     $r->addRoute('GET', '/admin/stop-impersonating', [\sdo\Controllers\AdminController::class, 'stopImpersonating']);
     
+    // Bot Automation
+    $r->addRoute('GET', '/admin/automation/profiles', [\sdo\Controllers\AdminController::class, 'getBotProfiles']);
+    $r->addRoute('POST', '/admin/automation/profiles/create', [\sdo\Controllers\AdminController::class, 'createBotProfile']);
+    $r->addRoute('POST', '/admin/automation/profiles/update', [\sdo\Controllers\AdminController::class, 'updateBotProfile']);
+    $r->addRoute('POST', '/admin/automation/profiles/delete', [\sdo\Controllers\AdminController::class, 'deleteBotProfile']);
+    $r->addRoute('POST', '/admin/automation/assign-profile', [\sdo\Controllers\AdminController::class, 'assignBotProfile']);
+    $r->addRoute('POST', '/admin/automation/generate-bot', [\sdo\Controllers\AdminController::class, 'generateBot']);
+    
     // API Management
     $r->addRoute('GET', '/admin/api/keys', [\sdo\Controllers\AdminController::class, 'getApiKeys']);
     $r->addRoute('GET', '/admin/api/applications', [\sdo\Controllers\AdminController::class, 'getApiApplications']);

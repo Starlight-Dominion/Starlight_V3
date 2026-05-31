@@ -68,6 +68,8 @@ $containerBuilder->addDefinitions([
     \sdo\Services\AdminPlayerService::class => DI\autowire(),
     \sdo\Services\AdminGameDataService::class => DI\autowire(),
     \sdo\Services\AdminSystemService::class => DI\autowire(),
+    \sdo\Services\AdminAutomationService::class => DI\autowire(),
+    \sdo\Services\BotAutomationService::class => DI\autowire(),
     \sdo\Services\DiscordLinkService::class => DI\autowire(),
     \sdo\Services\RateLimitService::class => DI\autowire(),
     \sdo\Infrastructure\ApiAuthMiddleware::class => DI\autowire(),

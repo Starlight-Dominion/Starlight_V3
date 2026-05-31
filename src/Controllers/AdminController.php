@@ -12,7 +12,11 @@ use sdo\Services\AdminGameDataService;
 use sdo\Services\AdminSystemService;
 use sdo\Services\ConfigService;
 use sdo\Services\ApiService;
+use sdo\Services\AdminAutomationService;
 use sdo\Repositories\Interfaces\UserRepositoryInterface;
+use sdo\Dto\Admin\BotProfileRequest;
+use sdo\Dto\Admin\AssignBotProfileRequest;
+use sdo\Dto\Admin\GenerateBotRequest;
 
 class AdminController extends BaseController
 {
@@ -25,22 +29,21 @@ class AdminController extends BaseController
         private AdminGameDataService $gameDataService,
         private AdminSystemService $systemService,
         private ApiService $apiService,
+        private AdminAutomationService $automationService,
         private UserRepositoryInterface $userRepository
     ) {
         parent::__construct($gameService, $advisorService, $configService, $authService);
     }
 
-    private function checkAdmin(): void
+    public function generateBot(): string
     {
-        if (!$this->authService->isLoggedIn($_SESSION)) {
-            $this->redirect('/login');
-        }
-
-        $user = $this->userRepository->findById((int)$_SESSION['user_id']);
-        if (!$this->authService->isAdmin($user)) {
-            $_SESSION['message'] = ['success' => false, 'message' => 'Access Denied: High Command Only.'];
-            $this->redirect('/dashboard');
-        }
+        return $this->jsonResponse(function() {
+            $this->checkAdmin();
+            $request = new GenerateBotRequest($_POST);
+            $res = $this->automationService->generateBot($request);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'GENERATE_BOT', "Commissioned automated sovereign {$request->name}", $_POST);
+            return $res;
+        });
     }
 
     public function index(): string
@@ -518,5 +521,70 @@ class AdminController extends BaseController
             $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_SETTING', "Modified setting {$key}", ['value' => $value]);
             return ['success' => true];
         });
+    }
+
+    public function getBotProfiles(): string
+    {
+        return $this->jsonResponse(function() {
+            $this->checkAdmin();
+            return ['success' => true, 'profiles' => $this->automationService->getAllProfiles()];
+        });
+    }
+
+    public function createBotProfile(): string
+    {
+        return $this->jsonResponse(function() {
+            $this->checkAdmin();
+            $request = new BotProfileRequest($_POST);
+            $id = $this->automationService->createProfile($request);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'CREATE_BOT_PROFILE', "Created bot profile ID {$id}", $_POST);
+            return ['success' => true, 'id' => $id];
+        });
+    }
+
+    public function updateBotProfile(): string
+    {
+        return $this->jsonResponse(function() {
+            $this->checkAdmin();
+            $id = (int)($_POST['id'] ?? 0);
+            $request = new BotProfileRequest($_POST);
+            $res = $this->automationService->updateProfile($id, $request);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'UPDATE_BOT_PROFILE', "Modified bot profile ID {$id}", $_POST);
+            return ['success' => $res];
+        });
+    }
+
+    public function deleteBotProfile(): string
+    {
+        return $this->jsonResponse(function() {
+            $this->checkAdmin();
+            $id = (int)($_POST['id'] ?? 0);
+            $res = $this->automationService->deleteProfile($id);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'DELETE_BOT_PROFILE', "Deleted bot profile ID {$id}");
+            return ['success' => $res];
+        });
+    }
+
+    public function assignBotProfile(): string
+    {
+        return $this->jsonResponse(function() {
+            $this->checkAdmin();
+            $request = new AssignBotProfileRequest($_POST);
+            $res = $this->automationService->assignProfile($request);
+            $this->systemService->logAdminAction((int)$_SESSION['user_id'], 'ASSIGN_BOT_PROFILE', "Assigned profile {$request->bot_profile_id} to user {$request->user_id}");
+            return ['success' => $res];
+        });
+    }
+
+    private function checkAdmin(): void
+    {
+        if (!$this->authService->isLoggedIn($_SESSION)) {
+            throw new \Exception('Access Denied: Not logged in.');
+        }
+
+        $user = $this->userRepository->findById((int)$_SESSION['user_id']);
+        if (!$this->authService->isAdmin($user)) {
+            throw new \Exception('Access Denied: High Command Only.');
+        }
     }
 }

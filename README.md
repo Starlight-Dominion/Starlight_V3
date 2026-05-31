@@ -84,6 +84,9 @@ vendor/bin/phinx seed:run -s InitialDataSeeder
 php bin/tick-dispatcher.php # Queues the tick
 php bin/tick-processor.php  # Processes the queued tick logic
 
+# Process automated bot actions
+php bin/bot-processor.php
+
 # Process Discord link/unlink action requests from Redis streams
 php bin/discord-action-worker.php
 

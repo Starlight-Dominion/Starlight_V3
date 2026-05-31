@@ -7,6 +7,7 @@
         data = $bindable(null), 
         tab = $bindable('identity'),
         savingId = $bindable(null),
+        botProfiles = [],
         onUpdateDominion,
         onUpdateManpower,
         onUpdateStructure,
@@ -94,6 +95,19 @@
                                         <span class="text-[9px] text-gray-600 uppercase">Flags this account as a non-player entity.</span>
                                     </div>
                                 </div>
+                                {#if data.dominion.user.is_bot}
+                                    <div class="space-y-2">
+                                        <span class="block text-[9px] font-black text-emerald-900 uppercase tracking-widest">Automation Protocol</span>
+                                        <select bind:value={data.dominion.user.bot_profile_id} class="w-full bg-black/40 border border-emerald-900/20 rounded-xl px-6 py-4 text-emerald-500 font-mono focus:border-emerald-500 outline-none uppercase text-xs font-black">
+                                            <option value={null}>NO ACTIVE PROTOCOL</option>
+                                            {#each botProfiles as profile}
+                                                <option value={profile.id}>{profile.name.toUpperCase()}</option>
+                                            {:else}
+                                                <option disabled>NO PROFILES CONFIGURED</option>
+                                            {/each}
+                                        </select>
+                                    </div>
+                                {/if}
                                 <div class="space-y-2">
                                     <span class="block text-[9px] font-black text-red-900 uppercase tracking-widest">Force Password Reset</span>
                                     <input type="password" bind:value={data.dominion.user.password} placeholder="••••••••" class="w-full bg-black/40 border border-red-900/20 rounded-xl px-6 py-4 text-red-500 font-mono focus:border-red-500 outline-none" />

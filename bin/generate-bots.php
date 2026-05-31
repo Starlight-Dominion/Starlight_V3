@@ -70,6 +70,7 @@ $maxAttempts = 200;
 $races = Race::all();
 $structures = Structure::all();
 $units = Unit::all();
+$profiles = \sdo\Models\BotProfile::all();
 
 while ($created < 100 && $attempts < $maxAttempts) {
     $attempts++;
@@ -86,12 +87,13 @@ while ($created < 100 && $attempts < $maxAttempts) {
     $email = 'bot_' . strtolower(str_replace("'", "", str_replace(" ", "_", $botName))) . '@starlight.ai';
 
     try {
-        Capsule::transaction(function () use ($botName, $email, $dominionName, $races, $structures, $units) {
+        Capsule::transaction(function () use ($botName, $email, $dominionName, $races, $structures, $units, $profiles) {
             $user = User::create([
                 'username' => $botName,
                 'email' => $email,
                 'password' => bin2hex(random_bytes(16)),
                 'is_bot' => true,
+                'bot_profile_id' => $profiles->isEmpty() ? null : $profiles->random()->id
             ]);
 
             $dominion = $user->dominion()->create([

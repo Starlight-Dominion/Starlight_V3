@@ -8,9 +8,12 @@
     import UnitInspector from '../components/admin/UnitInspector.svelte';
     import StructureInspector from '../components/admin/StructureInspector.svelte';
     import RaceInspector from '../components/admin/RaceInspector.svelte';
+    import BotProfileInspector from '../components/admin/BotProfileInspector.svelte';
+    import BotFoundry from '../components/admin/BotFoundry.svelte';
     let { stats = {} } = $props();
 
     let activeModule = $state('overview');
+    let showBotFoundry = $state(false);
     let searchQuery = $state('');
     let searchResults = $state([]);
     let units = $state([]);
@@ -59,6 +62,7 @@
         { id: 'barracks', name: 'Evolutionary Strains', icon: '🧬' },
         { id: 'players', name: 'Sovereign Oversight', icon: '👁' },
         { id: 'api', name: 'Neural API Gate', icon: '📡' },
+        { id: 'automation', name: 'Automation Suite', icon: '🤖' },
         { id: 'audit', name: 'Audit Trail', icon: '🕵️' },
         { id: 'docs', name: 'Documentation', icon: '📝' },
         { id: 'logs', name: 'Battle Records', icon: '📜' }
@@ -67,8 +71,13 @@
     let apiKeys = $state([]);
     let apiLogs = $state([]);
     let apiApps = $state([]);
+    let botProfiles = $state([]);
     let auditLogs = $state([]);
     let apiTab = $state('keys'); // 'keys', 'apps', 'logs'
+
+    // Bot Profile Inspector State
+    let showBotProfileInspector = $state(false);
+    let selectedBotProfile = $state(null);
 
     // Sovereign Inspector State
     let showInspector = $state(false);
@@ -234,6 +243,74 @@
         } catch (e) { console.error("Failed to fetch API data"); } finally { loading = false; }
     }
 
+    async function fetchBotProfiles() {
+        loading = true;
+        try {
+            const res = await fetch('/admin/automation/profiles');
+            const data = await res.json();
+            botProfiles = data.profiles;
+        } catch (e) { console.error("Failed to fetch bot profiles"); } finally { loading = false; }
+    }
+
+    async function saveBotProfile(profile) {
+        savingId = profile.id || 'new-profile';
+        const formData = new FormData();
+        if (profile.id) formData.append('id', profile.id);
+        formData.append('name', profile.name);
+        formData.append('description', profile.description || '');
+        formData.append('action_frequency_minutes', profile.action_frequency_minutes);
+        formData.append('weight_attack', profile.weight_attack);
+        formData.append('weight_build', profile.weight_build);
+        formData.append('weight_train', profile.weight_train);
+        formData.append('weight_explore', profile.weight_explore);
+        formData.append('_csrf', game.csrf);
+
+        const endpoint = profile.id ? '/admin/automation/profiles/update' : '/admin/automation/profiles/create';
+        const res = await adminPost(endpoint, formData);
+        if (res) fetchBotProfiles();
+        savingId = null;
+        showBotProfileInspector = false;
+    }
+
+    async function deleteBotProfile(id) {
+        if (!confirm("Permanently delete this automation profile?")) return;
+        const formData = new FormData();
+        formData.append('id', id);
+        formData.append('_csrf', game.csrf);
+        const res = await adminPost('/admin/automation/profiles/delete', formData);
+        if (res) fetchBotProfiles();
+    }
+
+    async function assignBotProfile(userId, profileId) {
+        const formData = new FormData();
+        formData.append('user_id', userId);
+        formData.append('bot_profile_id', profileId || '');
+        formData.append('_csrf', game.csrf);
+        const res = await adminPost('/admin/automation/assign-profile', formData);
+        if (res) fetchAllKingdoms(); // Refresh player list to show new assignment
+    }
+
+    async function commissionBots(formData) {
+        loading = true;
+        try {
+            const res = await fetch('/admin/automation/generate-bot', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                notify(`Single Unit Commissioned successfully.`);
+                fetchAllKingdoms(); // Refresh player list
+                return true;
+            } else {
+                notify(data.message || "Production Failure", "error");
+                return false;
+            }
+        } catch (e) {
+            notify("Neural Link Failure", "error");
+            return false;
+        } finally {
+            loading = false;
+        }
+    }
+
     async function fetchRaces() {
         loading = true;
         try {
@@ -280,6 +357,7 @@
         if (activeModule === 'logs') fetchBattleLogs();
         if (activeModule === 'players') fetchAllKingdoms();
         if (activeModule === 'api') fetchApiData();
+        if (activeModule === 'automation') fetchBotProfiles();
         if (activeModule === 'audit') fetchAuditLogs();
     });
 
@@ -688,6 +766,20 @@
 
             {:else if activeModule === 'players'}
                 <div in:fade class="space-y-6">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-3xl font-title font-black text-white uppercase tracking-tighter">Sovereign Oversight</h3>
+                            <p class="text-gray-500 font-bold uppercase tracking-[4px] text-[10px] mt-2 italic">Monitor and manage all active sectors and automated drones.</p>
+                        </div>
+                        <div class="flex gap-4">
+                            <button 
+                                onclick={() => { showBotFoundry = true; }}
+                                class="px-8 py-4 bg-red-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-[0_0_20px_rgba(127,29,29,0.2)]"
+                            >
+                                Bot Foundry
+                            </button>
+                        </div>
+                    </div>
                     <div class="flex gap-4">
                         <input type="text" bind:value={searchQuery} placeholder="Search kingdoms..." class="flex-grow bg-black/60 border border-white/10 rounded-xl px-6 py-4 text-white focus:border-red-900 focus:outline-none font-mono" onkeydown={(e) => e.key === 'Enter' && handleSearch()} />
                         <button onclick={handleSearch} class="bg-red-900 text-white px-8 rounded-xl font-title font-black text-[10px] uppercase tracking-widest hover:bg-red-700 transition-all">Search</button>
@@ -992,6 +1084,89 @@
                     {/if}
                 </div>
 
+            {:else if activeModule === 'automation'}
+                <div in:fade class="space-y-12">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-3xl font-title font-black text-white uppercase tracking-tighter">Automation Suite</h3>
+                            <p class="text-gray-500 font-bold uppercase tracking-[4px] text-[10px] mt-2 italic">Neural processing unit for automated sectors.</p>
+                        </div>
+                        <div class="flex gap-4">
+                            <button 
+                                onclick={() => { selectedBotProfile = { name: '', description: '', action_frequency_minutes: 60, weight_attack: 25, weight_build: 25, weight_train: 25, weight_explore: 25 }; showBotProfileInspector = true; }}
+                                class="px-8 py-4 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                            >
+                                Commission New Profile
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {#each botProfiles as profile}
+                            <div class="bg-dark-translucent border border-white/5 p-8 rounded-3xl flex flex-col justify-between group hover:border-emerald-500/30 transition-all relative overflow-hidden">
+                                <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none font-title font-black text-white italic text-4xl uppercase">
+                                    {profile.name.substring(0,3)}
+                                </div>
+                                <div class="space-y-6 relative z-10">
+                                    <div>
+                                        <h4 class="text-xl font-title font-black text-white uppercase tracking-tight leading-none">{profile.name}</h4>
+                                        <p class="text-[9px] font-bold text-gray-600 uppercase tracking-[3px] mt-2 italic">{profile.description || 'No directives defined.'}</p>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="bg-black/40 border border-white/5 p-4 rounded-xl">
+                                            <span class="block text-[7px] font-black text-emerald-900 uppercase tracking-widest mb-1">Frequency</span>
+                                            <span class="text-sm font-mono text-emerald-400 font-black uppercase">{profile.action_frequency_minutes}m</span>
+                                        </div>
+                                        <div class="bg-black/40 border border-white/5 p-4 rounded-xl">
+                                            <span class="block text-[7px] font-black text-gray-600 uppercase tracking-widest mb-1">Sectors</span>
+                                            <span class="text-sm font-mono text-white font-black uppercase">{profile.users_count || 0}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between text-[8px] font-black uppercase tracking-widest">
+                                            <span class="text-red-500">Attack</span>
+                                            <span class="text-white">{profile.weight_attack}%</span>
+                                        </div>
+                                        <div class="h-1 bg-white/5 rounded-full overflow-hidden">
+                                            <div class="h-full bg-red-500" style="width: {profile.weight_attack}%"></div>
+                                        </div>
+
+                                        <div class="flex justify-between text-[8px] font-black uppercase tracking-widest">
+                                            <span class="text-blue-500">Build</span>
+                                            <span class="text-white">{profile.weight_build}%</span>
+                                        </div>
+                                        <div class="h-1 bg-white/5 rounded-full overflow-hidden">
+                                            <div class="h-full bg-blue-500" style="width: {profile.weight_build}%"></div>
+                                        </div>
+
+                                        <div class="flex justify-between text-[8px] font-black uppercase tracking-widest">
+                                            <span class="text-amber-500">Train</span>
+                                            <span class="text-white">{profile.weight_train}%</span>
+                                        </div>
+                                        <div class="h-1 bg-white/5 rounded-full overflow-hidden">
+                                            <div class="h-full bg-amber-500" style="width: {profile.weight_train}%"></div>
+                                        </div>
+
+                                        <div class="flex justify-between text-[8px] font-black uppercase tracking-widest">
+                                            <span class="text-cyan-500">Explore</span>
+                                            <span class="text-white">{profile.weight_explore}%</span>
+                                        </div>
+                                        <div class="h-1 bg-white/5 rounded-full overflow-hidden">
+                                            <div class="h-full bg-cyan-500" style="width: {profile.weight_explore}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3 mt-8 relative z-10">
+                                    <button onclick={() => deleteBotProfile(profile.id)} class="w-12 h-12 rounded-xl bg-red-950/20 text-red-500 border border-red-900/30 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all">✕</button>
+                                    <button onclick={() => { selectedBotProfile = {...profile}; showBotProfileInspector = true; }} class="flex-grow py-4 bg-emerald-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)]">Calibrate Profile</button>
+                                </div>
+                            </div>
+                        {/each}
+                    </div>
+                </div>
+
             {:else if activeModule === 'audit'}
                 <div in:fade class="space-y-6">
                     <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
@@ -1104,8 +1279,9 @@
     <SovereignInspector 
         bind:show={showInspector} 
         bind:data={inspectorData} 
-        bind:tab={inspectorTab} 
-        bind:savingId 
+        bind:tab={inspectorTab}
+        savingId={savingId}
+        botProfiles={botProfiles}
         onUpdateDominion={updateInspectorDominion}
         onUpdateManpower={updateInspectorManpower}
         onUpdateStructure={updateInspectorStructure}
@@ -1142,12 +1318,26 @@
         onAddLevel={addStructureLevel}
     />
 
-    <RaceInspector
-        bind:show={showRaceInspector}
-        bind:data={selectedRace}
+    <RaceInspector 
+        bind:show={showRaceInspector} 
+        bind:data={selectedRace} 
         bind:tab={raceInspectorTab}
-        bind:savingId
-        onSave={updateRace}
+        savingId={savingId}
+        onSave={updateRace} 
+    />
+
+    <BotProfileInspector
+        bind:show={showBotProfileInspector}
+        bind:data={selectedBotProfile}
+        savingId={savingId}
+        onSave={saveBotProfile}
+    />
+
+    <BotFoundry
+        bind:show={showBotFoundry}
+        races={races}
+        profiles={botProfiles}
+        onCommission={commissionBots}
     />
 
     <div class="fixed bottom-8 right-8 z-[200] space-y-4 pointer-events-none">
