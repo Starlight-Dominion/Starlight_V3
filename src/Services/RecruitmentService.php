@@ -40,7 +40,10 @@ class RecruitmentService
             'active_session' => $activeSession,
             'daily_remaining' => max(0, $dailyLimit - $dailyCount),
             'three_day_remaining' => max(0, $threeDayLimit - $threeDayCount),
-            'max_clicks' => (int)$this->configService->get('recruitment_clicks_per_session', 150)
+            'max_clicks' => (int)$this->configService->get('recruitment_clicks_per_session', 150),
+            'cooldown_ms' => (int)$this->configService->get('recruitment_click_cooldown_ms', 500),
+            'total_recruited' => $this->recruitmentRepository->getTotalCitizensRecruited($domId),
+            'today_recruited' => $this->recruitmentRepository->getTodayCitizensRecruited($domId)
         ];
     }
 
@@ -99,7 +102,15 @@ class RecruitmentService
             // 2. Grant Citizen
             $this->dominionRepository->incrementStats($domId, ['citizens' => 1]);
 
-            // 3. Finalize if reached max
+            // 3. Log click
+            $this->logService->log(
+                $domId,
+                'recruitment_click',
+                "Commander processed a neural recruitment click.",
+                1
+            );
+
+            // 4. Finalize if reached max
             if ($newCount >= $maxClicks) {
                 $this->recruitmentRepository->updateSession($sessionId, [
                     'is_active' => false,

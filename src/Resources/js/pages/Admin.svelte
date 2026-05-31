@@ -712,6 +712,32 @@
                         </div>
                     </div>
 
+                    <!-- Recruitment Parameters -->
+                    <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+                        <header class="bg-cyan-950/20 px-8 py-5 border-b border-white/5 flex justify-between items-center">
+                            <h2 class="text-[10px] font-black text-cyan-500 uppercase tracking-[4px]">Recruitment Parameters</h2>
+                        </header>
+                        <div class="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                            {#each [
+                                { key: 'recruitment_sessions_per_day', label: 'Daily Sessions', icon: '📅' },
+                                { key: 'recruitment_sessions_per_3days', label: '72H Allocation', icon: '⏳' },
+                                { key: 'recruitment_clicks_per_session', label: 'Clicks Per Session', icon: '🖱' },
+                                { key: 'recruitment_click_cooldown_ms', label: 'Click Cooldown (ms)', icon: '⏱' }
+                            ] as param}
+                                {@const setting = gameSettings.find(s => s.setting_key === param.key)}
+                                {#if setting}
+                                    <div class="space-y-4">
+                                        <div class="flex justify-between items-end">
+                                            <span class="text-[8px] font-black text-gray-500 uppercase tracking-widest">{param.icon} {param.label}</span>
+                                            <button onclick={() => saveSetting(setting)} class="text-[8px] font-black text-cyan-500 hover:text-white uppercase tracking-widest disabled:opacity-30" disabled={savingId === setting.setting_key}>Commit</button>
+                                        </div>
+                                        <input type="number" bind:value={setting.setting_value} class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white font-mono text-xs focus:border-cyan-500 outline-none" />
+                                    </div>
+                                {/if}
+                            {/each}
+                        </div>
+                    </div>
+
                     <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
                         <header class="bg-cyan-950/20 px-8 py-4 border-b border-cyan-500/10 flex justify-between items-center">
                             <h2 class="text-[10px] font-black text-cyan-500 uppercase tracking-[4px]">Global Balance Parameters</h2>
