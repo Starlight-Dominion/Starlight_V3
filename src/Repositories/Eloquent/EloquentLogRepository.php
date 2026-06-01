@@ -40,4 +40,33 @@ class EloquentLogRepository implements LogRepositoryInterface
             ];
         })->toArray();
     }
+
+    public function getPaginatedLogs(int $page = 1, int $perPage = 50, array $filters = []): array
+    {
+        $query = GameLog::query();
+
+        if (!empty($filters['action'])) {
+            $query->where('action', 'LIKE', '%' . $filters['action'] . '%');
+        }
+
+        if (!empty($filters['dominion_id'])) {
+            $query->where('dominion_id', (int)$filters['dominion_id']);
+        }
+
+        $total = $query->count();
+
+        $logs = $query->orderBy('id', 'desc')
+            ->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get()
+            ->toArray();
+
+        return [
+            'data' => $logs,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'last_page' => (int)ceil($total / $perPage)
+        ];
+    }
 }

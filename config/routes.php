@@ -78,7 +78,8 @@ return function (RouteCollector $r) {
     $r->addRoute('GET', '/admin/races', [\sdo\Controllers\AdminController::class, 'getRaces']);
     $r->addRoute('POST', '/admin/update-race', [\sdo\Controllers\AdminController::class, 'updateRace']);
     $r->addRoute('GET', '/admin/battle-logs', [\sdo\Controllers\AdminController::class, 'getBattleLogs']);
-    $r->addRoute('GET', '/admin/audit-logs', [\sdo\Controllers\AdminController::class, 'getAuditLogs']);
+    $r->addRoute('GET', '/admin/logs/administrative', [\sdo\Controllers\AdminController::class, 'getAdminLogs']);
+    $r->addRoute('GET', '/admin/logs/recruitment', [\sdo\Controllers\AdminController::class, 'getRecruitmentLogs']);
     $r->addRoute('POST', '/admin/impersonate', [\sdo\Controllers\AdminController::class, 'impersonate']);
     $r->addRoute('GET', '/admin/stop-impersonating', [\sdo\Controllers\AdminController::class, 'stopImpersonating']);
     

@@ -494,11 +494,33 @@ class AdminController extends BaseController
         });
     }
 
-    public function getAuditLogs(): string
+    public function getAdminLogs(): string
     {
         return $this->jsonResponse(function() {
             $this->checkAdmin();
-            return ['success' => true, 'logs' => $this->systemService->getAuditLogs()];
+            $page = (int)($_GET['page'] ?? 1);
+            $perPage = (int)($_GET['per_page'] ?? 50);
+            $filters = [
+                'action' => $_GET['action'] ?? null,
+                'admin_id' => $_GET['admin_id'] ?? null
+            ];
+
+            return ['success' => true, 'logs' => $this->systemService->getPaginatedAdminLogs($page, $perPage, $filters)];
+        });
+    }
+
+    public function getRecruitmentLogs(): string
+    {
+        return $this->jsonResponse(function() {
+            $this->checkAdmin();
+            $page = (int)($_GET['page'] ?? 1);
+            $perPage = (int)($_GET['per_page'] ?? 50);
+            $filters = [
+                'action' => $_GET['action'] ?? null,
+                'dominion_id' => $_GET['dominion_id'] ?? null
+            ];
+
+            return ['success' => true, 'logs' => $this->systemService->getPaginatedRecruitmentLogs($page, $perPage, $filters)];
         });
     }
 

@@ -57,6 +57,8 @@ $containerBuilder->addDefinitions([
     \sdo\Repositories\Interfaces\DominionArmoryRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentDominionArmoryRepository::class),
     \sdo\Repositories\Interfaces\ManpowerRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentManpowerRepository::class),
     \sdo\Repositories\Interfaces\LogRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentLogRepository::class),
+    \sdo\Repositories\Interfaces\AdminLogRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentAdminLogRepository::class),
+    \sdo\Repositories\Interfaces\RecruitmentLogRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentRecruitmentLogRepository::class),
     \sdo\Repositories\Interfaces\RaceRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentRaceRepository::class),
     \sdo\Repositories\Interfaces\ApiRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentApiRepository::class),
     \sdo\Repositories\Interfaces\ConfigRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentConfigRepository::class),

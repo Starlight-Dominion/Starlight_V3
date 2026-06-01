@@ -10,6 +10,7 @@
     import RaceInspector from '../components/admin/RaceInspector.svelte';
     import BotProfileInspector from '../components/admin/BotProfileInspector.svelte';
     import BotFoundry from '../components/admin/BotFoundry.svelte';
+    import LogDashboard from '../components/admin/logs/LogDashboard.svelte';
     let { stats = {} } = $props();
 
     let activeModule = $state('overview');
@@ -63,7 +64,7 @@
         { id: 'players', name: 'Sovereign Oversight', icon: '👁' },
         { id: 'api', name: 'Neural API Gate', icon: '📡' },
         { id: 'automation', name: 'Automation Suite', icon: '🤖' },
-        { id: 'audit', name: 'Audit Trail', icon: '🕵️' },
+        { id: 'audit', name: 'Neural Audit Terminal', icon: '🕵️' },
         { id: 'docs', name: 'Documentation', icon: '📝' },
         { id: 'logs', name: 'Battle Records', icon: '📜' }
     ];
@@ -72,7 +73,6 @@
     let apiLogs = $state([]);
     let apiApps = $state([]);
     let botProfiles = $state([]);
-    let auditLogs = $state([]);
     let apiTab = $state('keys'); // 'keys', 'apps', 'logs'
 
     // Bot Profile Inspector State
@@ -339,15 +339,6 @@
         showRaceInspector = true;
     }
 
-    async function fetchAuditLogs() {
-        loading = true;
-        try {
-            const res = await fetch('/admin/audit-logs');
-            const data = await res.json();
-            auditLogs = data.logs;
-        } catch (e) { console.error("Failed to fetch audit logs"); } finally { loading = false; }
-    }
-
     $effect(() => {
         if (activeModule === 'mechanics' || activeModule === 'doctrine' || activeModule === 'docs') fetchSettings();
         if (activeModule === 'units') fetchUnits();
@@ -358,7 +349,6 @@
         if (activeModule === 'players') fetchAllKingdoms();
         if (activeModule === 'api') fetchApiData();
         if (activeModule === 'automation') fetchBotProfiles();
-        if (activeModule === 'audit') fetchAuditLogs();
     });
 
     async function handleSearch() {
@@ -603,16 +593,6 @@
         if (res) {
             window.location.href = '/dashboard';
         }
-    }
-
-    function exportAuditLogsToJson() {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(auditLogs, null, 2));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href",     dataStr);
-        downloadAnchorNode.setAttribute("download", `audit_logs_${new Date().toISOString()}.json`);
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
     }
 </script>
 
@@ -1194,47 +1174,8 @@
                 </div>
 
             {:else if activeModule === 'audit'}
-                <div in:fade class="space-y-6">
-                    <div class="bg-dark-translucent border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
-                        <header class="bg-cyan-950/20 px-8 py-6 border-b border-white/5 flex justify-between items-center">
-                            <div>
-                                <h2 class="text-[10px] font-black text-cyan-500 uppercase tracking-[4px]">Neural Audit Trail</h2>
-                                <p class="text-[8px] text-gray-600 uppercase mt-1">Full record of administrative directives.</p>
-                            </div>
-                            <button onclick={exportAuditLogsToJson} class="px-6 py-3 bg-white/5 border border-white/10 text-[9px] font-black uppercase text-gray-400 rounded-xl hover:bg-cyan-600 hover:text-white transition-all">
-                                Neural Export (JSON)
-                            </button>
-                        </header>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse font-mono">
-                                <thead>
-                                    <tr class="bg-cyan-950/20 border-b border-white/5 text-[9px] font-black text-gray-500 uppercase tracking-widest">
-                                        <th class="px-8 py-5 text-red-500">ID</th>
-                                        <th class="px-8 py-5">ADMIN ID</th>
-                                        <th class="px-8 py-5">OPERATION</th>
-                                        <th class="px-8 py-5">LOG DIRECTIVE (DESCRIPTION)</th>
-                                        <th class="px-8 py-5 text-right">TIMESTAMP</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-white/5">
-                                    {#each auditLogs as log}
-                                        <tr class="group hover:bg-white/[0.02] transition-colors border-b border-white/5 last:border-0">
-                                            <td class="px-8 py-6 text-red-900 text-xs font-black">#{log.id}</td>
-                                            <td class="px-8 py-6 text-gray-400 text-xs font-black">CMD_{log.dominion_id}</td>
-                                            <td class="px-8 py-6 text-white text-xs font-black uppercase tracking-tighter">{log.action.replace('ADMIN_', '')}</td>
-                                            <td class="px-8 py-6">
-                                                <span class="text-xs text-cyan-400 font-black">{log.description}</span>
-                                                {#if log.metadata}
-                                                    <span class="block text-[8px] text-gray-700 mt-1 uppercase break-all whitespace-pre-wrap">{JSON.stringify(log.metadata, null, 2)}</span>
-                                                {/if}
-                                            </td>
-                                            <td class="px-8 py-6 text-right text-[10px] text-gray-600 font-black uppercase tracking-widest">{log.created_at}</td>
-                                        </tr>
-                                    {/each}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                <div in:fade>
+                    <LogDashboard {game} />
                 </div>
 
             {:else if activeModule === 'docs'}

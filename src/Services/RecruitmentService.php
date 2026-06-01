@@ -7,9 +7,9 @@ use sdo\Models\Dominion;
 use sdo\Models\RecruitmentSession;
 use sdo\Repositories\Interfaces\DominionRepositoryInterface;
 use sdo\Repositories\Interfaces\RecruitmentRepositoryInterface;
+use sdo\Repositories\Interfaces\RecruitmentLogRepositoryInterface;
 use sdo\Infrastructure\TransactionManager;
 use sdo\Services\ConfigService;
-use sdo\Services\LogService;
 use Exception;
 use DateTime;
 
@@ -17,9 +17,9 @@ class RecruitmentService
 {
     public function __construct(
         private ConfigService $configService,
-        private LogService $logService,
         private DominionRepositoryInterface $dominionRepository,
         private RecruitmentRepositoryInterface $recruitmentRepository,
+        private RecruitmentLogRepositoryInterface $recruitmentLogRepository,
         private TransactionManager $transactionManager
     ) {}
 
@@ -103,12 +103,12 @@ class RecruitmentService
             $this->dominionRepository->incrementStats($domId, ['citizens' => 1]);
 
             // 3. Log click
-            $this->logService->log(
-                $domId,
-                'recruitment_click',
-                "Commander processed a neural recruitment click.",
-                1
-            );
+            $this->recruitmentLogRepository->log([
+                'dominion_id' => $domId,
+                'action' => 'recruitment_click',
+                'description' => "Commander processed a neural recruitment click.",
+                'amount' => 1
+            ]);
 
             // 4. Finalize if reached max
             if ($newCount >= $maxClicks) {
@@ -117,12 +117,12 @@ class RecruitmentService
                     'completed_at' => date('Y-m-d H:i:s')
                 ]);
                 
-                $this->logService->log(
-                    $domId,
-                    'recruitment_complete',
-                    "Commander completed a mobilization session, enlisting {$maxClicks} civilians.",
-                    $maxClicks
-                );
+                $this->recruitmentLogRepository->log([
+                    'dominion_id' => $domId,
+                    'action' => 'recruitment_complete',
+                    'description' => "Commander completed a mobilization session, enlisting {$maxClicks} civilians.",
+                    'amount' => $maxClicks
+                ]);
             }
 
             return [
