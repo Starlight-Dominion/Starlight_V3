@@ -8,19 +8,21 @@ use sdo\Models\Dominion;
 
 class AdvisorService
 {
-    public function __construct(private GameService $gameService) {}
-
-    private const ADVICE = [
-        "Your Treasury grows with each tick. Consider investing in infrastructure to boost your income.",
-        "A large population is the backbone of a strong army. Protect your Citizens.",
-        "Turns are your most valuable resource. Spend them wisely to outmaneuver your rivals.",
-        "Scouting your neighbors can reveal valuable information before you commit to an attack.",
-        "Don't neglect your defenses. A strong wall can repel a weak-willed invader."
-    ];
+    public function __construct(
+        private GameService $gameService,
+        private ConfigService $configService
+    ) {}
 
     public function getAdvice(): string
     {
-        return self::ADVICE[array_rand(self::ADVICE)];
+        $raw = $this->configService->get('ai_advisor_messages', '');
+        $messages = array_filter(array_map('trim', explode("\n", $raw)));
+
+        if (empty($messages)) {
+            return "Welcome, Commander. Infrastructure development is advised.";
+        }
+
+        return $messages[array_rand($messages)];
     }
 
     /**
@@ -50,15 +52,10 @@ class AdvisorService
     }
     
     /**
-     * Return contextual advisor advice based on dominion data when available.
+     * Return curated advisor advice. Contextual logic is overridden by High Command directives.
      */
     public function getContextualAdviceFromDominion(?Dominion $dominion): string
     {
-        if ($dominion) {
-            $xp = (int)$dominion->xp;
-            $level = $this->gameService->calculateLevel($xp);
-            return $this->getContextualAdvice($level, $xp);
-        }
         return $this->getAdvice();
     }
 

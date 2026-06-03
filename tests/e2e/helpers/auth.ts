@@ -21,81 +21,58 @@ export function makeCommanderCredentials(prefix = 'e2e'): CommanderCredentials {
   };
 }
 
-async function getCsrfToken(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const state = (window as { __INITIAL_STATE__?: { csrf?: string } }).__INITIAL_STATE__;
-    const token = (window as { __CSRF_TOKEN__?: string }).__CSRF_TOKEN__;
-
-    return state?.csrf ?? token ?? '';
-  });
-}
-
-async function submitAuthRequest(page: Page, path: string, payload: Record<string, string>): Promise<void> {
-  const csrf = await getCsrfToken(page);
-
-  const result = await page.evaluate(async ({ path, payload, csrf }) => {
-    const submission = new FormData();
-
-    for (const [key, value] of Object.entries(payload)) {
-      submission.append(key, value);
-    }
-
-    submission.append('_csrf', csrf);
-
-    const response = await fetch(path, {
-      method: 'POST',
-      body: submission,
-      headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    });
-
-    let body: unknown = null;
-    try {
-      body = await response.json();
-    } catch {
-      body = null;
-    }
-
-    return {
-      ok: response.ok,
-      status: response.status,
-      body,
-    };
-  }, { path, payload, csrf });
-
-  expect(result.ok, `${path} failed with status ${result.status}`).toBe(true);
-}
-
-export async function registerCommander(page: Page, creds: CommanderCredentials): Promise<void> {
-  await page.goto('/register');
-
-  await submitAuthRequest(page, '/register', {
-    email: creds.email,
-    username: creds.username,
-    dominion_name: creds.dominionName,
-    race: 'Human',
-    password: creds.password,
-    password_confirmation: creds.password,
-  });
-
-  await page.goto('/login?success=1');
-
-  await expect(page).toHaveURL(/\/login\?success=1$/);
-}
-
-export async function loginCommander(page: Page, creds: CommanderCredentials): Promise<void> {
-  await page.goto('/login');
-
-  await submitAuthRequest(page, '/login', {
-    username: creds.username,
-    password: creds.password,
-  });
-
-  await page.goto('/dashboard');
-
-  await expect(page).toHaveURL(/\/dashboard$/);
-}
-
 export async function registerAndLoginCommander(page: Page, creds: CommanderCredentials): Promise<void> {
-  await registerCommander(page, creds);
-  await loginCommander(page, creds);
+  // 1. Initial hit to get CSRF token
+  await page.goto('/register');
+  const csrf = await page.evaluate(() => (window as any).__CSRF_TOKEN__);
+
+  if (!csrf) {
+      throw new Error("Failed to extract CSRF token from /register shell.");
+  }
+
+  // 2. Perform Registration via Fetch for speed/reliability
+  const regResult = await page.evaluate(async ({ creds, csrf }) => {
+    const fd = new FormData();
+    fd.append('username', creds.username);
+    fd.append('email', creds.email);
+    fd.append('dominion_name', creds.dominionName);
+    fd.append('race', 'Human');
+    fd.append('password', creds.password);
+    fd.append('password_confirmation', creds.password);
+    fd.append('_csrf', csrf);
+
+    const res = await fetch('/register', {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    return res.json();
+  }, { creds, csrf });
+
+  if (!regResult.success) {
+      throw new Error(`E2E Registration failed: ${regResult.message || JSON.stringify(regResult)}`);
+  }
+
+  // 3. Perform Login via Fetch to establish session
+  const loginResult = await page.evaluate(async ({ creds, csrf }) => {
+    const fd = new FormData();
+    fd.append('username', creds.username);
+    fd.append('password', creds.password);
+    fd.append('_csrf', csrf);
+
+    const res = await fetch('/login', {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    return res.json();
+  }, { creds, csrf });
+
+  if (!loginResult.success) {
+      throw new Error(`E2E Login failed: ${loginResult.message || JSON.stringify(loginResult)}`);
+  }
+
+  // 4. Verify we can reach the dashboard
+  await page.goto('/dashboard');
+  await expect(page).toHaveURL(/\/dashboard$/);
 }

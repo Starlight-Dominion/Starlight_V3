@@ -133,6 +133,7 @@ For deeper dives into the system's design and features, refer to:
 - [Architecture Overview](ARCHITECTURE.md) - Deep dive into layers and request flow.
 - [OpenAPI Specification](OPEN_API.md) - Detailed documentation of the game's API endpoints.
 - [Admin Suite Guide](admin_suite_readme.md) - Documentation for the administrative management tools.
+- [Admin Suite E2E Testing](ADMIN_TESTING.md) - Exhaustive technical documentation of the administrative verification matrix.
 
 ---
 

@@ -20,12 +20,28 @@
         <div class="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-cyan-400/30"></div>
         <header class="bg-cyan-950/20 px-4 py-3 border-b border-cyan-500/10 flex justify-between items-center">
             <h2 class="text-cyan-400 font-title text-[10px] font-black uppercase tracking-[3px]">A.I. Advisor</h2>
-            <span class="w-1 h-1 bg-cyan-500 rounded-full animate-ping"></span>
+            {#if game.props.ai_advisor_pulse_enabled}
+                <span class="w-1 h-1 bg-cyan-500 rounded-full animate-ping"></span>
+            {/if}
         </header>
-        <div class="p-6">
+        <div class="p-6 space-y-4">
             <p class="text-gray-300 text-xs italic border-l-2 border-cyan-500/30 pl-4">
                 "{user?.advice || 'Welcome, Commander.'}"
             </p>
+
+            {#if game.props.dominion_news}
+                <div class="pt-4 border-t border-white/5 space-y-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                        <span class="text-[8px] font-black text-emerald-500 uppercase tracking-[3px]">Dominion News Wire</span>
+                    </div>
+                    <div class="bg-emerald-950/5 p-3 rounded border border-emerald-500/10">
+                        <p class="text-[9px] text-gray-400 leading-relaxed font-mono">
+                            {game.props.dominion_news}
+                        </p>
+                    </div>
+                </div>
+            {/if}
         </div>
     </div>
 

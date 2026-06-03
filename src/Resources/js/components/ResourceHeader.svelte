@@ -61,7 +61,9 @@
                 <a href="/combat/training" class="text-[9px] font-title font-bold tracking-[2px] uppercase text-gray-500 hover:text-cyan-400 transition-colors">Training</a>
                 <a href="/combat/battlefield" class="text-[9px] font-title font-bold tracking-[2px] uppercase text-gray-500 hover:text-cyan-400 transition-colors">War Room</a>
                 <a href="/combat/recruit" class="text-[9px] font-title font-bold tracking-[2px] uppercase text-cyan-400 hover:text-white transition-colors flex items-center gap-2">
-                    <span class="w-1 h-1 bg-cyan-500 rounded-full animate-ping"></span>
+                    {#if game.user?.has_recruitment_available}
+                        <span class="w-1 h-1 bg-cyan-500 rounded-full animate-ping"></span>
+                    {/if}
                     Recruitment
                 </a>
             </nav>

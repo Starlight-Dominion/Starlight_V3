@@ -58,6 +58,7 @@ abstract class BaseController
                     'income_per_tick' => $this->gameService->getTotalIncome($dominion->id),
                     'citizen_growth_rate' => $this->gameService->getTotalCitizenGrowth($dominion->id),
                     'is_admin' => $this->authService->isAdmin($dominion->user),
+                    'has_recruitment_available' => $this->gameService->hasAvailableRecruitment($dominion->id),
                     'dominion' => $dominion->toArray(),
                     'avatar_path' => $dominion->user->avatar_path,
                     'advisorHistory' => $vm->advisorHistory
@@ -67,7 +68,10 @@ abstract class BaseController
 
         $state = [
             'component' => $component,
-            'props' => $pageData,
+            'props' => array_merge($pageData, [
+                'dominion_news' => $this->configService->get('dominion_news', ''),
+                'ai_advisor_pulse_enabled' => (bool)$this->configService->get('ai_advisor_pulse_enabled', '1'),
+            ]),
             'user' => $userData,
             'csrf' => Csrf::getToken(),
             'global_broadcast' => $this->configService->get('global_broadcast', ''),

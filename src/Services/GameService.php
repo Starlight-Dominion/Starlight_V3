@@ -28,8 +28,28 @@ class GameService
         private ConfigService $configService,
         private DominionRepositoryInterface $dominionRepository,
         private ManpowerRepositoryInterface $manpowerRepository,
-        private DominionStructureRepositoryInterface $dominionStructureRepository
+        private DominionStructureRepositoryInterface $dominionStructureRepository,
+        private \sdo\Repositories\Interfaces\RecruitmentRepositoryInterface $recruitmentRepository
     ) {}
+
+    /**
+     * Checks if the dominion has any available recruitment capacity (active session or remaining daily sessions).
+     */
+    public function hasAvailableRecruitment(int $dominionId): bool
+    {
+        $active = $this->recruitmentRepository->findActiveSession($dominionId);
+        if ($active) {
+            return true;
+        }
+
+        $dailyLimit = (int)$this->configService->get('recruitment_sessions_per_day', 2);
+        $dailyCount = $this->recruitmentRepository->countRecentSessions($dominionId, 24);
+
+        $threeDayLimit = (int)$this->configService->get('recruitment_sessions_per_3days', 5);
+        $threeDayCount = $this->recruitmentRepository->countRecentSessions($dominionId, 72);
+
+        return $dailyCount < $dailyLimit && $threeDayCount < $threeDayLimit;
+    }
 
     public function getRealmTime(): DateTime
     {
