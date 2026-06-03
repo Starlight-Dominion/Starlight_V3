@@ -28,14 +28,14 @@ class AdminGameDataService
     public function updateUnit(int $id, array $data): bool
     {
         $unitColumns = $this->unitRepository->getColumns();
-        $filteredData = array_filter($data, fn($key) => in_array($key, $unitColumns), ARRAY_FILTER_USE_KEY);
+        $filteredData = $this->sanitizeData($data, $unitColumns);
 
         return $this->unitRepository->update($id, $filteredData);
     }
 
     public function addUnit(array $data): int
     {
-        $unit = $this->unitRepository->create($data);
+        $unit = $this->unitRepository->create($this->sanitizeData($data));
         return (int)$unit->id;
     }
 
@@ -57,14 +57,14 @@ class AdminGameDataService
 
     public function addStructure(array $data): int
     {
-        $structure = $this->structureRepository->create($data);
+        $structure = $this->structureRepository->create($this->sanitizeData($data));
         return (int)$structure->id;
     }
 
     public function updateStructure(int $id, array $data): bool
     {
         $columns = $this->structureRepository->getColumns();
-        $filteredData = array_filter($data, fn($key) => in_array($key, $columns), ARRAY_FILTER_USE_KEY);
+        $filteredData = $this->sanitizeData($data, $columns);
         return $this->structureRepository->update($id, $filteredData);
     }
 
@@ -76,13 +76,13 @@ class AdminGameDataService
     public function updateStructureLevel(int $structureId, int $level, array $data): bool
     {
         $columns = $this->structureRepository->getLevelColumns();
-        $filteredData = array_filter($data, fn($key) => in_array($key, $columns), ARRAY_FILTER_USE_KEY);
+        $filteredData = $this->sanitizeData($data, $columns);
         return $this->structureRepository->updateLevel($structureId, $level, $filteredData);
     }
 
     public function addStructureLevel(array $data): bool
     {
-        return $this->structureRepository->addLevel($data);
+        return $this->structureRepository->addLevel($this->sanitizeData($data));
     }
 
     // --- Armory ---
@@ -94,13 +94,13 @@ class AdminGameDataService
     public function updateArmoryItem(int $id, array $data): bool
     {
         $armoryColumns = $this->armoryRepository->getColumns();
-        $filteredData = array_filter($data, fn($key) => in_array($key, $armoryColumns), ARRAY_FILTER_USE_KEY);
+        $filteredData = $this->sanitizeData($data, $armoryColumns);
         return $this->armoryRepository->update($id, $filteredData);
     }
 
     public function addArmoryItem(array $data): int
     {
-        $item = $this->armoryRepository->create($data);
+        $item = $this->armoryRepository->create($this->sanitizeData($data));
         return (int)$item->id;
     }
 
@@ -128,7 +128,21 @@ class AdminGameDataService
     public function updateRace(int $id, array $data): bool
     {
         $raceColumns = $this->raceRepository->getColumns();
-        $filteredData = array_filter($data, fn($key) => in_array($key, $raceColumns), ARRAY_FILTER_USE_KEY);
+        $filteredData = $this->sanitizeData($data, $raceColumns);
         return $this->raceRepository->update($id, $filteredData);
+    }
+
+    private function sanitizeData(array $data, ?array $columns = null): array
+    {
+        $sanitized = [];
+        foreach ($data as $key => $value) {
+            if ($columns !== null && !in_array($key, $columns)) {
+                continue;
+            }
+            
+            // Convert empty strings to null for database compatibility
+            $sanitized[$key] = ($value === '') ? null : $value;
+        }
+        return $sanitized;
     }
 }
