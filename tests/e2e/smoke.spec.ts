@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { makeCommanderCredentials, registerAndLoginCommander } from './helpers/auth';
 
 test.describe('smoke', () => {

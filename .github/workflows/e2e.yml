@@ -67,9 +67,6 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build frontend assets
-        run: npm run build
-
       - name: Setup PHP
         uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # 2.37.1
         with:
@@ -126,8 +123,8 @@ jobs:
       - name: Install Playwright browsers
         run: npm run test:e2e:install
 
-      - name: Run Playwright E2E tests
-        run: npm run test:e2e:ci
+      - name: Run Playwright E2E tests with coverage gate
+        run: npm run test:e2e:ci:gate
 
       - name: Upload Playwright report
         if: always()
@@ -143,4 +140,14 @@ jobs:
         with:
           name: playwright-test-results
           path: test-results/
+          retention-days: 14
+
+      - name: Upload frontend coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: frontend-coverage
+          path: |
+            .nyc_output/
+            coverage/
           retention-days: 14
