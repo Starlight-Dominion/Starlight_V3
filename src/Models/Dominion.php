@@ -29,6 +29,7 @@ class Dominion extends Model
         'dexterity_points' => 'integer',
         'charisma_points' => 'integer',
         'deposits_today' => 'integer',
+        'miners' => 'integer',
         'current_mine_tier' => 'integer',
         'current_mine_level' => 'integer',
         'housing_level' => 'integer',

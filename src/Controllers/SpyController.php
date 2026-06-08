@@ -7,6 +7,7 @@ namespace sdo\Controllers;
 use sdo\Services\GameService;
 use sdo\Services\AdvisorService;
 use sdo\Services\SpyService;
+use sdo\Services\BattlefieldService;
 use sdo\Services\AuthService;
 use sdo\Services\ConfigService;
 
@@ -17,7 +18,8 @@ class SpyController extends BaseController
         AdvisorService $advisorService,
         ConfigService $configService,
         AuthService $authService,
-        private SpyService $spyService
+        private SpyService $spyService,
+        private BattlefieldService $battlefieldService
     ) {
         parent::__construct($gameService, $advisorService, $configService, $authService);
     }
@@ -37,6 +39,7 @@ class SpyController extends BaseController
             'spyIntel' => $spyIntel,
             'availableSpies' => $availableSpies,
             'spyCount' => $availableSpies['available_spies'] ?? 0,
+            'players' => $this->battlefieldService->getBattlefieldList()
         ]);
     }
 

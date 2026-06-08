@@ -56,7 +56,12 @@ class AdvisorService
      */
     public function getContextualAdviceFromDominion(?Dominion $dominion): string
     {
-        return $this->getAdvice();
+        if (!$dominion) {
+            return $this->getAdvice();
+        }
+
+        $level = $this->gameService->calculateLevel($dominion->xp);
+        return $this->getContextualAdvice($level, $dominion->xp);
     }
 
     /**

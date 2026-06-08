@@ -59,13 +59,22 @@ class RecruitmentServiceTest extends TestCase
             $table->timestamp('completed_at')->nullable();
         });
 
+        Capsule::schema()->create('recruitment_logs', function ($table) {
+            $table->increments('id');
+            $table->integer('dominion_id')->unsigned();
+            $table->string('action');
+            $table->string('description');
+            $table->integer('amount')->default(0);
+            $table->timestamp('created_at')->useCurrent();
+        });
+
         $this->configMock = $this->createMock(ConfigService::class);
         $this->logMock = $this->createMock(LogService::class);
         $this->service = new RecruitmentService(
             $this->configMock ?? $this->createMock(\sdo\Services\ConfigService::class),
-            $this->logMock ?? $this->createMock(\sdo\Services\LogService::class),
             new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
             new \sdo\Repositories\Eloquent\EloquentRecruitmentRepository(),
+            new \sdo\Repositories\Eloquent\EloquentRecruitmentLogRepository(),
             new \sdo\Infrastructure\TransactionManager()
         );
     }

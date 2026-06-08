@@ -37,6 +37,9 @@ abstract class BaseController
         if (isset($_SESSION['user_id'])) {
             $dominion = $this->gameService->getDominionByUserId((int)$_SESSION['user_id']);
             if ($dominion) {
+                // Ensure alliance data is fresh and loaded
+                $dominion->user->load(['alliance', 'allianceRole']);
+
                 $advice = $this->advisorService->getContextualAdviceFromDominion($dominion);
                 $vm = new GameStateViewModel(
                     $dominion,
@@ -61,6 +64,13 @@ abstract class BaseController
                     'has_recruitment_available' => $this->gameService->hasAvailableRecruitment($dominion->id),
                     'dominion' => $dominion->toArray(),
                     'avatar_path' => $dominion->user->avatar_path,
+                    'alliance' => $dominion->user->alliance ? [
+                        'id' => $dominion->user->alliance->id,
+                        'name' => $dominion->user->alliance->name,
+                        'tag' => $dominion->user->alliance->tag,
+                        'is_leader' => ($dominion->user->id === $dominion->user->alliance->leader_id),
+                        'can_manage' => (bool)($dominion->user->allianceRole?->can_invite || $dominion->user->allianceRole?->can_kick || $dominion->user->allianceRole?->can_manage_roles)
+                    ] : null,
                     'advisorHistory' => $vm->advisorHistory
                 ];
             }

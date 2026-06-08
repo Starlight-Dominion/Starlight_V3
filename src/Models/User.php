@@ -21,8 +21,20 @@ class User extends Model
         'stasis_until' => 'datetime',
         'handle_last_changed' => 'datetime',
         'bot_profile_id' => 'integer',
-        'last_bot_action_at' => 'datetime'
+        'last_bot_action_at' => 'datetime',
+        'alliance_id' => 'integer',
+        'alliance_role_id' => 'integer'
     ];
+
+    public function alliance(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Alliance::class, 'alliance_id');
+    }
+
+    public function allianceRole(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(AllianceRole::class, 'alliance_role_id');
+    }
 
     public function dominion(): HasOne
     {

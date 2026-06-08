@@ -12,13 +12,19 @@ class Eloquent
     {
         $capsule = new Capsule();
 
+        $host = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? '127.0.0.1');
+        $name = getenv('DB_NAME') ?: ($_ENV['DB_NAME'] ?? 'sdo');
+        $user = getenv('DB_USER') ?: ($_ENV['DB_USER'] ?? 'root');
+        $pass = getenv('DB_PASS') ?: ($_ENV['DB_PASS'] ?? '');
+        $port = getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? 3306);
+
         $capsule->addConnection([
             'driver'    => 'mysql',
-            'host'      => $_ENV['DB_HOST'],
-            'database'  => $_ENV['DB_NAME'],
-            'username'  => $_ENV['DB_USER'],
-            'password'  => $_ENV['DB_PASS'],
-            'port'      => $_ENV['DB_PORT'],
+            'host'      => $host,
+            'database'  => $name,
+            'username'  => $user,
+            'password'  => $pass,
+            'port'      => $port,
             'charset'   => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
         ]);

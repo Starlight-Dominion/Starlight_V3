@@ -1,3 +1,4 @@
+# Environment
 /vendor/
 /node_modules/
 /public/css/style.css
@@ -5,7 +6,6 @@
 /docker-compose.override.yml
 /.phpunit.cache/
 /.php-cs-fixer.cache
-/legacy_files/
 .phpunit.result.cache
 
 # Playwright
@@ -23,3 +23,7 @@
 #File Types
 *.zip
 .phpunit.result.cache
+
+# Legacy 
+/Stellar-Dominion-Game/
+/legacy_files/

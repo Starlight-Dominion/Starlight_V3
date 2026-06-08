@@ -27,73 +27,44 @@ class TacticalService
         $manpowerMap = $manpower->mapWithKeys(fn($m) => [$m->unit->slug => $m->total_quantity]);
 
         // Attribute Multipliers (1% per point)
-        $strengthMult = 1 + ($dom->strength_points * 0.01);
-        $constitutionMult = 1 + ($dom->constitution_points * 0.01);
-        $dexterityMult = 1 + ($dom->dexterity_points * 0.01);
-        $charismaMult = 1 + ($dom->charisma_points * 0.01);
+        $strengthBonus = 1 + ($dom->strength_points * 0.01);
+        $constitutionBonus = 1 + ($dom->constitution_points * 0.01);
+        $dexterityBonus = 1 + ($dom->dexterity_points * 0.01); // Keeping for consistency
+        $charismaBonus = 1 + ($dom->charisma_points * 0.01); // Mapping to defense in legacy? No, charisma is for economy/discount.
 
-        $rawAttack = 0;
-        $rawDefense = 0;
-        $rawEspionage = 0;
-        $rawSentry = 0;
-
-        foreach ($manpower as $m) {
-            $qty = $m->total_quantity;
-            if ($qty > 0) {
-                $rawAttack += $qty * (int)$m->unit->power_offense;
-                $rawDefense += $qty * (int)$m->unit->power_defense;
-                $rawEspionage += $qty * (int)$m->unit->power_spy_offense;
-                $rawSentry += $qty * (int)$m->unit->power_spy_defense;
-            }
-        }
-
-        // 1:1 Equipping Logic
-        $atkArmoryBonus = $this->getArmoryBonus($dominionId, 'soldiers', (int)($manpowerMap['soldiers'] ?? 0), 'attack_bonus');
-        $defArmoryBonus = $this->getArmoryBonus($dominionId, 'guards', (int)($manpowerMap['guards'] ?? 0), 'defense_bonus');
-
-        // Structural Multipliers
+        // Structural Multipliers (Legacy style: 1 + buff/100)
         $buffs = $this->dominionStructureRepository->sumMultipleStructureLevelBuffs($dominionId, [
             'off' => 'buff_offense',
             'def' => 'buff_defense'
         ]);
 
-        $offenseUpgradeMult = 1 + (($buffs['off'] ?? 0) / 100.0);
-        $defenseUpgradeMult = 1 + (($buffs['def'] ?? 0) / 100.0);
+        $offenseMult = 1 + (($buffs['off'] ?? 0) / 100.0);
+        $defenseMult = 1 + (($buffs['def'] ?? 0) / 100.0);
 
-        // Final Aggregate Ratings
-        $rawAttack = ($rawAttack * $strengthMult + $atkArmoryBonus) * $offenseUpgradeMult;
-        $rawDefense = ($rawDefense * $constitutionMult + $defArmoryBonus) * $defenseUpgradeMult;
-        $rawEspionage = $rawEspionage * $dexterityMult;
-        $rawSentry = $rawSentry * $charismaMult;
+        /**
+         * Legacy Combat Formulas:
+         * offensePower = soldiers * 10 * strengthBonus * offenseMult
+         * defenseRating = guards * 10 * constitutionBonus * defenseMult
+         * spyOffense = spies * 10 * strengthBonus * offenseMult
+         * sentryDefense = sentries * 10 * defenseMult
+         */
+        $soldiers = (int)($manpowerMap['soldiers'] ?? 0);
+        $guards = (int)($manpowerMap['guards'] ?? 0);
+        $spies = (int)($manpowerMap['spies'] ?? 0);
+        $sentries = (int)($manpowerMap['sentries'] ?? 0);
+
+        $offensePower = (int)floor($soldiers * 10 * $strengthBonus * $offenseMult);
+        $defenseRating = (int)floor($guards * 10 * $constitutionBonus * $defenseMult);
+        $spyOffense = (int)floor($spies * 10 * $dexterityBonus * $offenseMult);
+        $sentryDefense = (int)floor($sentries * 10 * $charismaBonus * $defenseMult);
 
         return [
-            'offense' => (int)$rawAttack,
-            'defense' => (int)$rawDefense,
-            'espionage' => (int)$rawEspionage,
-            'sentry' => (int)$rawSentry,
+            'offense' => $offensePower,
+            'defense' => $defenseRating,
+            'espionage' => $spyOffense,
+            'sentry' => $sentryDefense,
             'army' => $manpowerMap->toArray()
         ];
-    }
-
-    private function getArmoryBonus(int $domId, string $type, int $unitCount, string $field): float
-    {
-        if ($unitCount <= 0) return 0.0;
-
-        $items = $this->dominionArmoryRepository->getEquippedItemsByType($domId, $type)
-            ->sortByDesc(fn($m) => $m->item->$field);
-
-        $bonus = 0.0;
-        $remainingCapacity = $unitCount;
-
-        foreach ($items as $item) {
-            $effectiveQty = min($remainingCapacity, $item->quantity);
-            $bonus += ($effectiveQty * (float)$item->item->$field);
-            
-            $remainingCapacity -= $effectiveQty;
-            if ($remainingCapacity <= 0) break;
-        }
-
-        return $bonus;
     }
 
     public function getTacticalOverview(int $dominionId): array

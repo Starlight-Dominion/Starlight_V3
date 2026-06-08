@@ -15,7 +15,7 @@ test.describe('Admin Suite Exhaustive Validation', () => {
     await page.goto('/dashboard');
     await page.goto('/admin');
     await expect(page).toHaveURL(/\/admin$/);
-    await expect(page.locator('h1')).toContainText(/Command Center/i);
+    await expect(page.getByRole('heading', { name: /Command Center/i })).toBeVisible();
   });
 
   test('Module: Command Overview renders correctly', async ({ page }) => {

@@ -2,7 +2,6 @@
     import { game } from './stores/gameStore.svelte.js';
     
     import ResourceHeader from './components/ResourceHeader.svelte';
-    import TacticalSidebar from './components/TacticalSidebar.svelte';
     import PublicNav from './components/PublicNav.svelte';
 
     // Page Components
@@ -27,6 +26,13 @@
     import Recruit from './pages/Recruit.svelte';
     import BattleReport from './pages/BattleReport.svelte';
     import Rules from './pages/Rules.svelte';
+    import AllianceHub from './pages/alliance/AllianceHub.svelte';
+    import AllianceBank from './pages/alliance/AllianceBank.svelte';
+    import AllianceStructures from './pages/alliance/AllianceStructures.svelte';
+    import AllianceForum from './pages/alliance/AllianceForum.svelte';
+    import AllianceThread from './pages/alliance/AllianceThread.svelte';
+    import AllianceManagement from './pages/alliance/AllianceManagement.svelte';
+    import AllianceUnaligned from './pages/alliance/AllianceUnaligned.svelte';
 
     const components = {
         'home': Landing,
@@ -38,8 +44,15 @@
         'pages/contact': Contact,
         'dashboard/index': Dashboard,
         'admin/index': Admin,
+        'alliance/hub': AllianceHub,
+        'alliance/bank': AllianceBank,
+        'alliance/structures': AllianceStructures,
+        'alliance/forum': AllianceForum,
+        'alliance/thread': AllianceThread,
+        'alliance/management': AllianceManagement,
+        'alliance/unaligned': AllianceUnaligned,
         'structures/index': Structures,
-        'mines': Mines,
+        'mines/index': Mines,
         'battlefield/index': Battlefield,
         'battlefield/report': BattleReport,
         'armory/index': Armory,
@@ -60,7 +73,7 @@
     });
 
     const isPublicView = $derived(['home', 'pages/about', 'pages/rules', 'pages/terms', 'pages/contact', 'auth/login', 'auth/register'].includes(game.component));
-    const isAdminView = $derived(game.component === 'admin/index');
+    const isAdminView = $derived(game.component.startsWith('admin/'));
 
     const bgUrl = "/images/backgroundMain.avif";
 </script>
@@ -95,16 +108,7 @@
         {#if game.user && !isPublicView}
             <ResourceHeader />
             <main class="flex-grow w-full max-w-7xl mx-auto px-6 py-8">
-                {#if isAdminView}
-                    <ActiveComponent {...game.props} />
-                {:else}
-                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                        <TacticalSidebar />
-                        <section class="lg:col-span-3">
-                            <ActiveComponent {...game.props} />
-                        </section>
-                    </div>
-                {/if}
+                <ActiveComponent {...game.props} />
             </main>
         {:else}
             <PublicNav />

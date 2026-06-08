@@ -21,13 +21,19 @@ $containerBuilder = new ContainerBuilder();
 $containerBuilder->addDefinitions([
     // Database connection
     PDO::class => function (ContainerInterface $c) {
+        $host = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? '127.0.0.1');
+        $name = getenv('DB_NAME') ?: ($_ENV['DB_NAME'] ?? 'sdo');
+        $user = getenv('DB_USER') ?: ($_ENV['DB_USER'] ?? 'root');
+        $pass = getenv('DB_PASS') ?: ($_ENV['DB_PASS'] ?? '');
+        $port = getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? 3306);
+
         $dsn = sprintf(
             "mysql:host=%s;dbname=%s;port=%d;charset=utf8mb4",
-            $_ENV['DB_HOST'],
-            $_ENV['DB_NAME'],
-            $_ENV['DB_PORT']
+            $host,
+            $name,
+            $port
         );
-        return new PDO($dsn, $_ENV['DB_USER'], $_ENV['DB_PASS'], [
+        return new PDO($dsn, $user, $pass, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
@@ -38,10 +44,12 @@ $containerBuilder->addDefinitions([
 
     // Redis connection
     Predis\Client::class => function (ContainerInterface $c) {
+        $host = getenv('REDIS_HOST') ?: ($_ENV['REDIS_HOST'] ?? '127.0.0.1');
+        $port = getenv('REDIS_PORT') ?: ($_ENV['REDIS_PORT'] ?? 6379);
         return new Predis\Client([
             'scheme' => 'tcp',
-            'host' => $_ENV['REDIS_HOST'],
-            'port' => $_ENV['REDIS_PORT'],
+            'host' => $host,
+            'port' => $port,
         ]);
     },
 
@@ -65,7 +73,12 @@ $containerBuilder->addDefinitions([
     \sdo\Repositories\Interfaces\DiscordLinkRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentDiscordLinkRepository::class),
     \sdo\Repositories\Interfaces\RecruitmentRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentRecruitmentRepository::class),
     \sdo\Repositories\Interfaces\TickRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentTickRepository::class),
+    \sdo\Repositories\Interfaces\AllianceRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentAllianceRepository::class),
+    \sdo\Repositories\Interfaces\ForumRepositoryInterface::class => DI\create(\sdo\Repositories\Eloquent\EloquentForumRepository::class),
     \sdo\Services\ConfigService::class => DI\autowire(),
+    \sdo\Services\AllianceService::class => DI\autowire(),
+    \sdo\Services\AllianceResourceService::class => DI\autowire(),
+    \sdo\Services\AllianceForumService::class => DI\autowire(),
     \sdo\Services\ApiService::class => DI\autowire(),
     \sdo\Services\AdminPlayerService::class => DI\autowire(),
     \sdo\Services\AdminGameDataService::class => DI\autowire(),

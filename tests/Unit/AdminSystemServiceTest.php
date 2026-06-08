@@ -33,7 +33,9 @@ class AdminSystemServiceTest extends TestCase
             new \sdo\Repositories\Eloquent\EloquentUserRepository(),
             new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
             new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
-            new \sdo\Repositories\Eloquent\EloquentLogRepository()
+            new \sdo\Repositories\Eloquent\EloquentLogRepository(),
+            new \sdo\Repositories\Eloquent\EloquentAdminLogRepository(),
+            new \sdo\Repositories\Eloquent\EloquentRecruitmentLogRepository()
         );
     }
 
