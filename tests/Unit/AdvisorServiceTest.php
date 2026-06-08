@@ -49,7 +49,7 @@ class AdvisorServiceTest extends TestCase
 
     public function testGetContextualAdvice_EarlyProgress()
     {
-        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class));
+        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class), $this->createMock(\sdo\Services\ConfigService::class));
         $level = 1;
         $xp = 0; // 0% progress
         $advice = $advisor->getContextualAdvice($level, $xp);
@@ -60,7 +60,7 @@ class AdvisorServiceTest extends TestCase
 
     public function testGetContextualAdvice_MidProgress()
     {
-        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class));
+        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class), $this->createMock(\sdo\Services\ConfigService::class));
         $level = 3;
         $xp = 700; // ~60% progress toward next level
         $advice = $advisor->getContextualAdvice($level, $xp);
@@ -69,7 +69,7 @@ class AdvisorServiceTest extends TestCase
 
     public function testGetContextualAdvice_HighProgress()
     {
-        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class));
+        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class), $this->createMock(\sdo\Services\ConfigService::class));
         $level = 4;
         $xp = 1500; // ~85% progress toward next level
         $advice = $advisor->getContextualAdvice($level, $xp);
@@ -78,7 +78,7 @@ class AdvisorServiceTest extends TestCase
 
     public function testGetContextualAdvice_Baseline2()
     {
-        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class));
+        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class), $this->createMock(\sdo\Services\ConfigService::class));
         $level = 2;
         $xp = 100; // 0% progress for level 2
         $advice = $advisor->getContextualAdvice($level, $xp);
@@ -87,7 +87,7 @@ class AdvisorServiceTest extends TestCase
 
     public function testGetContextualAdviceFromDominion_Early()
     {
-        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class));
+        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class), $this->createMock(\sdo\Services\ConfigService::class));
         $dominion = new Dominion(['xp' => 0]);
         $advice = $advisor->getContextualAdviceFromDominion($dominion);
         $this->assertEquals("You are just starting to grow. Focus on steady resource collection and expand housing to support population growth.", $advice);
@@ -95,7 +95,7 @@ class AdvisorServiceTest extends TestCase
 
     public function testGetContextualAdviceFromDominion_Mid()
     {
-        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class));
+        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class), $this->createMock(\sdo\Services\ConfigService::class));
         $dominion = new Dominion(['xp' => 150]); // level 2, progress ~16.7%
         $advice = $advisor->getContextualAdviceFromDominion($dominion);
         // With <20% progress, early message is returned
@@ -104,7 +104,9 @@ class AdvisorServiceTest extends TestCase
 
     public function testGetContextualAdviceFromDominion_Null()
     {
-        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class));
+        $configMock = $this->createMock(\sdo\Services\ConfigService::class);
+        $configMock->method('get')->willReturn('');
+        $advisor = new AdvisorService($this->createMock(\sdo\Services\GameService::class), $configMock);
         $advice = $advisor->getContextualAdviceFromDominion(null);
         $this->assertIsString($advice);
     }

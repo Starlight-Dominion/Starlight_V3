@@ -15,4 +15,6 @@ interface RecruitmentRepositoryInterface
     public function createSession(array $data): RecruitmentSession;
     public function updateSession(int $id, array $data): bool;
     public function incrementClicks(int $id): int;
+    public function getTotalCitizensRecruited(int $dominionId): int;
+    public function getTodayCitizensRecruited(int $dominionId): int;
 }

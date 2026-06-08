@@ -8,6 +8,8 @@ use sdo\Repositories\Interfaces\UserRepositoryInterface;
 use sdo\Repositories\Interfaces\DominionRepositoryInterface;
 use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
 use sdo\Repositories\Interfaces\LogRepositoryInterface;
+use sdo\Repositories\Interfaces\AdminLogRepositoryInterface;
+use sdo\Repositories\Interfaces\RecruitmentLogRepositoryInterface;
 use DateTime;
 use DateTimeZone;
 
@@ -17,7 +19,9 @@ class AdminSystemService
         private UserRepositoryInterface $userRepository,
         private DominionRepositoryInterface $dominionRepository,
         private ManpowerRepositoryInterface $manpowerRepository,
-        private LogRepositoryInterface $logRepository
+        private LogRepositoryInterface $logRepository,
+        private AdminLogRepositoryInterface $adminLogRepository,
+        private RecruitmentLogRepositoryInterface $recruitmentLogRepository
     ) {}
 
     public function getSystemStats(): array
@@ -40,12 +44,22 @@ class AdminSystemService
 
     public function logAdminAction(int $adminId, string $action, string $description, array $metadata = []): void
     {
-        $this->logRepository->log([
-            'dominion_id' => $adminId,
-            'action' => 'ADMIN_' . strtoupper($action),
+        $this->adminLogRepository->log([
+            'admin_id' => $adminId,
+            'action' => strtoupper($action),
             'description' => $description,
             'metadata' => $metadata
         ]);
+    }
+
+    public function getPaginatedAdminLogs(int $page = 1, int $perPage = 50, array $filters = []): array
+    {
+        return $this->adminLogRepository->getPaginatedLogs($page, $perPage, $filters);
+    }
+
+    public function getPaginatedRecruitmentLogs(int $page = 1, int $perPage = 50, array $filters = []): array
+    {
+        return $this->recruitmentLogRepository->getPaginatedLogs($page, $perPage, $filters);
     }
 
     public function getAuditLogs(int $limit = 100): array
@@ -56,5 +70,10 @@ class AdminSystemService
     public function getRecentBattleLogs(int $limit = 50): array
     {
         return $this->logRepository->getRecentBattleLogs($limit);
+    }
+
+    public function getPaginatedGameLogs(int $page = 1, int $perPage = 50, array $filters = []): array
+    {
+        return $this->logRepository->getPaginatedLogs($page, $perPage, $filters);
     }
 }

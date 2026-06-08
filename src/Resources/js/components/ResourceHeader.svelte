@@ -1,90 +1,114 @@
 <script>
-    import { game, resources } from '../stores/gameStore.svelte.js';
-    import { fade } from 'svelte/transition';
-    
-    let activeMenu = $state(null);
+  import { game } from '../stores/gameStore.svelte.js';
+  import { fade } from 'svelte/transition';
 
-    const toggleMenu = (menu, e) => {
-        e.stopPropagation();
-        activeMenu = activeMenu === menu ? null : menu;
-    };
+  const mainNavLinks = [
+    { title: 'HOME', url: '/dashboard' },
+    { title: 'BATTLE', url: '/combat/battlefield' },
+    { title: 'STRUCTURES', url: '/structures' },
+    { title: 'SECTOR GROUP', url: '/alliance' },
+    { title: 'COMMUNITY', url: '/contact' },
+    { title: 'SIGN OUT', url: '/logout' }
+  ];
 
-    const closeAll = () => activeMenu = null;
+  const subNavConfig = $derived({
+    'HOME': [
+      { title: 'Dashboard', url: '/dashboard', component: 'dashboard/index' },
+      { title: 'Bank', url: '/bank', component: 'bank/index' },
+      { title: 'Settings', url: '/settings', component: 'settings/index' }
+    ],
+    'BATTLE': [
+      { title: 'War Room', url: '/combat/battlefield', component: 'battlefield/index' },
+      { title: 'Training', url: '/combat/training', component: 'training/index' },
+      { title: 'Spy', url: '/spy', component: 'spy/index' },
+      { title: 'Armory', url: '/structures/armory', component: 'armory/index' },
+      { title: 'Recruitment', url: '/combat/recruit', component: 'combat/recruit' }
+    ],
+    'SECTOR GROUP': [
+      { 
+        title: game.user?.alliance ? `SECTOR GROUP: [${game.user.alliance.tag}]` : 'UNALIGNED', 
+        url: '/alliance', 
+        component: 'alliance/hub',
+        isLabel: true 
+      },
+      { title: 'Alliance Hub', url: '/alliance', component: 'alliance/hub' },
+      ...(game.user?.alliance ? [
+        { title: 'Alliance Treasury', url: '/alliance/treasury', component: 'alliance/bank' },
+        { title: 'Alliance Structures', url: '/alliance/structures', component: 'alliance/structures' },
+        { title: 'Alliance Forum', url: '/alliance/forum', component: 'alliance/forum' },
+        ...(game.user.alliance.can_manage ? [
+            { title: 'Alliance Command', url: '/alliance/command', component: 'alliance/management' }
+        ] : [])
+      ] : [])
+    ],
+    'STRUCTURES': [
+      { title: 'Overview', url: '/structures', component: 'structures/index' },
+      { title: 'Foundation', url: '/structures/foundation', component: 'foundation/index' },
+      { title: 'Mines', url: '/structures/mines', component: 'mines/index' },
+      { title: 'Upgrades', url: '/structures/upgrades', component: 'upgrades/index' }
+    ],
+    'COMMUNITY': [
+      { title: 'Signal Uplink', url: '/contact', component: 'pages/contact' },
+      { title: 'Protocols', url: '/rules', component: 'pages/rules' },
+      { title: 'Sector Laws', url: '/terms', component: 'pages/terms' }
+    ]
+  });
+
+  const activeMainCategory = $derived.by(() => {
+    const comp = game.component;
+    for (const [cat, subLinks] of Object.entries(subNavConfig)) {
+      if (subLinks.some(link => link.component === comp)) {
+        return cat;
+      }
+    }
+    return 'HOME';
+  });
 </script>
 
-<svelte:window onclick={closeAll} />
+<div in:fade class="w-full max-w-7xl mx-auto px-6 pt-8 pb-4">
+    <header class="text-center mb-8">
+        <h1 class="text-5xl font-title font-black text-cyan-400 tracking-[8px] uppercase" style="text-shadow: 0 0 15px rgba(6, 182, 212, 0.6);">
+            STARLIGHT DOMINION
+        </h1>
+        <p class="text-[9px] font-mono text-cyan-900 uppercase tracking-[4px] mt-2">Galactic Command Interface</p>
+    </header>
 
-<header class="sticky top-0 z-[100] bg-dark-translucent border-b border-cyan-500/20 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-    <div class="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center relative">
-        
-        <div class="flex items-center gap-12">
-            <a href="/dashboard" class="group flex flex-col">
-                <span class="text-cyan-400 font-title font-black text-xl tracking-[4px] uppercase text-shadow-glow group-hover:text-white transition-all">
-                    Starlight Dominion
-                </span>
-                <span class="text-[7px] font-mono text-cyan-900 uppercase tracking-[2px] -mt-1">Sector Command Interface</span>
-            </a>
-            
-            <nav class="hidden md:flex items-center gap-8">
-                <div class="relative">
-                    <button 
-                        onclick={(e) => toggleMenu('home', e)}
-                        class="text-[9px] font-title font-bold tracking-[2px] uppercase flex items-center gap-2 transition-colors {activeMenu === 'home' ? 'text-cyan-400' : 'text-gray-500 hover:text-gray-300'}"
-                    >
-                        Command <span class="text-[7px] opacity-40">▼</span>
-                    </button>
-                    {#if activeMenu === 'home'}
-                        <div in:fade={{ duration: 100 }} class="absolute top-full left-0 mt-4 w-48 bg-[#060a19] border border-cyan-500/30 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] py-2 backdrop-blur-xl z-[110]">
-                            <a href="/dashboard" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">Dashboard</a>
-                            <a href="/settings" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">System Settings</a>
-                        </div>
-                    {/if}
-                </div>
-
-                <div class="relative">
-                    <button 
-                        onclick={(e) => toggleMenu('structures', e)}
-                        class="text-[9px] font-title font-bold tracking-[2px] uppercase flex items-center gap-2 transition-colors {activeMenu === 'structures' ? 'text-cyan-400' : 'text-gray-500 hover:text-gray-300'}"
-                    >
-                        Infrastructure <span class="text-[7px] opacity-40">▼</span>
-                    </button>
-                    {#if activeMenu === 'structures'}
-                        <div in:fade={{ duration: 100 }} class="absolute top-full left-0 mt-4 w-56 bg-[#060a19] border border-cyan-500/30 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] py-2 backdrop-blur-xl z-[110]">
-                            <a href="/structures" class="block px-4 py-3 text-[9px] font-black uppercase tracking-widest text-cyan-400 border-b border-white/5 mb-1">Structural Overview</a>
-                            <a href="/structures/foundation" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">Foundation</a>
-                            <a href="/structures/armory" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">Sector Armory</a>
-                            <a href="/bank" class="block px-4 py-3 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all">The Iron Bank</a>
-                        </div>
-                    {/if}
-                </div>
-
-                <a href="/combat/training" class="text-[9px] font-title font-bold tracking-[2px] uppercase text-gray-500 hover:text-cyan-400 transition-colors">Training</a>
-                <a href="/combat/battlefield" class="text-[9px] font-title font-bold tracking-[2px] uppercase text-gray-500 hover:text-cyan-400 transition-colors">War Room</a>
-                <a href="/combat/recruit" class="text-[9px] font-title font-bold tracking-[2px] uppercase text-cyan-400 hover:text-white transition-colors flex items-center gap-2">
-                    <span class="w-1 h-1 bg-cyan-500 rounded-full animate-ping"></span>
-                    Recruitment
+    <div class="main-bg border border-cyan-500/10 rounded-xl shadow-2xl p-1 bg-[#0c1427]/60 backdrop-blur-md overflow-hidden">
+        <nav class="flex justify-center flex-wrap items-center gap-x-2 md:gap-x-6 bg-[#030712]/80 p-3 rounded-t-lg">
+            {#each mainNavLinks as link}
+                <a 
+                    href={link.url}
+                    class="font-title text-[11px] font-black tracking-[2px] uppercase transition-all px-4 py-2 {link.title === activeMainCategory ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-500 hover:text-white'}"
+                >
+                    {link.title}
                 </a>
-            </nav>
-        </div>
+            {/each}
+        </nav>
 
-        <div class="flex items-center gap-8">
-            <div class="hidden lg:flex gap-8 items-center border-l border-white/5 pl-8">
-                <div class="flex flex-col items-end">
-                    <span class="text-[7px] font-black text-cyan-900 uppercase tracking-widest">Operational Credits</span>
-                    <div class="flex items-center gap-2">
-                        <span class="text-white font-mono font-bold text-sm">{resources.credits.toLocaleString()}</span>
-                    </div>
-                </div>
+        {#if subNavConfig[activeMainCategory] && subNavConfig[activeMainCategory].length > 0}
+            <div in:fade={{ duration: 150 }} class="bg-[#0c1427]/40 text-center p-3 flex justify-center flex-wrap gap-x-6 gap-y-1 rounded-b-lg border-t border-white/5">
+                {#each subNavConfig[activeMainCategory] as link}
+                    {#if link.isLabel}
+                        <span class="text-[10px] font-black uppercase tracking-widest text-cyan-600/50 italic mr-2 border-r border-white/5 pr-6 py-1">
+                            {link.title}
+                        </span>
+                    {:else}
+                        <a 
+                            href={link.url}
+                            class="text-[10px] font-bold uppercase tracking-widest transition-all {game.component === link.component ? 'text-white shadow-[0_0_8px_white]' : 'text-gray-500 hover:text-cyan-400'}"
+                        >
+                            {link.title}
+                        </a>
+                    {/if}
+                {/each}
             </div>
-
-            <div class="flex items-center gap-4">
-                <div class="bg-black/40 px-4 py-2 rounded border border-cyan-500/20 flex flex-col items-center min-w-[90px]">
-                    <span class="text-[7px] font-black text-cyan-800 uppercase tracking-widest">Cycle Sync</span>
-                    <!-- FIX: Referencing game.formattedTick directly -->
-                    <span class="text-cyan-400 font-mono font-bold text-sm leading-none mt-1">{game.formattedTick}</span>
-                </div>
-                <a href="/logout" class="text-[8px] font-black text-red-900 uppercase hover:text-red-500 transition-all tracking-tighter">Terminate Link</a>
-            </div>
-        </div>
+        {/if}
     </div>
-</header>
+</div>
+
+<style>
+    .font-title { font-family: 'Orbitron', sans-serif; }
+    .main-bg {
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(6, 182, 212, 0.05);
+    }
+</style>

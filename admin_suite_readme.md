@@ -106,6 +106,16 @@ Manage the blueprints and evolution paths for all Dominion buildings.
 
 ---
 
+## 🤖 Automation Suite
+
+Neural processing unit for automated sectors. Manage bot behaviors and action frequencies.
+- **Automation Profiles:** Create and calibrate behavioral templates (e.g., "Warmonger", "Builder").
+- **Weighted Decision Matrix:** Use sliders to adjust the probability of specific actions (Attack, Build, Train, Explore) per profile.
+- **Action Frequency:** Define how often bots under a specific profile will execute an action.
+- **Assignment:** Link bots to specific automation profiles via the **Sovereign Inspector**.
+
+---
+
 ## 🧬 Evolutionary Strains (Barracks)
 
 Manage the genetic traits of the various races in the Dominion.

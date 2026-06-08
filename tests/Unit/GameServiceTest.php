@@ -25,6 +25,13 @@ class GameServiceTest extends TestCase
 
     private function createTables(): void
     {
+        Capsule::schema()->create('users', function ($table) {
+            $table->increments('id');
+            $table->string('username')->unique();
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->timestamps();
+        });
         Capsule::schema()->create('game_settings', function ($table) { $table->string('setting_key')->unique(); $table->text('setting_value')->nullable(); });
         Capsule::schema()->create('races', function ($table) { $table->increments('id'); $table->string('name'); $table->string('slug'); $table->text('description')->nullable(); });
         Capsule::schema()->create('dominions', function ($table) {
@@ -64,14 +71,15 @@ class GameServiceTest extends TestCase
 
     public function testIncomeBreakdownCalculation(): void
     {
-        $config = $this->createMock(ConfigService::class);
-        $config->method('get')->willReturn(100); // base stipend
+        $configMock = $this->createMock(ConfigService::class);
+        $configMock->method('get')->willReturn(100); 
         
         $service = new GameService(
-            new \sdo\Services\ConfigService(new \sdo\Repositories\Eloquent\EloquentConfigRepository()),
+            $configMock,
             new \sdo\Repositories\Eloquent\EloquentDominionRepository(),
             new \sdo\Repositories\Eloquent\EloquentManpowerRepository(),
-            new \sdo\Repositories\Eloquent\EloquentDominionStructureRepository()
+            new \sdo\Repositories\Eloquent\EloquentDominionStructureRepository(),
+            new \sdo\Repositories\Eloquent\EloquentRecruitmentRepository()
         );
         
         // 1. Setup Dominion
@@ -106,15 +114,15 @@ class GameServiceTest extends TestCase
             'buff_economy' => 20
         ]);
 
-        // Calculation: (Base 100 + (5 workers * 10 CP)) * 1.2 Multiplier = 150 * 1.2 = 180
+        // Calculation: (Base 5000 + (5 workers * 50 Legacy CP)) * 1.2 Multiplier = 5250 * 1.2 = 6300
         
         $breakdown = $service->getIncomeBreakdown((int)$domId);
         
-        $this->assertEquals(100, $breakdown['base']);
-        $this->assertEquals(50, $breakdown['unit_total']);
+        $this->assertEquals(5000, $breakdown['base']);
+        $this->assertEquals(250, $breakdown['unit_total']);
         $this->assertCount(1, $breakdown['units']);
         $this->assertEquals('Utility Workers', $breakdown['units'][0]['name']);
         $this->assertEquals(20, $breakdown['bonus_percent']);
-        $this->assertEquals(180, $breakdown['total']);
+        $this->assertEquals(6300, $breakdown['total']);
     }
 }

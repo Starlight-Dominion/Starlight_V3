@@ -49,8 +49,31 @@ return function (RouteCollector $r) {
 
     // Recruitment Routes
     $r->addRoute('GET', '/combat/recruit', [\sdo\Controllers\RecruitmentController::class, 'index']);
-    $r->addRoute('POST', '/combat/recruit/start', [\sdo\Controllers\RecruitmentController::class, 'start']);
     $r->addRoute('POST', '/combat/recruit/click', [\sdo\Controllers\RecruitmentController::class, 'click']);
+
+    // Alliance Routes
+    $r->addRoute('GET', '/alliance', [\sdo\Controllers\AllianceController::class, 'hubPage']);
+    $r->addRoute('GET', '/alliance/treasury', [\sdo\Controllers\AllianceController::class, 'treasuryPage']);
+    $r->addRoute('GET', '/alliance/structures', [\sdo\Controllers\AllianceController::class, 'structuresPage']);
+    $r->addRoute('GET', '/alliance/forum', [\sdo\Controllers\AllianceController::class, 'forumPage']);
+    $r->addRoute('GET', '/alliance/forum/thread/{id:\d+}', [\sdo\Controllers\AllianceController::class, 'threadPage']);
+    $r->addRoute('GET', '/alliance/command', [\sdo\Controllers\AllianceController::class, 'managementPage']);
+    $r->addRoute('GET', '/api/alliance/hub', [\sdo\Controllers\AllianceController::class, 'hub']);
+    $r->addRoute('GET', '/api/alliance/list', [\sdo\Controllers\AllianceController::class, 'list']);
+    $r->addRoute('POST', '/api/alliance/create', [\sdo\Controllers\AllianceController::class, 'create']);
+    $r->addRoute('POST', '/api/alliance/leave', [\sdo\Controllers\AllianceController::class, 'leave']);
+    $r->addRoute('POST', '/api/alliance/apply', [\sdo\Controllers\AllianceController::class, 'apply']);
+    $r->addRoute('POST', '/api/alliance/process-application', [\sdo\Controllers\AllianceController::class, 'processApplication']);
+    $r->addRoute('POST', '/api/alliance/kick', [\sdo\Controllers\AllianceController::class, 'kick']);
+    $r->addRoute('GET', '/api/alliance/bank', [\sdo\Controllers\AllianceController::class, 'bank']);
+    $r->addRoute('POST', '/api/alliance/bank/donate', [\sdo\Controllers\AllianceController::class, 'donate']);
+    $r->addRoute('POST', '/api/alliance/bank/withdraw', [\sdo\Controllers\AllianceController::class, 'withdraw']);
+    $r->addRoute('GET', '/api/alliance/structures', [\sdo\Controllers\AllianceController::class, 'structures']);
+    $r->addRoute('POST', '/api/alliance/structures/purchase', [\sdo\Controllers\AllianceController::class, 'purchaseStructure']);
+    $r->addRoute('GET', '/api/alliance/forum', [\sdo\Controllers\AllianceController::class, 'forum']);
+    $r->addRoute('POST', '/api/alliance/forum/thread/create', [\sdo\Controllers\AllianceController::class, 'createThread']);
+    $r->addRoute('GET', '/api/alliance/forum/thread/{id:\d+}', [\sdo\Controllers\AllianceController::class, 'thread']);
+    $r->addRoute('POST', '/api/alliance/forum/thread/{id:\d+}/reply', [\sdo\Controllers\AllianceController::class, 'reply']);
 
     // Admin Command Center
     $r->addRoute('GET', '/admin', [\sdo\Controllers\AdminController::class, 'index']);
@@ -78,9 +101,18 @@ return function (RouteCollector $r) {
     $r->addRoute('GET', '/admin/races', [\sdo\Controllers\AdminController::class, 'getRaces']);
     $r->addRoute('POST', '/admin/update-race', [\sdo\Controllers\AdminController::class, 'updateRace']);
     $r->addRoute('GET', '/admin/battle-logs', [\sdo\Controllers\AdminController::class, 'getBattleLogs']);
-    $r->addRoute('GET', '/admin/audit-logs', [\sdo\Controllers\AdminController::class, 'getAuditLogs']);
+    $r->addRoute('GET', '/admin/logs/administrative', [\sdo\Controllers\AdminController::class, 'getAdminLogs']);
+    $r->addRoute('GET', '/admin/logs/recruitment', [\sdo\Controllers\AdminController::class, 'getRecruitmentLogs']);
     $r->addRoute('POST', '/admin/impersonate', [\sdo\Controllers\AdminController::class, 'impersonate']);
     $r->addRoute('GET', '/admin/stop-impersonating', [\sdo\Controllers\AdminController::class, 'stopImpersonating']);
+    
+    // Bot Automation
+    $r->addRoute('GET', '/admin/automation/profiles', [\sdo\Controllers\AdminController::class, 'getBotProfiles']);
+    $r->addRoute('POST', '/admin/automation/profiles/create', [\sdo\Controllers\AdminController::class, 'createBotProfile']);
+    $r->addRoute('POST', '/admin/automation/profiles/update', [\sdo\Controllers\AdminController::class, 'updateBotProfile']);
+    $r->addRoute('POST', '/admin/automation/profiles/delete', [\sdo\Controllers\AdminController::class, 'deleteBotProfile']);
+    $r->addRoute('POST', '/admin/automation/assign-profile', [\sdo\Controllers\AdminController::class, 'assignBotProfile']);
+    $r->addRoute('POST', '/admin/automation/generate-bot', [\sdo\Controllers\AdminController::class, 'generateBot']);
     
     // API Management
     $r->addRoute('GET', '/admin/api/keys', [\sdo\Controllers\AdminController::class, 'getApiKeys']);
@@ -94,6 +126,13 @@ return function (RouteCollector $r) {
     $r->addRoute('GET', '/admin/settings', [\sdo\Controllers\AdminController::class, 'getSettings']);
     $r->addRoute('POST', '/admin/update-setting', [\sdo\Controllers\AdminController::class, 'updateSetting']);
 
+    // Mines Routes (Miner Assignment/Untraining & Upgrades)
+    $r->addRoute('GET', '/structures/mines', [\sdo\Controllers\MinesController::class, 'index']);
+    $r->addRoute('POST', '/structures/mines/assign', [\sdo\Controllers\MinesController::class, 'assign']);
+    $r->addRoute('POST', '/structures/mines/unassign', [\sdo\Controllers\MinesController::class, 'unassign']);
+    $r->addRoute('POST', '/structures/mines/upgrade-current', [\sdo\Controllers\MinesController::class, 'upgradeCurrentMine']);
+    $r->addRoute('POST', '/structures/mines/upgrade-tier', [\sdo\Controllers\MinesController::class, 'upgradeMineTier']);
+
     // Open API v1
     $r->addRoute('GET', '/api/v1/ping', [\sdo\Controllers\ApiController::class, 'ping']);
     $r->addRoute('GET', '/api/v1/sector/status', [\sdo\Controllers\ApiController::class, 'sectorStatus']);
@@ -104,15 +143,6 @@ return function (RouteCollector $r) {
         'required_scope' => 'discord.link-status.read',
     ]]);
 
-    // Mines Routes (Miner Assignment/Untraining & Upgrades)
-    $r->addRoute('GET', '/structures/mines', [\sdo\Controllers\MinesController::class, 'index']);
-    $r->addRoute('POST', '/structures/mines/assign', [\sdo\Controllers\MinesController::class, 'assign']);
-    $r->addRoute('POST', '/structures/mines/unassign', [\sdo\Controllers\MinesController::class, 'unassign']);
-    $r->addRoute('POST', '/structures/mines/upgrade-current', [\sdo\Controllers\MinesController::class, 'upgradeCurrentMine']);
-    $r->addRoute('POST', '/structures/mines/upgrade-tier', [\sdo\Controllers\MinesController::class, 'upgradeMineTier']);
-
-    //Armory Actions
-    $r->addRoute('POST', '/structures/armory/buy', [\sdo\Controllers\ArmoryController::class, 'buy']);
     $r->addRoute('POST', '/structures/armory/sell', [\sdo\Controllers\ArmoryController::class, 'sell']);
     $r->addRoute('POST', '/structures/armory/upgrade', [\sdo\Controllers\ArmoryController::class, 'upgrade']);
     $r->addRoute('POST', '/structures/armory/equip', [\sdo\Controllers\ArmoryController::class, 'toggleEquip']);

@@ -20,7 +20,9 @@ class GameService
     ];
 
     public const TIMEZONE = 'America/New_York';
-    public const BASE_INCOME = 100;
+    public const BASE_INCOME = 5000;
+    public const CREDITS_PER_WORKER = 50;
+    public const BASE_CITIZENS = 1;
 
     public const BASE_TURNS_PER_TICK = 4;
 
@@ -28,8 +30,28 @@ class GameService
         private ConfigService $configService,
         private DominionRepositoryInterface $dominionRepository,
         private ManpowerRepositoryInterface $manpowerRepository,
-        private DominionStructureRepositoryInterface $dominionStructureRepository
+        private DominionStructureRepositoryInterface $dominionStructureRepository,
+        private \sdo\Repositories\Interfaces\RecruitmentRepositoryInterface $recruitmentRepository
     ) {}
+
+    /**
+     * Checks if the dominion has any available recruitment capacity (active session or remaining daily sessions).
+     */
+    public function hasAvailableRecruitment(int $dominionId): bool
+    {
+        $active = $this->recruitmentRepository->findActiveSession($dominionId);
+        if ($active) {
+            return true;
+        }
+
+        $dailyLimit = (int)$this->configService->get('recruitment_sessions_per_day', 2);
+        $dailyCount = $this->recruitmentRepository->countRecentSessions($dominionId, 24);
+
+        $threeDayLimit = (int)$this->configService->get('recruitment_sessions_per_3days', 5);
+        $threeDayCount = $this->recruitmentRepository->countRecentSessions($dominionId, 72);
+
+        return $dailyCount < $dailyLimit && $threeDayCount < $threeDayLimit;
+    }
 
     public function getRealmTime(): DateTime
     {
@@ -85,10 +107,16 @@ class GameService
 
     /**
      * Provides a detailed breakdown of the total credit income.
+     * Legacy Formula: (BASE_INCOME + (workers * 50)) * economyMult * wealthMult
      */
     public function getIncomeBreakdown(int $dominionId): array
     {
-        $baseCredits = (int)$this->configService->get('baseline_credits_per_tick', 100);
+        $dominion = $this->dominionRepository->findById($dominionId);
+        if (!$dominion) {
+            return ['base' => 0, 'units' => [], 'unit_total' => 0, 'bonus_percent' => 0, 'total' => 0];
+        }
+
+        $baseCredits = self::BASE_INCOME;
         
         $unitProductionList = [];
         $totalUnitProduction = 0;
@@ -96,38 +124,47 @@ class GameService
         $manpower = $this->manpowerRepository->getManpowerByDominion($dominionId);
                 
         foreach ($manpower as $m) {
-            if ($m->total_quantity > 0 && ($m->unit->production_credits ?? 0) > 0) {
-                $prod = $m->total_quantity * $m->unit->production_credits;
-                $totalUnitProduction += $prod;
-                $unitProductionList[] = [
-                    'name' => $m->unit->name,
-                    'quantity' => $m->total_quantity,
-                    'production' => $prod
-                ];
+            if ($m->total_quantity > 0) {
+                // If the unit has a production value, use it. Otherwise, workers use the legacy constant.
+                $prodValue = ($m->unit->slug === 'workers') ? self::CREDITS_PER_WORKER : ($m->unit->production_credits ?? 0);
+                
+                if ($prodValue > 0) {
+                    $prod = $m->total_quantity * $prodValue;
+                    $totalUnitProduction += $prod;
+                    $unitProductionList[] = [
+                        'name' => $m->unit->name,
+                        'quantity' => $m->total_quantity,
+                        'production' => $prod
+                    ];
+                }
             }
         }
 
-        $totalBuff = (float)$this->sumStructureLevelBuff($dominionId, 'buff_economy');
-        $multiplier = 1 + ($totalBuff / 100);
+        $economyBuff = (float)$this->sumStructureLevelBuff($dominionId, 'buff_economy');
+        $economyMult = 1 + ($economyBuff / 100);
+
+        // Map Charisma to Legacy Wealth multiplier
+        $wealthMult = 1 + ($dominion->charisma_points * 0.01);
         
-        $totalIncome = (int)floor(($baseCredits + $totalUnitProduction) * $multiplier);
+        $totalIncome = (int)floor(($baseCredits + $totalUnitProduction) * $economyMult * $wealthMult);
 
         return [
             'base' => $baseCredits,
             'units' => $unitProductionList,
             'unit_total' => $totalUnitProduction,
-            'bonus_percent' => (int)$totalBuff,
+            'bonus_percent' => (int)$economyBuff,
+            'wealth_multiplier' => $wealthMult,
             'total' => $totalIncome
         ];
     }
 
     /**
      * Calculates the total citizen growth per tick including buffs.
+     * Legacy Formula: BASE_CITIZENS + populationLevelBonuses
      */
     public function getTotalCitizenGrowth(int $dominionId): int
     {
-        $baseCitizens = (int)$this->configService->get('baseline_citizens_per_tick', 50);
-
+        $baseCitizens = self::BASE_CITIZENS;
         $totalBuff = (int)$this->sumStructureLevelBuff($dominionId, 'buff_citizens_per_tick');
 
         return $baseCitizens + $totalBuff;

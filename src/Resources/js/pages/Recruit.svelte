@@ -8,10 +8,16 @@
     let dailyRemaining = $state(status.daily_remaining);
     let threeDayRemaining = $state(status.three_day_remaining);
     let maxClicks = $state(status.max_clicks);
+    let cooldownMs = $state(status.cooldown_ms || 500);
+    let totalRecruited = $state(status.total_recruited || 0);
+    let todayRecruited = $state(status.today_recruited || 0);
     
     let loading = $state(false);
     let message = $state(null);
     let clicking = $state(false);
+    let onCooldown = $state(false);
+    let sessionFinished = $state(false);
+    let slowDownWarning = $state(false);
 
     const progress = $derived(session ? (session.clicks_count / maxClicks) * 100 : 0);
 
@@ -19,6 +25,7 @@
         if (loading) return;
         loading = true;
         message = null;
+        sessionFinished = false;
 
         const fd = new FormData();
         fd.append('_csrf', game.csrf);
@@ -32,8 +39,6 @@
             const data = await res.json();
             if (data.success) {
                 session = data.session;
-                // Refresh status values would be better from data, 
-                // but let's assume reload or local state update
             } else {
                 message = { success: false, message: data.message };
             }
@@ -45,8 +50,16 @@
     }
 
     async function handleStep() {
-        if (!session || clicking || session.clicks_count >= maxClicks) return;
+        if (!session || sessionFinished || session.clicks_count >= maxClicks) return;
+        
+        if (onCooldown || clicking) {
+            slowDownWarning = true;
+            setTimeout(() => slowDownWarning = false, 1000);
+            return;
+        }
+
         clicking = true;
+        onCooldown = true;
 
         const fd = new FormData();
         fd.append('session_id', session.id);
@@ -59,13 +72,18 @@
                 headers: { 'Accept': 'application/json' }
             });
             const data = await res.json();
+            
             if (data.success) {
                 session.clicks_count = data.count;
-                // Reactive update for sidebar
                 resources.citizens += 1;
+                totalRecruited += 1;
+                todayRecruited += 1;
+
+                if (data.count >= maxClicks) {
+                   sessionFinished = true;
+                }
             } else if (data.message === "Mobilization complete.") {
-                session = null;
-                window.location.reload(); // Hard refresh to reset limits
+                sessionFinished = true;
             } else {
                 message = { success: false, message: data.message };
             }
@@ -73,25 +91,36 @@
             message = { success: false, message: "Link unstable. Data loss imminent." };
         } finally {
             clicking = false;
+            setTimeout(() => {
+                onCooldown = false;
+            }, cooldownMs);
         }
     }
 </script>
 
 <div in:fade class="space-y-8 pb-24">
-    <header class="border-b border-cyan-500/20 pb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+    <header class="border-b border-cyan-500/20 pb-6 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
         <div>
             <h1 class="text-4xl font-title font-black text-white uppercase tracking-tighter text-shadow-glow">Neural Recruitment</h1>
             <p class="text-cyan-500/60 text-[9px] font-bold uppercase tracking-[4px] mt-2 italic">Direct civilian processing for sector expansion.</p>
         </div>
 
-        <div class="flex gap-4">
-            <div class="bg-dark-translucent border border-cyan-500/20 p-4 rounded-xl text-center min-w-[120px]">
+        <div class="flex flex-wrap gap-4">
+            <div class="bg-dark-translucent border border-cyan-500/20 p-4 rounded-xl text-center min-w-[100px] flex-grow">
                 <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">Daily Access</span>
                 <span class="text-xl font-black {dailyRemaining > 0 ? 'text-cyan-400' : 'text-red-600'}">{dailyRemaining}</span>
             </div>
-            <div class="bg-dark-translucent border border-cyan-500/20 p-4 rounded-xl text-center min-w-[120px]">
+            <div class="bg-dark-translucent border border-cyan-500/20 p-4 rounded-xl text-center min-w-[100px] flex-grow">
                 <span class="block text-[8px] font-black text-gray-600 uppercase tracking-widest">72H Allocation</span>
                 <span class="text-xl font-black {threeDayRemaining > 0 ? 'text-cyan-400' : 'text-red-600'}">{threeDayRemaining}</span>
+            </div>
+            <div class="bg-dark-translucent border border-cyan-500/20 p-4 rounded-xl text-center min-w-[100px] flex-grow">
+                <span class="block text-[8px] font-black text-cyan-900 uppercase tracking-widest">Today Recruited</span>
+                <span class="text-xl font-black text-white">{todayRecruited.toLocaleString()}</span>
+            </div>
+            <div class="bg-dark-translucent border border-cyan-500/20 p-4 rounded-xl text-center min-w-[100px] flex-grow">
+                <span class="block text-[8px] font-black text-cyan-900 uppercase tracking-widest">Total Recruited</span>
+                <span class="text-xl font-black text-white">{totalRecruited.toLocaleString()}</span>
             </div>
         </div>
     </header>
@@ -127,10 +156,21 @@
             </div>
         {:else}
             <div in:fade class="bg-dark-translucent border border-cyan-500/20 rounded-3xl p-12 space-y-12 shadow-2xl relative">
+                
+                {#if slowDownWarning}
+                    <div in:slide out:fade class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+                        <div class="bg-red-600 text-white px-8 py-3 rounded-full font-title font-black text-xs uppercase tracking-[4px] shadow-[0_0_30px_rgba(220,38,38,0.5)] animate-bounce">
+                            ⚠️ SLOW DOWN: Link Overheating
+                        </div>
+                    </div>
+                {/if}
+
                 <div class="flex justify-between items-end">
                     <div class="space-y-1">
                         <span class="text-[10px] font-black text-cyan-800 uppercase tracking-[3px]">Link Status</span>
-                        <h2 class="text-2xl font-title font-black text-cyan-400 uppercase">Processing Civilians</h2>
+                        <h2 class="text-2xl font-title font-black {sessionFinished ? 'text-gray-600' : 'text-cyan-400'} uppercase">
+                            {sessionFinished ? 'Neural Link Terminated' : 'Processing Civilians'}
+                        </h2>
                     </div>
                     <div class="text-right">
                         <span class="text-[10px] font-black text-gray-600 uppercase tracking-widest">Session Progress</span>
@@ -143,7 +183,7 @@
                 <!-- PROGRESS BAR -->
                 <div class="h-4 bg-black/60 border border-white/5 rounded-full overflow-hidden p-0.5">
                     <div 
-                        class="h-full bg-gradient-to-r from-cyan-900 via-cyan-500 to-cyan-400 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.5)] transition-all duration-300"
+                        class="h-full {sessionFinished ? 'bg-gray-600' : 'bg-gradient-to-r from-cyan-900 via-cyan-500 to-cyan-400'} rounded-full shadow-[0_0_15px_rgba(6,182,212,0.5)] transition-all duration-300"
                         style="width: {progress}%"
                     ></div>
                 </div>
@@ -152,28 +192,46 @@
                     <button 
                         onclick={handleStep}
                         onmousedown={(e) => e.preventDefault()}
-                        class="w-64 h-64 rounded-full border-4 border-cyan-500/20 bg-black/40 flex items-center justify-center relative group transition-all active:scale-95 active:border-cyan-400"
-                        disabled={clicking}
+                        class="w-64 h-64 rounded-full border-4 {sessionFinished ? 'border-gray-800 grayscale cursor-not-allowed' : (onCooldown ? 'border-red-900/40' : 'border-cyan-500/20 active:scale-95 active:border-cyan-400')} bg-black/40 flex items-center justify-center relative group transition-all"
+                        disabled={sessionFinished}
                     >
-                        <div class="absolute inset-0 rounded-full border border-cyan-500/5 group-hover:scale-110 transition-transform duration-500"></div>
-                        <div class="absolute inset-4 rounded-full border-2 border-dashed border-cyan-500/10 animate-[spin_10s_linear_infinite]"></div>
+                        <div class="absolute inset-0 rounded-full border border-cyan-500/5 {sessionFinished ? '' : 'group-hover:scale-110'} transition-transform duration-500"></div>
+                        <div class="absolute inset-4 rounded-full border-2 border-dashed {sessionFinished ? 'border-gray-800' : 'border-cyan-500/10 animate-[spin_10s_linear_infinite]'}"></div>
                         
                         <div class="text-center relative z-10">
-                            <div class="w-12 h-12 mx-auto mb-4 text-cyan-500 group-hover:text-cyan-400 transition-colors">
-                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
-                            </div>
-                            <span class="block text-[10px] font-black text-cyan-500 uppercase tracking-[4px]">Process</span>
-                            <span class="block text-[8px] font-bold text-gray-600 uppercase tracking-widest">Neural Link</span>
+                            {#if sessionFinished}
+                                <div class="w-12 h-12 mx-auto mb-4 text-gray-700">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z"/></svg>
+                                </div>
+                                <span class="block text-[10px] font-black text-gray-600 uppercase tracking-[4px]">Session Finished</span>
+                                <span class="block text-[8px] font-bold text-gray-800 uppercase tracking-widest mt-1">Uplink Closed</span>
+                            {:else}
+                                <div class="w-12 h-12 mx-auto mb-4 {onCooldown ? 'text-red-900' : 'text-cyan-500 group-hover:text-cyan-400'} transition-colors">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+                                </div>
+                                <span class="block text-[10px] font-black {onCooldown ? 'text-red-900' : 'text-cyan-500'} uppercase tracking-[4px]">Process</span>
+                                <span class="block text-[8px] font-bold text-gray-600 uppercase tracking-widest">Neural Link</span>
+                            {/if}
                         </div>
 
-                        {#if clicking}
+                        {#if clicking && !sessionFinished}
                              <div class="absolute inset-0 rounded-full bg-cyan-500/10 animate-ping"></div>
                         {/if}
                     </button>
                 </div>
 
                 <div class="text-center">
-                    <p class="text-[9px] text-gray-600 uppercase tracking-widest font-black">Link Stability: {100 - (clicking ? 15 : 0)}% &bull; Latency: 42ms</p>
+                    {#if sessionFinished}
+                        <p class="text-[10px] text-cyan-400 uppercase tracking-[4px] font-black animate-pulse">Processing Complete. Sector resources expanded.</p>
+                        <button 
+                            onclick={() => window.location.reload()} 
+                            class="mt-4 text-[8px] font-black text-gray-600 hover:text-cyan-400 uppercase tracking-widest transition-all"
+                        >
+                            Establish New Session
+                        </button>
+                    {:else}
+                        <p class="text-[9px] text-gray-600 uppercase tracking-widest font-black">Link Stability: {100 - (clicking ? 15 : 0)}% &bull; Latency: 42ms</p>
+                    {/if}
                 </div>
             </div>
         {/if}

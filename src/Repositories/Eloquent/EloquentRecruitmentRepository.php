@@ -52,4 +52,16 @@ class EloquentRecruitmentRepository implements RecruitmentRepositoryInterface
         $session->increment('clicks_count');
         return (int)$session->clicks_count;
     }
+
+    public function getTotalCitizensRecruited(int $dominionId): int
+    {
+        return (int)RecruitmentSession::where('dominion_id', $dominionId)->sum('clicks_count');
+    }
+
+    public function getTodayCitizensRecruited(int $dominionId): int
+    {
+        return (int)RecruitmentSession::where('dominion_id', $dominionId)
+            ->where('created_at', '>=', date('Y-m-d 00:00:00'))
+            ->sum('clicks_count');
+    }
 }

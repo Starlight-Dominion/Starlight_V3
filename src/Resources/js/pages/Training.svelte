@@ -1,205 +1,222 @@
 <script>
     import { game, resources } from '../stores/gameStore.svelte.js';
     import { fade, slide } from 'svelte/transition';
+    import AiAdvisor from '../components/AiAdvisor.svelte';
     
     let { units = {} } = $props();
     let quantities = $state({});
     let loading = $state(false);
     let message = $state(null);
 
-    const kingdom = $derived(game.user?.kingdom || {});
-    
-    function calculateMax(unit) {
+    // Derived Calculations
+    const totalTrainCost = $derived(
+        Object.entries(quantities).reduce((sum, [slug, qty]) => {
+            const unit = units[slug];
+            return sum + (Number(qty || 0) * (unit?.cost_credits || 0));
+        }, 0)
+    );
+
+    const totalCitizensNeeded = $derived(
+        Object.values(quantities).reduce((sum, qty) => sum + Number(qty || 0), 0)
+    );
+
+    const totalPersonnel = $derived(
+        Object.values(units).reduce((sum, unit) => sum + (unit.owned || 0), 0)
+    );
+
+    const canAfford = $derived(
+        totalCitizensNeeded <= resources.citizens && totalTrainCost <= resources.credits
+    );
+
+    function formatNumber(num) {
+        return new Intl.NumberFormat().format(num);
+    }
+
+    function calculateMax(slug) {
+        const unit = units[slug];
+        if (!unit) return 0;
         const byCredits = unit.cost_credits > 0 ? Math.floor(resources.credits / unit.cost_credits) : Infinity;
-        const byCitizens = unit.cost_citizens > 0 ? Math.floor(resources.citizens / unit.cost_citizens) : Infinity;
+        const byCitizens = resources.citizens;
         
         const max = Math.min(byCredits, byCitizens);
         return isFinite(max) ? max : 0;
     }
 
-    async function handleTrain(slug) {
-        const qty = quantities[slug] || 0;
-        if (qty <= 0 || loading) return;
+    function setMax(slug) {
+        quantities[slug] = calculateMax(slug);
+    }
+
+    async function handleTrain() {
+        if (loading || !canAfford || totalCitizensNeeded <= 0) return;
 
         loading = true;
         message = null;
-        const formData = new FormData();
-        formData.append('unit_type', slug); 
-        formData.append('quantity', qty);
-        formData.append('_csrf', game.csrf);
+
+        // Collect non-zero quantities
+        const trainingSet = Object.entries(quantities)
+            .filter(([_, qty]) => Number(qty) > 0);
+
+        if (trainingSet.length === 0) {
+            loading = false;
+            return;
+        }
 
         try {
-            const res = await fetch('/combat/train', {
-                method: 'POST',
-                body: formData,
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            });
-            const data = await res.json();
-            message = data;
-            if (data.success) {
-                window.location.reload();
-            } else {
-                loading = false;
+            // For now, the backend handles one unit type per request or needs an update.
+            // Let's assume we need to process them or the backend can handle a batch.
+            // If the backend handles only one, we might need a loop, but let's try the first one 
+            // or assume a batch if the controller supports it.
+            // Looking at TrainingController.php, it takes 'unit_type' and 'quantity'.
+            // So we need to loop if there are multiple.
+            
+            for (const [slug, qty] of trainingSet) {
+                const formData = new FormData();
+                formData.append('unit_type', slug); 
+                formData.append('quantity', qty);
+                formData.append('_csrf', game.csrf);
+
+                const res = await fetch('/combat/train', {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    message = data;
+                    loading = false;
+                    return;
+                }
             }
+
+            // If we reach here, all were successful
+            window.location.reload();
         } catch (e) {
-            message = { success: false, message: "Mobilization link unstable." };
+            message = { success: false, message: "Neural link unstable. Mobilization aborted." };
             loading = false;
         }
     }
 </script>
 
-<div in:fade class="space-y-8 pb-24">
-    <!-- Main Header -->
-    <header class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 border-b border-cyan-500/20 pb-8">
-        <div>
-            <h1 class="text-4xl font-title font-black text-white uppercase tracking-tighter text-shadow-glow">Military Mobilization</h1>
-            <p class="text-cyan-500/60 text-xs font-bold uppercase tracking-[4px] mt-2 italic">Sector Defense Command Interface</p>
-        </div>
+<div in:fade class="grid grid-cols-1 lg:grid-cols-4 gap-4 pb-24">
+    
+    <!-- SIDEBAR ADVISOR -->
+    <aside class="lg:col-span-1 space-y-4">
+        <AiAdvisor 
+            stats={[
+                { label: 'Personnel Strength', value: totalPersonnel }
+            ]}
+        />
+    </aside>
+
+    <!-- MAIN TRAINING CONTENT -->
+    <main class="lg:col-span-3 space-y-4">
         
-        <!-- Commander's Protocol (User Journey) -->
-        <div class="flex gap-4">
-            <div class="px-4 py-3 bg-cyan-950/20 border border-cyan-500/20 rounded-lg flex flex-col items-center">
-                <span class="text-[10px] text-cyan-500 font-black uppercase">Phase 01</span>
-                <span class="text-xs text-white font-bold uppercase">Enlist</span>
+        <!-- Header Panel -->
+        <header class="bg-gray-900/60 border border-white/5 rounded-lg p-6 backdrop-blur-md relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                <span class="text-6xl font-title font-black text-white italic">BARRACKS_V4</span>
             </div>
-            <div class="px-4 py-3 bg-black/40 border border-white/5 rounded-lg flex flex-col items-center opacity-40">
-                <span class="text-[10px] text-gray-600 font-black uppercase">Phase 02</span>
-                <span class="text-xs text-gray-500 font-bold uppercase">Equip</span>
+            <div class="relative z-10">
+                <h1 class="text-3xl font-title font-black text-white uppercase tracking-tighter text-shadow-glow">Military Terminal</h1>
+                <p class="text-cyan-500/60 text-[10px] font-bold uppercase tracking-[4px] mt-1 italic">Authorized personnel mobilization interface.</p>
             </div>
-            <div class="px-4 py-3 bg-black/40 border border-white/5 rounded-lg flex flex-col items-center opacity-40">
-                <span class="text-[10px] text-gray-600 font-black uppercase">Phase 03</span>
-                <span class="text-xs text-gray-500 font-bold uppercase">Deploy</span>
-            </div>
-        </div>
-    </header>
+        </header>
 
-    <!-- Contextual Logistics Dashboard -->
-    <section class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-cyan-950/10 border border-cyan-500/10 rounded-2xl p-6 shadow-inner">
-        <div class="flex items-center gap-6">
-            <div class="p-4 bg-black/40 border border-cyan-500/20 rounded-xl">
-                <svg viewBox="0 0 24 24" class="w-8 h-8 text-cyan-500" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        {#if message}
+            <div in:slide class="p-3 rounded border text-[10px] font-black uppercase text-center {message.success ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-400' : 'bg-red-950/40 border-red-500/50 text-red-500'}">
+                {message.message}
             </div>
-            <div>
-                <h4 class="text-xs font-black text-cyan-700 uppercase tracking-widest leading-none mb-1">Available Personnel</h4>
-                <div class="flex items-baseline gap-2">
-                    <span class="text-3xl font-mono font-black text-white">{resources.citizens.toLocaleString()}</span>
-                    <span class="text-xs text-gray-500 uppercase font-bold tracking-widest">Civilians</span>
+        {/if}
+
+        <!-- Top Summary Dashboard -->
+        <div class="bg-gray-900/40 border border-white/5 rounded-lg p-4 backdrop-blur-sm shadow-2xl">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div class="space-y-1">
+                    <p class="text-[8px] uppercase font-black text-gray-600 tracking-widest">Available Citizens</p>
+                    <p class="text-lg font-mono font-bold text-white">{formatNumber(resources.citizens)}</p>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-[8px] uppercase font-black text-gray-600 tracking-widest">Operation Credits</p>
+                    <p class="text-lg font-mono font-bold text-white">{formatNumber(resources.credits)}</p>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-[8px] uppercase font-black text-gray-600 tracking-widest">Projected Cost</p>
+                    <p class="text-lg font-mono font-bold text-cyan-400">{formatNumber(totalTrainCost)} <span class="text-[10px] opacity-40">CP</span></p>
+                </div>
+                <div class="space-y-1">
+                    <p class="text-[8px] uppercase font-black text-gray-600 tracking-widest">Mobilization Status</p>
+                    {#if totalCitizensNeeded > resources.citizens}
+                        <p class="text-lg font-title font-black text-red-600 uppercase tracking-tighter">OVER_POP</p>
+                    {:else if totalTrainCost > resources.credits}
+                        <p class="text-lg font-title font-black text-red-600 uppercase tracking-tighter">NO_FUNDS</p>
+                    {:else}
+                        <p class="text-lg font-title font-black text-emerald-500 uppercase tracking-tighter">READY</p>
+                    {/if}
                 </div>
             </div>
         </div>
 
-        <div class="flex items-center gap-6 border-t md:border-t-0 md:border-l border-white/5 pt-4 md:pt-0 md:pl-6">
-            <div class="p-4 bg-black/40 border border-cyan-500/20 rounded-xl">
-                <svg viewBox="0 0 24 24" class="w-8 h-8 text-cyan-500" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
-            </div>
-            <div>
-                <h4 class="text-xs font-black text-cyan-700 uppercase tracking-widest leading-none mb-1">War Chest</h4>
-                <div class="flex items-baseline gap-2">
-                    <span class="text-3xl font-mono font-black text-white">{resources.credits.toLocaleString()}</span>
-                    <span class="text-xs text-gray-500 uppercase font-bold tracking-widest">Credits</span>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    {#if message}
-        <div in:slide class="p-4 rounded-xl text-xs font-black uppercase text-center border {message.success ? 'bg-cyan-900/20 border-cyan-500 text-cyan-400' : 'bg-red-950/30 border-red-500 text-red-500'} shadow-lg shadow-cyan-500/5">
-            {message.message}
-        </div>
-    {/if}
-
-    <!-- Command Roster (Ledger Layout) -->
-    <div class="flex flex-col gap-4">
-        {#each Object.entries(units) as [slug, unit]}
-            <div class="bg-dark-translucent border border-white/5 rounded-2xl p-6 hover:border-cyan-500/30 transition-all flex flex-col xl:flex-row gap-8 items-center relative overflow-hidden group">
-                <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none font-title font-black text-white text-5xl italic uppercase select-none">
-                    {slug}
-                </div>
-
-                <!-- Identity Zone (Left) -->
-                <div class="w-full xl:w-1/3 space-y-2 relative z-10">
-                    <div class="flex items-center gap-3">
-                        <span class="w-1.5 h-1.5 bg-cyan-500 rounded-full"></span>
-                        <h3 class="text-white text-2xl font-title font-black uppercase tracking-widest">{unit.name}</h3>
-                    </div>
-                    <p class="text-gray-400 text-xs leading-relaxed italic">{unit.description}</p>
-                </div>
-
-                <!-- Metrics Zone (Middle) -->
-                <div class="w-full xl:w-1/3 grid grid-cols-2 gap-4 relative z-10">
-                    <div class="flex flex-col gap-3">
-                        <div class="flex items-center gap-2">
-                            <div class="px-2 py-1 bg-red-950/20 border border-red-900/30 rounded text-center min-w-[50px]">
-                                <span class="block text-[8px] text-red-700 font-black uppercase leading-none mb-0.5">Offense</span>
-                                <span class="text-sm font-mono font-black text-white">{unit.power_offense}</span>
-                            </div>
-                            <div class="px-2 py-1 bg-cyan-950/20 border border-cyan-900/30 rounded text-center min-w-[50px]">
-                                <span class="block text-[8px] text-cyan-700 font-black uppercase leading-none mb-0.5">Defense</span>
-                                <span class="text-sm font-mono font-black text-white">{unit.power_defense}</span>
+        <!-- Unit Training Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {#each Object.entries(units) as [slug, unit]}
+                <div class="bg-gray-900/40 border border-white/5 rounded-lg p-4 space-y-4 backdrop-blur-sm transition-all hover:bg-gray-900/60 group">
+                    <div class="flex items-center gap-4 border-b border-white/5 pb-3">
+                        <div class="w-12 h-12 rounded-lg bg-black/60 border border-white/10 flex items-center justify-center text-cyan-400 font-title font-black text-xl group-hover:border-cyan-500 transition-all">
+                            {unit.name?.charAt(0)}
+                        </div>
+                        <div class="flex-grow">
+                            <h3 class="text-white font-title font-black text-sm uppercase tracking-widest">{unit.name}</h3>
+                            <div class="flex gap-3 mt-1">
+                                <span class="text-[9px] text-gray-500 uppercase font-black tracking-tighter">Cost: <span class="text-cyan-600 font-mono">{formatNumber(unit.cost_credits)} CP</span></span>
+                                <span class="text-[9px] text-gray-500 uppercase font-black tracking-tighter">Personnel: <span class="text-white font-mono">{formatNumber(unit.owned || 0)}</span></span>
                             </div>
                         </div>
-                        <div class="flex flex-col">
-                            <span class="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1">Requisition Cost</span>
-                            <span class="text-xs font-mono text-white">
-                                <span class="text-cyan-400 font-bold">{unit.cost_credits.toLocaleString()} CP</span> / 
-                                <span class="font-bold">{unit.cost_citizens} CIT</span>
-                            </span>
-                        </div>
                     </div>
-
-                    <div class="flex flex-col justify-center border-l border-white/5 pl-4">
-                        <span class="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-1">Max Enlistment</span>
-                        <div class="flex items-baseline gap-1">
-                            <span class="text-2xl font-mono text-cyan-400 font-black">{calculateMax(unit).toLocaleString()}</span>
-                            <span class="text-[8px] text-gray-500 uppercase font-bold">Units</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Action Zone (Right) -->
-                <div class="w-full xl:w-1/3 flex flex-col sm:flex-row gap-4 relative z-10">
-                    <div class="flex-grow flex flex-col gap-2">
-                        <div class="relative">
+                    
+                    <p class="text-[10px] text-gray-400 italic leading-relaxed min-h-[30px] line-clamp-2">{unit.description}</p>
+                    
+                    <div class="flex gap-2">
+                        <div class="relative flex-grow">
                             <input 
                                 type="number" 
                                 bind:value={quantities[slug]} 
-                                placeholder="Magnitude" 
-                                class="w-full bg-black/60 border border-white/10 rounded-xl px-4 py-4 text-white font-mono text-base focus:border-cyan-400 focus:outline-none transition-colors pr-16" 
+                                placeholder="0" 
+                                class="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white font-mono text-sm focus:border-cyan-500 outline-none transition-all pr-12"
+                                min="0"
                             />
                             <button 
-                                onclick={() => quantities[slug] = calculateMax(unit)}
-                                class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-2 text-[9px] font-black uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-lg hover:bg-cyan-500 hover:text-black transition-all"
-                            >
-                                Max
-                            </button>
+                                onclick={() => setMax(slug)}
+                                class="absolute right-1 top-1/2 -translate-y-1/2 px-2 py-1 text-[8px] font-black uppercase bg-cyan-900/30 text-cyan-500 border border-cyan-500/20 rounded hover:bg-cyan-500 hover:text-black transition-all"
+                            >MAX</button>
                         </div>
-                        
-                        {#if quantities[slug] > 0}
-                            <div class="flex justify-between items-center px-1" transition:slide>
-                                <span class="text-[9px] font-black text-gray-600 uppercase tracking-widest">Est. Cost:</span>
-                                <span class="text-sm font-mono text-white font-black">{(unit.cost_credits * quantities[slug]).toLocaleString()} CP</span>
-                            </div>
-                        {/if}
                     </div>
-
-                    <button 
-                        onclick={() => handleTrain(slug)} 
-                        class="sm:w-32 h-[58px] bg-white text-black font-title font-black text-xs uppercase tracking-[2px] rounded-xl hover:bg-cyan-500 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all disabled:opacity-20 disabled:grayscale" 
-                        disabled={loading || !quantities[slug] || quantities[slug] <= 0 || quantities[slug] > calculateMax(unit)}
-                    >
-                        {loading ? '...' : 'Enlist'}
-                    </button>
                 </div>
-            </div>
-        {/each}
-    </div>
-    
-    <div class="text-center pt-8">
-        <p class="text-gray-600 text-[10px] font-bold uppercase tracking-[4px] italic">Tactical Gear requisitioning available in the <a href="/structures/armory" class="text-cyan-400 underline hover:text-white transition-colors">Sector Armory</a>.</p>
-    </div>
+            {/each}
+        </div>
+
+        <!-- Action Button -->
+        <div class="pt-4">
+            <button 
+                onclick={handleTrain}
+                disabled={loading || !canAfford || totalCitizensNeeded <= 0}
+                class="w-full bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-500/30 text-cyan-400 font-title font-black py-4 rounded-lg uppercase text-[11px] tracking-[3px] transition-all disabled:opacity-20 shadow-[0_0_20px_rgba(34,211,238,0.1)]"
+            >
+                {loading ? 'Processing Requisition...' : 'Execute Training Authorization'}
+            </button>
+        </div>
+
+        <footer class="text-center pt-8">
+            <p class="text-gray-600 text-[9px] font-bold uppercase tracking-[4px] italic">
+                Strategic military deployments require synchronized neural command. 
+                <a href="/combat/battlefield" class="text-cyan-500 underline hover:text-white transition-colors">Access War Room &raquo;</a>
+            </p>
+        </footer>
+
+    </main>
 </div>
 
 <style>
+    .font-title { font-family: 'Orbitron', sans-serif; }
     .text-shadow-glow {
         text-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
     }

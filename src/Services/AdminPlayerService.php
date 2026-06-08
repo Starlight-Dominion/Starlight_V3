@@ -66,6 +66,11 @@ class AdminPlayerService
         $userChanges = [];
 
         foreach ($stats as $field => $value) {
+            // Sanitize empty strings to null for database compatibility (prevents strict mode errors on int/date columns)
+            if ($value === '') {
+                $value = null;
+            }
+
             if (in_array($field, $domColumns)) {
                 $domChanges[$field] = $value;
             } elseif (in_array($field, $userColumns)) {

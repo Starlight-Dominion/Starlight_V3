@@ -57,7 +57,7 @@ switch ($routeInfo[0]) {
         $routeMeta = is_array($handler) && isset($handler[2]) && is_array($handler[2]) ? $handler[2] : [];
         
         $startTime = microtime(true);
-        $isApi = str_starts_with($uri, '/api/');
+        $isApi = str_starts_with($uri, '/api/v1/');
         $apiKey = null;
 
         if ($isApi) {
