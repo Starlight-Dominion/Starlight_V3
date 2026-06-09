@@ -139,18 +139,18 @@ class EloquentTickRepository implements TickRepositoryInterface
         $idsTable = 'tick_ids_tmp';
         $tempTable = 'tick_deltas_tmp';
 
-        Capsule::statement('DROP TEMPORARY TABLE IF EXISTS ' . $idsTable);
-        Capsule::statement('DROP TEMPORARY TABLE IF EXISTS ' . $tempTable);
-
-        Capsule::statement('CREATE TEMPORARY TABLE ' . $idsTable . ' (
+        Capsule::statement('CREATE TEMPORARY TABLE IF NOT EXISTS ' . $idsTable . ' (
             dominion_id BIGINT UNSIGNED NOT NULL PRIMARY KEY
         )');
 
-        Capsule::statement('CREATE TEMPORARY TABLE ' . $tempTable . ' (
+        Capsule::statement('CREATE TEMPORARY TABLE IF NOT EXISTS ' . $tempTable . ' (
             dominion_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
             delta_credits BIGINT NOT NULL,
             delta_citizens INT NOT NULL
         )');
+
+        Capsule::statement('TRUNCATE TABLE ' . $idsTable);
+        Capsule::statement('TRUNCATE TABLE ' . $tempTable);
 
         try {
             foreach (array_chunk($ids, 5000) as $idChunk) {
@@ -226,8 +226,8 @@ class EloquentTickRepository implements TickRepositoryInterface
                 'turns' => (int)($metrics->total_turns ?? 0),
             ];
         } finally {
-            Capsule::statement('DROP TEMPORARY TABLE IF EXISTS ' . $tempTable);
-            Capsule::statement('DROP TEMPORARY TABLE IF EXISTS ' . $idsTable);
+            Capsule::statement('TRUNCATE TABLE ' . $tempTable);
+            Capsule::statement('TRUNCATE TABLE ' . $idsTable);
         }
     }
 

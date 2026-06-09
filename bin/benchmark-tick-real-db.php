@@ -27,6 +27,8 @@ const CITIZEN_BUFFS = [1 => -20, 2 => 0, 3 => 10, 4 => 25, 5 => 60];
 $count = isset($argv[1]) ? max(1, (int)$argv[1]) : 100000;
 $seedChunk = isset($argv[2]) ? max(100, (int)$argv[2]) : 1000;
 $benchDbName = $argv[3] ?? (getenv('BENCH_DB_NAME') ?: 'sdo_bench');
+$setRuns = isset($argv[4]) ? max(1, (int)$argv[4]) : 5;
+$legacyRuns = isset($argv[5]) ? max(1, (int)$argv[5]) : 1;
 
 bootBenchmarkConnection($benchDbName);
 
@@ -40,15 +42,50 @@ seedBenchmarkData($count, $seedChunk);
 $repository = new EloquentTickRepository();
 $dominionIds = range(1, $count);
 
-$setBased = runSetBasedBenchmark($repository, $dominionIds);
-$legacy = runLegacyBenchmark($repository, $dominionIds);
+$setBasedRuns = [];
+for ($i = 1; $i <= $setRuns; $i++) {
+    echo sprintf("\n--- Set-based run %d/%d ---\n", $i, $setRuns);
+    $setBasedRuns[] = runSetBasedBenchmark($repository, $dominionIds);
+}
+
+$legacyRunsData = [];
+for ($i = 1; $i <= $legacyRuns; $i++) {
+    echo sprintf("\n--- Legacy run %d/%d ---\n", $i, $legacyRuns);
+    $legacyRunsData[] = runLegacyBenchmark($repository, $dominionIds);
+}
+
+$setBasedTimes = array_map(static fn(array $r): float => (float)$r['elapsed_ms'], $setBasedRuns);
+$legacyTimes = array_map(static fn(array $r): float => (float)$r['elapsed_ms'], $legacyRunsData);
 
 echo "\nReal DB benchmark summary (MariaDB):\n";
-echo sprintf("- Set-based SQL: %.2f ms\n", $setBased['elapsed_ms']);
-echo sprintf("- Legacy loop:   %.2f ms\n", $legacy['elapsed_ms']);
-echo sprintf("- Speedup: %.2fx\n", $legacy['elapsed_ms'] > 0 ? ($legacy['elapsed_ms'] / $setBased['elapsed_ms']) : 0.0);
+echo sprintf("- Set-based runs: %d | p50=%.2f ms | p95=%.2f ms\n", $setRuns, percentile($setBasedTimes, 0.50), percentile($setBasedTimes, 0.95));
+echo sprintf("- Legacy runs:    %d | p50=%.2f ms | p95=%.2f ms\n", $legacyRuns, percentile($legacyTimes, 0.50), percentile($legacyTimes, 0.95));
+echo sprintf("- Speedup (p50): %.2fx\n", percentile($legacyTimes, 0.50) > 0 ? (percentile($legacyTimes, 0.50) / percentile($setBasedTimes, 0.50)) : 0.0);
 
 echo "\nBenchmark complete.\n";
+
+function percentile(array $values, float $q): float
+{
+    if (empty($values)) {
+        return 0.0;
+    }
+
+    sort($values, SORT_NUMERIC);
+    $n = count($values);
+    if ($n === 1) {
+        return (float)$values[0];
+    }
+
+    $pos = ($n - 1) * $q;
+    $lower = (int)floor($pos);
+    $upper = (int)ceil($pos);
+    if ($lower === $upper) {
+        return (float)$values[$lower];
+    }
+
+    $weight = $pos - $lower;
+    return (1.0 - $weight) * (float)$values[$lower] + $weight * (float)$values[$upper];
+}
 
 function bootBenchmarkConnection(string $database): void
 {
