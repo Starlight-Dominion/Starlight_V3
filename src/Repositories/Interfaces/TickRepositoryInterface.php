@@ -12,6 +12,7 @@ interface TickRepositoryInterface
     public function getAllDominionIds(): array;
     public function getTickData(array $dominionIds): Collection;
     public function applyTickResults(int $dominionId, int $credits, int $citizens, int $turns, string $tickTime): bool;
+    public function applyTickResultsSetBased(array $dominionIds, int $baseCredits, int $baseCitizens, int $baseTurns, string $tickTime): array;
     public function createTickLog(array $data): TickLog;
     public function updateTickLogByTickId(string $tickId, array $data): bool;
     public function findTickLogByTickId(string $tickId): ?TickLog;

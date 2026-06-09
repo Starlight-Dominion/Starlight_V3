@@ -60,6 +60,75 @@ class EloquentTickRepository implements TickRepositoryInterface
             ]) > 0;
     }
 
+    public function applyTickResultsSetBased(array $dominionIds, int $baseCredits, int $baseCitizens, int $baseTurns, string $tickTime): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $dominionIds), static fn (int $id): bool => $id > 0)));
+        if (empty($ids)) {
+            return [
+                'credits' => 0,
+                'citizens' => 0,
+                'turns' => 0,
+            ];
+        }
+
+        $economyBuffSql = "COALESCE((
+            SELECT SUM(sl.buff_economy)
+            FROM dominion_structures ds
+            JOIN structure_levels sl
+              ON ds.structure_id = sl.structure_id
+             AND ds.level = sl.level
+            WHERE ds.dominion_id = dominions.id
+        ), 0)";
+
+        $citizenBuffSql = "COALESCE((
+            SELECT SUM(sl.buff_citizens_per_tick)
+            FROM dominion_structures ds
+            JOIN structure_levels sl
+              ON ds.structure_id = sl.structure_id
+             AND ds.level = sl.level
+            WHERE ds.dominion_id = dominions.id
+        ), 0)";
+
+        $unitProductionSql = "COALESCE((
+            SELECT SUM(dm.total_quantity * u.production_credits)
+            FROM dominion_manpower dm
+            JOIN units u ON dm.unit_id = u.id
+            WHERE dm.dominion_id = dominions.id
+        ), 0)";
+
+        $creditsExpr = 'CASE
+            WHEN (((' . (int)$baseCredits . ' + ' . $unitProductionSql . ') * (1 + (' . $economyBuffSql . ' / 100.0)))) < 0 THEN 0
+            ELSE CAST((((' . (int)$baseCredits . ' + ' . $unitProductionSql . ') * (1 + (' . $economyBuffSql . ' / 100.0)))) AS INTEGER)
+        END';
+
+        $citizensExpr = 'CASE
+            WHEN ((' . (int)$baseCitizens . ' + ' . $citizenBuffSql . ')) < 0 THEN 0
+            ELSE (' . (int)$baseCitizens . ' + ' . $citizenBuffSql . ')
+        END';
+
+        $metrics = Capsule::table('dominions')
+            ->whereIn('id', $ids)
+            ->selectRaw('COALESCE(SUM(' . $creditsExpr . '), 0) as total_credits')
+            ->selectRaw('COALESCE(SUM(' . $citizensExpr . '), 0) as total_citizens')
+            ->selectRaw('COUNT(*) * ' . (int)$baseTurns . ' as total_turns')
+            ->first();
+
+        Capsule::table('dominions')
+            ->whereIn('id', $ids)
+            ->update([
+                'credits' => Capsule::raw('credits + (' . $creditsExpr . ')'),
+                'citizens' => Capsule::raw('citizens + (' . $citizensExpr . ')'),
+                'turns' => Capsule::raw('turns + ' . (int)$baseTurns),
+                'last_tick' => $tickTime,
+            ]);
+
+        return [
+            'credits' => (int)($metrics->total_credits ?? 0),
+            'citizens' => (int)($metrics->total_citizens ?? 0),
+            'turns' => (int)($metrics->total_turns ?? 0),
+        ];
+    }
+
     public function createTickLog(array $data): TickLog
     {
         return TickLog::create($data);

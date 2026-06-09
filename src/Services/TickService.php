@@ -75,7 +75,6 @@ class TickService
      */
     public function processTickJob(array $dominionIds, string $tickTime, string $tickId): void
     {
-        $startTime = microtime(true);
         $metricsKey = self::METRICS_KEY_PREFIX . $tickId;
 
         $baseCitizens = (int)$this->configService->get('baseline_citizens_per_tick', 50);
@@ -89,26 +88,13 @@ class TickService
         ];
 
         $this->transactionManager->transaction(function () use ($dominionIds, $baseCitizens, $baseCredits, $baseTurns, $tickTime, &$localMetrics) {
-            $dominions = $this->tickRepository->getTickData($dominionIds);
-            foreach ($dominions as $dom) {
-                $multiplier = 1 + ((float)($dom->total_economy_buff ?? 0) / 100);
-                $basePlusUnit = $baseCredits + (int)($dom->total_unit_production ?? 0);
-                $creditsGained = max(0, (int)floor($basePlusUnit * $multiplier));
-                
-                $citizenGained = max(0, $baseCitizens + (int)($dom->total_citizen_buff ?? 0));
-
-                $this->tickRepository->applyTickResults(
-                    (int)$dom->id,
-                    $creditsGained,
-                    $citizenGained,
-                    $baseTurns,
-                    $tickTime
-                );
-
-                $localMetrics['credits'] += $creditsGained;
-                $localMetrics['citizens'] += $citizenGained;
-                $localMetrics['turns'] += $baseTurns;
-            }
+            $localMetrics = $this->tickRepository->applyTickResultsSetBased(
+                $dominionIds,
+                $baseCredits,
+                $baseCitizens,
+                $baseTurns,
+                $tickTime
+            );
         });
 
         // Atomically update Redis metrics
