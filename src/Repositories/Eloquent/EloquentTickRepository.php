@@ -149,8 +149,8 @@ class EloquentTickRepository implements TickRepositoryInterface
             delta_citizens INT NOT NULL
         )');
 
-        Capsule::statement('TRUNCATE TABLE ' . $idsTable);
-        Capsule::statement('TRUNCATE TABLE ' . $tempTable);
+        Capsule::statement('DELETE FROM ' . $idsTable);
+        Capsule::statement('DELETE FROM ' . $tempTable);
 
         try {
             foreach (array_chunk($ids, 5000) as $idChunk) {
@@ -226,8 +226,8 @@ class EloquentTickRepository implements TickRepositoryInterface
                 'turns' => (int)($metrics->total_turns ?? 0),
             ];
         } finally {
-            Capsule::statement('TRUNCATE TABLE ' . $tempTable);
-            Capsule::statement('TRUNCATE TABLE ' . $idsTable);
+            Capsule::statement('DELETE FROM ' . $tempTable);
+            Capsule::statement('DELETE FROM ' . $idsTable);
         }
     }
 
