@@ -97,14 +97,19 @@ class EloquentTickRepository implements TickRepositoryInterface
         ), 0)";
 
         $creditsExpr = 'CASE
-            WHEN (((' . (int)$baseCredits . ' + ' . $unitProductionSql . ') * (1 + (' . $economyBuffSql . ' / 100.0)))) < 0 THEN 0
-            ELSE FLOOR((((' . (int)$baseCredits . ' + ' . $unitProductionSql . ') * (1 + (' . $economyBuffSql . ' / 100.0)))))
+            WHEN (((' . (int)$baseCredits . ' + ' . $unitProductionSql . ') * (1 + (' . $economyBuffSql . ' / 100e0)))) < 0 THEN 0
+            ELSE FLOOR((((' . (int)$baseCredits . ' + ' . $unitProductionSql . ') * (1 + (' . $economyBuffSql . ' / 100e0)))))
         END';
 
         $citizensExpr = 'CASE
             WHEN ((' . (int)$baseCitizens . ' + ' . $citizenBuffSql . ')) < 0 THEN 0
             ELSE (' . (int)$baseCitizens . ' + ' . $citizenBuffSql . ')
         END';
+
+        $driver = Capsule::connection()->getDriverName();
+        if ($driver === 'mysql') {
+            return $this->applyTickResultsSetBasedMysql($ids, $creditsExpr, $citizensExpr, $baseTurns, $tickTime);
+        }
 
         $metrics = Capsule::table('dominions')
             ->whereIntegerInRaw('id', $ids)
@@ -121,6 +126,51 @@ class EloquentTickRepository implements TickRepositoryInterface
                 'turns' => Capsule::raw('turns + ' . (int)$baseTurns),
                 'last_tick' => $tickTime,
             ]);
+
+        return [
+            'credits' => (int)($metrics->total_credits ?? 0),
+            'citizens' => (int)($metrics->total_citizens ?? 0),
+            'turns' => (int)($metrics->total_turns ?? 0),
+        ];
+    }
+
+    private function applyTickResultsSetBasedMysql(array $ids, string $creditsExpr, string $citizensExpr, int $baseTurns, string $tickTime): array
+    {
+        $tempTable = 'tick_deltas_tmp';
+
+        Capsule::statement('DROP TEMPORARY TABLE IF EXISTS ' . $tempTable);
+        Capsule::statement('CREATE TEMPORARY TABLE ' . $tempTable . ' (
+            dominion_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+            delta_credits BIGINT NOT NULL,
+            delta_citizens INT NOT NULL
+        )');
+
+        Capsule::table($tempTable)->insertUsing(
+            ['dominion_id', 'delta_credits', 'delta_citizens'],
+            Capsule::table('dominions')
+                ->whereIntegerInRaw('id', $ids)
+                ->selectRaw('id as dominion_id')
+                ->selectRaw($creditsExpr . ' as delta_credits')
+                ->selectRaw($citizensExpr . ' as delta_citizens')
+        );
+
+        $metrics = Capsule::table($tempTable)
+            ->selectRaw('COALESCE(SUM(delta_credits), 0) as total_credits')
+            ->selectRaw('COALESCE(SUM(delta_citizens), 0) as total_citizens')
+            ->selectRaw('COUNT(*) * ' . (int)$baseTurns . ' as total_turns')
+            ->first();
+
+        Capsule::update(
+            'UPDATE dominions d
+             JOIN ' . $tempTable . ' t ON t.dominion_id = d.id
+             SET d.credits = d.credits + t.delta_credits,
+                 d.citizens = d.citizens + t.delta_citizens,
+                 d.turns = d.turns + ?,
+                 d.last_tick = ?',
+            [(int)$baseTurns, $tickTime]
+        );
+
+        Capsule::statement('DROP TEMPORARY TABLE IF EXISTS ' . $tempTable);
 
         return [
             'credits' => (int)($metrics->total_credits ?? 0),
