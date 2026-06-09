@@ -98,7 +98,7 @@ class EloquentTickRepository implements TickRepositoryInterface
 
         $creditsExpr = 'CASE
             WHEN (((' . (int)$baseCredits . ' + ' . $unitProductionSql . ') * (1 + (' . $economyBuffSql . ' / 100.0)))) < 0 THEN 0
-            ELSE CAST((((' . (int)$baseCredits . ' + ' . $unitProductionSql . ') * (1 + (' . $economyBuffSql . ' / 100.0)))) AS INTEGER)
+            ELSE FLOOR((((' . (int)$baseCredits . ' + ' . $unitProductionSql . ') * (1 + (' . $economyBuffSql . ' / 100.0)))))
         END';
 
         $citizensExpr = 'CASE
@@ -107,14 +107,14 @@ class EloquentTickRepository implements TickRepositoryInterface
         END';
 
         $metrics = Capsule::table('dominions')
-            ->whereIn('id', $ids)
+            ->whereIntegerInRaw('id', $ids)
             ->selectRaw('COALESCE(SUM(' . $creditsExpr . '), 0) as total_credits')
             ->selectRaw('COALESCE(SUM(' . $citizensExpr . '), 0) as total_citizens')
             ->selectRaw('COUNT(*) * ' . (int)$baseTurns . ' as total_turns')
             ->first();
 
         Capsule::table('dominions')
-            ->whereIn('id', $ids)
+            ->whereIntegerInRaw('id', $ids)
             ->update([
                 'credits' => Capsule::raw('credits + (' . $creditsExpr . ')'),
                 'citizens' => Capsule::raw('citizens + (' . $citizensExpr . ')'),
