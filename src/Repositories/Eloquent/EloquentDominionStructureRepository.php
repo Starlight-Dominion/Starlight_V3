@@ -6,6 +6,7 @@ namespace sdo\Repositories\Eloquent;
 
 use sdo\Models\DominionStructure;
 use sdo\Repositories\Interfaces\DominionStructureRepositoryInterface;
+use sdo\Support\TickSummaryMaintainer;
 use Illuminate\Support\Collection;
 
 class EloquentDominionStructureRepository implements DominionStructureRepositoryInterface
@@ -32,10 +33,19 @@ class EloquentDominionStructureRepository implements DominionStructureRepository
             $structure->dominion_id = $dominionId;
             $structure->structure_id = $structureId;
             $structure->level = $level;
-            return $structure->save();
+            $saved = $structure->save();
+            if ($saved) {
+                TickSummaryMaintainer::recomputeForDominion($dominionId);
+            }
+            return $saved;
         }
 
-        return $structure->update(['level' => $level]);
+        $updated = $structure->update(['level' => $level]);
+        if ($updated) {
+            TickSummaryMaintainer::recomputeForDominion($dominionId);
+        }
+
+        return $updated;
     }
 
     public function sumStructureLevelBuff(int $dominionId, string $column): float
@@ -68,9 +78,15 @@ class EloquentDominionStructureRepository implements DominionStructureRepository
 
     public function updateOrCreate(int $dominionId, int $structureId, array $data): bool
     {
-        return (bool)DominionStructure::updateOrCreate(
+        $saved = (bool)DominionStructure::updateOrCreate(
             ['dominion_id' => $dominionId, 'structure_id' => $structureId],
             $data
         );
+
+        if ($saved) {
+            TickSummaryMaintainer::recomputeForDominion($dominionId);
+        }
+
+        return $saved;
     }
 }

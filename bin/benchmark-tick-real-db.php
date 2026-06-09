@@ -211,6 +211,7 @@ function prepareSchema(): void
 
     Capsule::statement('DROP TABLE IF EXISTS dominion_manpower');
     Capsule::statement('DROP TABLE IF EXISTS dominion_structures');
+    Capsule::statement('DROP TABLE IF EXISTS dominion_tick_summaries');
     Capsule::statement('DROP TABLE IF EXISTS structure_levels');
     Capsule::statement('DROP TABLE IF EXISTS units');
     Capsule::statement('DROP TABLE IF EXISTS structures');
@@ -296,6 +297,13 @@ function prepareSchema(): void
         KEY idx_unit (unit_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
 
+    Capsule::statement('CREATE TABLE dominion_tick_summaries (
+        dominion_id INT UNSIGNED NOT NULL PRIMARY KEY,
+        total_economy_buff INT NOT NULL DEFAULT 0,
+        total_citizen_buff INT NOT NULL DEFAULT 0,
+        total_unit_production BIGINT NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+
     Capsule::statement('SET FOREIGN_KEY_CHECKS=1');
     echo "- Schema ready.\n";
 }
@@ -347,6 +355,7 @@ function seedBenchmarkData(int $count, int $batchSize): void
         $dominions = [];
         $dominionStructures = [];
         $manpower = [];
+        $tickSummaries = [];
 
         for ($id = $start; $id <= $end; $id++) {
             $users[] = [
@@ -367,6 +376,7 @@ function seedBenchmarkData(int $count, int $batchSize): void
             ];
 
             $economyLevel = economyLevel($id);
+            $economyBuff = $economyLevel > 0 ? ECONOMY_BUFFS[$economyLevel] : 0;
             if ($economyLevel > 0) {
                 $dominionStructures[] = [
                     'dominion_id' => $id,
@@ -376,6 +386,7 @@ function seedBenchmarkData(int $count, int $batchSize): void
             }
 
             $housingLevel = housingLevel($id);
+            $citizenBuff = $housingLevel > 0 ? CITIZEN_BUFFS[$housingLevel] : 0;
             if ($housingLevel > 0) {
                 $dominionStructures[] = [
                     'dominion_id' => $id,
@@ -384,9 +395,20 @@ function seedBenchmarkData(int $count, int $batchSize): void
                 ];
             }
 
-            $manpower[] = ['dominion_id' => $id, 'unit_id' => 1, 'total_quantity' => $id % 21];
-            $manpower[] = ['dominion_id' => $id, 'unit_id' => 2, 'total_quantity' => ($id * 2) % 17];
-            $manpower[] = ['dominion_id' => $id, 'unit_id' => 3, 'total_quantity' => ($id * 3) % 13];
+            $u1 = $id % 21;
+            $u2 = ($id * 2) % 17;
+            $u3 = ($id * 3) % 13;
+
+            $manpower[] = ['dominion_id' => $id, 'unit_id' => 1, 'total_quantity' => $u1];
+            $manpower[] = ['dominion_id' => $id, 'unit_id' => 2, 'total_quantity' => $u2];
+            $manpower[] = ['dominion_id' => $id, 'unit_id' => 3, 'total_quantity' => $u3];
+
+            $tickSummaries[] = [
+                'dominion_id' => $id,
+                'total_economy_buff' => $economyBuff,
+                'total_citizen_buff' => $citizenBuff,
+                'total_unit_production' => $u1 + ($u2 * 3) + ($u3 * 7),
+            ];
         }
 
         Capsule::table('users')->insert($users);
@@ -395,6 +417,7 @@ function seedBenchmarkData(int $count, int $batchSize): void
             Capsule::table('dominion_structures')->insert($dominionStructures);
         }
         Capsule::table('dominion_manpower')->insert($manpower);
+        Capsule::table('dominion_tick_summaries')->insert($tickSummaries);
 
         if (($chunkNo % 20) === 0 || $chunkNo === $totalChunks) {
             echo sprintf("Seed progress: %d/%d chunks\n", $chunkNo, $totalChunks);

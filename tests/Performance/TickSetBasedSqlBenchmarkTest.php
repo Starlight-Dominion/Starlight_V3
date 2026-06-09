@@ -100,6 +100,13 @@ class TickSetBasedSqlBenchmarkTest extends TestCase
             $table->integer('total_quantity')->default(0);
             $table->primary(['dominion_id', 'unit_id']);
         });
+
+        Capsule::schema()->create('dominion_tick_summaries', function ($table): void {
+            $table->integer('dominion_id')->unsigned()->primary();
+            $table->integer('total_economy_buff')->default(0);
+            $table->integer('total_citizen_buff')->default(0);
+            $table->bigInteger('total_unit_production')->default(0);
+        });
     }
 
     public function testSetBasedTickSqlHandlesOneHundredThousandDominionsExactly(): void
@@ -287,6 +294,7 @@ class TickSetBasedSqlBenchmarkTest extends TestCase
             $dominions = [];
             $dominionStructures = [];
             $manpower = [];
+            $tickSummaries = [];
 
             for ($id = $start; $id <= $end; $id++) {
                 $users[] = [
@@ -307,6 +315,7 @@ class TickSetBasedSqlBenchmarkTest extends TestCase
                 ];
 
                 $economyLevel = $this->economyLevel($id);
+                $economyBuff = $economyLevel > 0 ? self::ECONOMY_BUFFS[$economyLevel] : 0;
                 if ($economyLevel > 0) {
                     $dominionStructures[] = [
                         'dominion_id' => $id,
@@ -316,6 +325,7 @@ class TickSetBasedSqlBenchmarkTest extends TestCase
                 }
 
                 $housingLevel = $this->housingLevel($id);
+                $citizenBuff = $housingLevel > 0 ? self::CITIZEN_BUFFS[$housingLevel] : 0;
                 if ($housingLevel > 0) {
                     $dominionStructures[] = [
                         'dominion_id' => $id,
@@ -324,20 +334,31 @@ class TickSetBasedSqlBenchmarkTest extends TestCase
                     ];
                 }
 
+                $u1 = $id % 21;
+                $u2 = ($id * 2) % 17;
+                $u3 = ($id * 3) % 13;
+
                 $manpower[] = [
                     'dominion_id' => $id,
                     'unit_id' => 1,
-                    'total_quantity' => $id % 21,
+                    'total_quantity' => $u1,
                 ];
                 $manpower[] = [
                     'dominion_id' => $id,
                     'unit_id' => 2,
-                    'total_quantity' => ($id * 2) % 17,
+                    'total_quantity' => $u2,
                 ];
                 $manpower[] = [
                     'dominion_id' => $id,
                     'unit_id' => 3,
-                    'total_quantity' => ($id * 3) % 13,
+                    'total_quantity' => $u3,
+                ];
+
+                $tickSummaries[] = [
+                    'dominion_id' => $id,
+                    'total_economy_buff' => $economyBuff,
+                    'total_citizen_buff' => $citizenBuff,
+                    'total_unit_production' => $u1 + ($u2 * 3) + ($u3 * 7),
                 ];
             }
 
@@ -347,6 +368,7 @@ class TickSetBasedSqlBenchmarkTest extends TestCase
                 Capsule::table('dominion_structures')->insert($dominionStructures);
             }
             Capsule::table('dominion_manpower')->insert($manpower);
+            Capsule::table('dominion_tick_summaries')->insert($tickSummaries);
         }
     }
 

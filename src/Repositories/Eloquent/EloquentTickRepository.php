@@ -19,6 +19,16 @@ class EloquentTickRepository implements TickRepositoryInterface
 
     public function getTickData(array $dominionIds): Collection
     {
+        if ($this->hasTickSummaryTable()) {
+            return Dominion::whereIn('id', $dominionIds)
+                ->select(['dominions.*'])
+                ->leftJoin('dominion_tick_summaries as dts', 'dts.dominion_id', '=', 'dominions.id')
+                ->selectRaw('COALESCE(dts.total_economy_buff, 0) as total_economy_buff')
+                ->selectRaw('COALESCE(dts.total_citizen_buff, 0) as total_citizen_buff')
+                ->selectRaw('COALESCE(dts.total_unit_production, 0) as total_unit_production')
+                ->get();
+        }
+
         return Dominion::whereIn('id', $dominionIds)
             ->select(['dominions.*'])
             ->selectSub(function ($query) {
@@ -71,30 +81,43 @@ class EloquentTickRepository implements TickRepositoryInterface
             ];
         }
 
-        $economyBuffSql = "COALESCE((
-            SELECT SUM(sl.buff_economy)
-            FROM dominion_structures ds
-            JOIN structure_levels sl
-              ON ds.structure_id = sl.structure_id
-             AND ds.level = sl.level
-            WHERE ds.dominion_id = dominions.id
-        ), 0)";
+        $driver = Capsule::connection()->getDriverName();
+        $hasSummaryTable = $this->hasTickSummaryTable();
 
-        $citizenBuffSql = "COALESCE((
-            SELECT SUM(sl.buff_citizens_per_tick)
-            FROM dominion_structures ds
-            JOIN structure_levels sl
-              ON ds.structure_id = sl.structure_id
-             AND ds.level = sl.level
-            WHERE ds.dominion_id = dominions.id
-        ), 0)";
+        if ($driver === 'mysql' && $hasSummaryTable) {
+            return $this->applyTickResultsSetBasedMysql($ids, $baseCredits, $baseCitizens, $baseTurns, $tickTime);
+        }
 
-        $unitProductionSql = "COALESCE((
-            SELECT SUM(dm.total_quantity * u.production_credits)
-            FROM dominion_manpower dm
-            JOIN units u ON dm.unit_id = u.id
-            WHERE dm.dominion_id = dominions.id
-        ), 0)";
+        if ($hasSummaryTable) {
+            $economyBuffSql = 'COALESCE((SELECT dts.total_economy_buff FROM dominion_tick_summaries dts WHERE dts.dominion_id = dominions.id), 0)';
+            $citizenBuffSql = 'COALESCE((SELECT dts.total_citizen_buff FROM dominion_tick_summaries dts WHERE dts.dominion_id = dominions.id), 0)';
+            $unitProductionSql = 'COALESCE((SELECT dts.total_unit_production FROM dominion_tick_summaries dts WHERE dts.dominion_id = dominions.id), 0)';
+        } else {
+            $economyBuffSql = "COALESCE((
+                SELECT SUM(sl.buff_economy)
+                FROM dominion_structures ds
+                JOIN structure_levels sl
+                  ON ds.structure_id = sl.structure_id
+                 AND ds.level = sl.level
+                WHERE ds.dominion_id = dominions.id
+            ), 0)";
+
+            $citizenBuffSql = "COALESCE((
+                SELECT SUM(sl.buff_citizens_per_tick)
+                FROM dominion_structures ds
+                JOIN structure_levels sl
+                  ON ds.structure_id = sl.structure_id
+                 AND ds.level = sl.level
+                WHERE ds.dominion_id = dominions.id
+            ), 0)";
+
+            $unitProductionSql = "COALESCE((
+                SELECT SUM(dm.total_quantity * u.production_credits)
+                FROM dominion_manpower dm
+                JOIN units u ON dm.unit_id = u.id
+                WHERE dm.dominion_id = dominions.id
+            ), 0)";
+        }
 
         $creditsExpr = 'CASE
             WHEN (((' . (int)$baseCredits . ' + ' . $unitProductionSql . ') * (1 + (' . $economyBuffSql . ' / 100e0)))) < 0 THEN 0
@@ -105,11 +128,6 @@ class EloquentTickRepository implements TickRepositoryInterface
             WHEN ((' . (int)$baseCitizens . ' + ' . $citizenBuffSql . ')) < 0 THEN 0
             ELSE (' . (int)$baseCitizens . ' + ' . $citizenBuffSql . ')
         END';
-
-        $driver = Capsule::connection()->getDriverName();
-        if ($driver === 'mysql') {
-            return $this->applyTickResultsSetBasedMysql($ids, $baseCredits, $baseCitizens, $baseTurns, $tickTime);
-        }
 
         $metrics = Capsule::table('dominions')
             ->whereIntegerInRaw('id', $ids)
@@ -161,44 +179,21 @@ class EloquentTickRepository implements TickRepositoryInterface
                 Capsule::table($idsTable)->insert($rows);
             }
 
-            $structureAgg = Capsule::table('dominion_structures as ds')
-                ->join('structure_levels as sl', function ($join) {
-                    $join->on('ds.structure_id', '=', 'sl.structure_id')
-                        ->on('ds.level', '=', 'sl.level');
-                })
-                ->join($idsTable . ' as tid', 'tid.dominion_id', '=', 'ds.dominion_id')
-                ->groupBy('ds.dominion_id')
-                ->selectRaw('ds.dominion_id as dominion_id')
-                ->selectRaw('COALESCE(SUM(sl.buff_economy), 0) as total_economy_buff')
-                ->selectRaw('COALESCE(SUM(sl.buff_citizens_per_tick), 0) as total_citizen_buff');
-
-            $manpowerAgg = Capsule::table('dominion_manpower as dm')
-                ->join('units as u', 'dm.unit_id', '=', 'u.id')
-                ->join($idsTable . ' as tid', 'tid.dominion_id', '=', 'dm.dominion_id')
-                ->groupBy('dm.dominion_id')
-                ->selectRaw('dm.dominion_id as dominion_id')
-                ->selectRaw('COALESCE(SUM(dm.total_quantity * u.production_credits), 0) as total_unit_production');
-
             $deltaCreditsExpr = 'CASE
-                WHEN (((' . (int)$baseCredits . ' + COALESCE(ma.total_unit_production, 0)) * (1 + (COALESCE(sa.total_economy_buff, 0) / 100e0)))) < 0 THEN 0
-                ELSE FLOOR(((' . (int)$baseCredits . ' + COALESCE(ma.total_unit_production, 0)) * (1 + (COALESCE(sa.total_economy_buff, 0) / 100e0))))
+                WHEN (((' . (int)$baseCredits . ' + COALESCE(dts.total_unit_production, 0)) * (1 + (COALESCE(dts.total_economy_buff, 0) / 100e0)))) < 0 THEN 0
+                ELSE FLOOR(((' . (int)$baseCredits . ' + COALESCE(dts.total_unit_production, 0)) * (1 + (COALESCE(dts.total_economy_buff, 0) / 100e0))))
             END';
 
             $deltaCitizensExpr = 'CASE
-                WHEN ((' . (int)$baseCitizens . ' + COALESCE(sa.total_citizen_buff, 0))) < 0 THEN 0
-                ELSE (' . (int)$baseCitizens . ' + COALESCE(sa.total_citizen_buff, 0))
+                WHEN ((' . (int)$baseCitizens . ' + COALESCE(dts.total_citizen_buff, 0))) < 0 THEN 0
+                ELSE (' . (int)$baseCitizens . ' + COALESCE(dts.total_citizen_buff, 0))
             END';
 
             Capsule::table($tempTable)->insertUsing(
                 ['dominion_id', 'delta_credits', 'delta_citizens'],
                 Capsule::table('dominions as d')
                     ->join($idsTable . ' as ti', 'ti.dominion_id', '=', 'd.id')
-                    ->leftJoinSub($structureAgg, 'sa', function ($join) {
-                        $join->on('sa.dominion_id', '=', 'd.id');
-                    })
-                    ->leftJoinSub($manpowerAgg, 'ma', function ($join) {
-                        $join->on('ma.dominion_id', '=', 'd.id');
-                    })
+                    ->leftJoin('dominion_tick_summaries as dts', 'dts.dominion_id', '=', 'd.id')
                     ->selectRaw('d.id as dominion_id')
                     ->selectRaw($deltaCreditsExpr . ' as delta_credits')
                     ->selectRaw($deltaCitizensExpr . ' as delta_citizens')
@@ -246,5 +241,10 @@ class EloquentTickRepository implements TickRepositoryInterface
     {
         // Eloquent supports metadata->tick_id for JSON columns in modern Laravel/Eloquent
         return TickLog::where('metadata->tick_id', $tickId)->first();
+    }
+
+    private function hasTickSummaryTable(): bool
+    {
+        return Capsule::schema()->hasTable('dominion_tick_summaries');
     }
 }

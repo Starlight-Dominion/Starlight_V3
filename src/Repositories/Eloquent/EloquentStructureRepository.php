@@ -8,6 +8,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use sdo\Models\Structure;
 use sdo\Models\StructureLevel;
 use sdo\Repositories\Interfaces\StructureRepositoryInterface;
+use sdo\Support\TickSummaryMaintainer;
 use Illuminate\Support\Collection;
 
 class EloquentStructureRepository implements StructureRepositoryInterface
@@ -40,7 +41,17 @@ class EloquentStructureRepository implements StructureRepositoryInterface
 
     public function delete(int $id): bool
     {
-        return Structure::where('id', $id)->delete() > 0;
+        $impactedDominionIds = Capsule::table('dominion_structures')
+            ->where('structure_id', $id)
+            ->pluck('dominion_id')
+            ->all();
+
+        $deleted = Structure::where('id', $id)->delete() > 0;
+        if ($deleted) {
+            TickSummaryMaintainer::recomputeForDominions($impactedDominionIds);
+        }
+
+        return $deleted;
     }
 
     public function findLevel(int $structureId, int $level): ?StructureLevel
@@ -59,14 +70,25 @@ class EloquentStructureRepository implements StructureRepositoryInterface
 
     public function updateLevel(int $structureId, int $level, array $data): bool
     {
-        return StructureLevel::where('structure_id', $structureId)
+        $updated = StructureLevel::where('structure_id', $structureId)
             ->where('level', $level)
             ->update($data) > 0;
+
+        if ($updated) {
+            TickSummaryMaintainer::recomputeForStructureImpact($structureId, $level);
+        }
+
+        return $updated;
     }
 
     public function addLevel(array $data): bool
     {
-        return StructureLevel::create($data)->exists;
+        $added = StructureLevel::create($data)->exists;
+        if ($added && isset($data['structure_id'], $data['level'])) {
+            TickSummaryMaintainer::recomputeForStructureImpact((int)$data['structure_id'], (int)$data['level']);
+        }
+
+        return $added;
     }
 
     public function getColumns(): array

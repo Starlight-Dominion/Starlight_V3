@@ -10,6 +10,7 @@ use sdo\Models\Unit;
 use sdo\Models\Structure;
 use sdo\Models\DominionStructure;
 use sdo\Models\DominionManpower;
+use sdo\Support\TickSummaryMaintainer;
 use sdo\Dto\Admin\BotProfileRequest;
 use sdo\Dto\Admin\AssignBotProfileRequest;
 use sdo\Dto\Admin\GenerateBotRequest;
@@ -81,6 +82,8 @@ class AdminAutomationService
                     'total_quantity' => 0
                 ]);
             }
+
+            TickSummaryMaintainer::recomputeForDominion((int)$dominion->id);
 
             return ['success' => true, 'bot_id' => $user->id];
         });

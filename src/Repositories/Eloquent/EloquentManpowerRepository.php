@@ -6,6 +6,7 @@ namespace sdo\Repositories\Eloquent;
 
 use sdo\Models\DominionManpower;
 use sdo\Repositories\Interfaces\ManpowerRepositoryInterface;
+use sdo\Support\TickSummaryMaintainer;
 use Illuminate\Support\Collection;
 
 class EloquentManpowerRepository implements ManpowerRepositoryInterface
@@ -36,7 +37,11 @@ class EloquentManpowerRepository implements ManpowerRepositoryInterface
                 $manpower->dominion_id = $dominionId;
                 $manpower->unit_id = $unitId;
                 $manpower->total_quantity = $change;
-                return $manpower->save();
+                $saved = $manpower->save();
+                if ($saved) {
+                    TickSummaryMaintainer::recomputeForDominion($dominionId);
+                }
+                return $saved;
             }
             return false;
         }
@@ -44,7 +49,12 @@ class EloquentManpowerRepository implements ManpowerRepositoryInterface
         $newQty = $manpower->total_quantity + $change;
         if ($newQty < 0) return false;
 
-        return $manpower->update(['total_quantity' => $newQty]);
+        $updated = $manpower->update(['total_quantity' => $newQty]);
+        if ($updated) {
+            TickSummaryMaintainer::recomputeForDominion($dominionId);
+        }
+
+        return $updated;
     }
 
     public function sumTotalQuantity(): float
@@ -54,9 +64,15 @@ class EloquentManpowerRepository implements ManpowerRepositoryInterface
 
     public function setQuantityWithStable(int $dominionId, int $unitId, int $total, int $stabled): bool
     {
-        return (bool)\sdo\Models\DominionManpower::updateOrCreate(
+        $saved = (bool)\sdo\Models\DominionManpower::updateOrCreate(
             ['dominion_id' => $dominionId, 'unit_id' => $unitId],
             ['total_quantity' => $total, 'stabled_quantity' => $stabled]
         );
+
+        if ($saved) {
+            TickSummaryMaintainer::recomputeForDominion($dominionId);
+        }
+
+        return $saved;
     }
 }
