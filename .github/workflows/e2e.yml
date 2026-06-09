@@ -52,7 +52,6 @@ jobs:
       REDIS_PORT: 6379
       APP_ENV: production
       APP_DEBUG: false
-      PLAYWRIGHT_BASE_URL: http://127.0.0.1:8080
 
     steps:
       - name: Checkout
