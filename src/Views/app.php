@@ -8,6 +8,10 @@
     <?php if (isset($_ENV['APP_ENV']) && $_ENV['APP_ENV'] === 'development'): ?>
         <script type="module" src="http://localhost:5173/@vite/client"></script>
         <script type="module" src="http://localhost:5173/src/Resources/js/app.js"></script>
+
+        <script type="module" src="http://starlightdominion.com:5173/@vite/client"></script>
+        <script type="module" src="http://starlightdominion.com:5173/src/Resources/js/app.js"></script>
+        
     <?php else: ?>
         <?php 
             $manifestPath = dirname(__DIR__, 2) . '/public/dist/.vite/manifest.json';
