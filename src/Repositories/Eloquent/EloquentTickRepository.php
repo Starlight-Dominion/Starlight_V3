@@ -140,14 +140,14 @@ class EloquentTickRepository implements TickRepositoryInterface
         $tempTable = 'tick_deltas_tmp';
 
         Capsule::statement('CREATE TEMPORARY TABLE IF NOT EXISTS ' . $idsTable . ' (
-            dominion_id BIGINT UNSIGNED NOT NULL PRIMARY KEY
-        )');
+            dominion_id INT UNSIGNED NOT NULL PRIMARY KEY
+        ) ENGINE=MEMORY');
 
         Capsule::statement('CREATE TEMPORARY TABLE IF NOT EXISTS ' . $tempTable . ' (
-            dominion_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+            dominion_id INT UNSIGNED NOT NULL PRIMARY KEY,
             delta_credits BIGINT NOT NULL,
             delta_citizens INT NOT NULL
-        )');
+        ) ENGINE=MEMORY');
 
         Capsule::statement('DELETE FROM ' . $idsTable);
         Capsule::statement('DELETE FROM ' . $tempTable);
