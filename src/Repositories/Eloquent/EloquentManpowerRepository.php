@@ -64,15 +64,15 @@ class EloquentManpowerRepository implements ManpowerRepositoryInterface
 
     public function setQuantityWithStable(int $dominionId, int $unitId, int $total, int $stabled): bool
     {
-        $saved = (bool)\sdo\Models\DominionManpower::updateOrCreate(
+        $model = \sdo\Models\DominionManpower::updateOrCreate(
             ['dominion_id' => $dominionId, 'unit_id' => $unitId],
             ['total_quantity' => $total, 'stabled_quantity' => $stabled]
         );
 
-        if ($saved) {
+        if ($model->wasRecentlyCreated || $model->wasChanged()) {
             TickSummaryMaintainer::recomputeForDominion($dominionId);
         }
 
-        return $saved;
+        return $model->exists;
     }
 }

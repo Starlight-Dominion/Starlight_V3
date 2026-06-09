@@ -40,6 +40,10 @@ class EloquentDominionStructureRepository implements DominionStructureRepository
             return $saved;
         }
 
+        if ((int)$structure->level === $level) {
+            return true;
+        }
+
         $updated = $structure->update(['level' => $level]);
         if ($updated) {
             TickSummaryMaintainer::recomputeForDominion($dominionId);
@@ -78,15 +82,15 @@ class EloquentDominionStructureRepository implements DominionStructureRepository
 
     public function updateOrCreate(int $dominionId, int $structureId, array $data): bool
     {
-        $saved = (bool)DominionStructure::updateOrCreate(
+        $model = DominionStructure::updateOrCreate(
             ['dominion_id' => $dominionId, 'structure_id' => $structureId],
             $data
         );
 
-        if ($saved) {
+        if ($model->wasRecentlyCreated || $model->wasChanged()) {
             TickSummaryMaintainer::recomputeForDominion($dominionId);
         }
 
-        return $saved;
+        return $model->exists;
     }
 }
