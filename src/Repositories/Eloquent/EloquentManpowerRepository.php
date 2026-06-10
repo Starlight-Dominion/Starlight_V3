@@ -30,21 +30,22 @@ class EloquentManpowerRepository implements ManpowerRepositoryInterface
             ->where('unit_id', $unitId)
             ->first();
 
-        if (!$manpower) {
-            if ($change > 0) {
-                $manpower = new DominionManpower();
-                $manpower->dominion_id = $dominionId;
-                $manpower->unit_id = $unitId;
-                $manpower->total_quantity = $change;
-                return $manpower->save();
-            }
-            return false;
-        }
+        $currentQty = $manpower ? $manpower->total_quantity : 0;
+        $newQty = $currentQty + $change;
 
-        $newQty = $manpower->total_quantity + $change;
         if ($newQty < 0) return false;
 
-        return $manpower->update(['total_quantity' => $newQty]);
+        if (!$manpower) {
+            return DominionManpower::insert([
+                'dominion_id' => $dominionId,
+                'unit_id' => $unitId,
+                'total_quantity' => $newQty
+            ]);
+        }
+
+        return DominionManpower::where('dominion_id', $dominionId)
+            ->where('unit_id', $unitId)
+            ->update(['total_quantity' => $newQty]) > 0;
     }
 
     public function sumTotalQuantity(): float
@@ -54,9 +55,24 @@ class EloquentManpowerRepository implements ManpowerRepositoryInterface
 
     public function setQuantityWithStable(int $dominionId, int $unitId, int $total, int $stabled): bool
     {
-        return (bool)\sdo\Models\DominionManpower::updateOrCreate(
-            ['dominion_id' => $dominionId, 'unit_id' => $unitId],
-            ['total_quantity' => $total, 'stabled_quantity' => $stabled]
-        );
+        $exists = DominionManpower::where('dominion_id', $dominionId)
+            ->where('unit_id', $unitId)
+            ->exists();
+
+        if (!$exists) {
+            return DominionManpower::insert([
+                'dominion_id' => $dominionId,
+                'unit_id' => $unitId,
+                'total_quantity' => $total,
+                'stabled_quantity' => $stabled
+            ]);
+        }
+
+        return DominionManpower::where('dominion_id', $dominionId)
+            ->where('unit_id', $unitId)
+            ->update([
+                'total_quantity' => $total,
+                'stabled_quantity' => $stabled
+            ]) > 0;
     }
 }

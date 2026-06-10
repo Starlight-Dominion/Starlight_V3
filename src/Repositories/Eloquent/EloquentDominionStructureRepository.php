@@ -26,16 +26,39 @@ class EloquentDominionStructureRepository implements DominionStructureRepository
 
     public function updateLevel(int $dominionId, int $structureId, int $level): bool
     {
-        $structure = $this->findByDominionAndStructure($dominionId, $structureId);
-        if (!$structure) {
-            $structure = new DominionStructure();
-            $structure->dominion_id = $dominionId;
-            $structure->structure_id = $structureId;
-            $structure->level = $level;
-            return $structure->save();
+        $exists = DominionStructure::where('dominion_id', $dominionId)
+            ->where('structure_id', $structureId)
+            ->exists();
+
+        if (!$exists) {
+            return DominionStructure::insert([
+                'dominion_id' => $dominionId,
+                'structure_id' => $structureId,
+                'level' => $level
+            ]);
         }
 
-        return $structure->update(['level' => $level]);
+        return DominionStructure::where('dominion_id', $dominionId)
+            ->where('structure_id', $structureId)
+            ->update(['level' => $level]) > 0;
+    }
+
+    public function updateOrCreate(int $dominionId, int $structureId, array $data): bool
+    {
+        $exists = DominionStructure::where('dominion_id', $dominionId)
+            ->where('structure_id', $structureId)
+            ->exists();
+
+        if (!$exists) {
+            return DominionStructure::insert(array_merge($data, [
+                'dominion_id' => $dominionId,
+                'structure_id' => $structureId
+            ]));
+        }
+
+        return DominionStructure::where('dominion_id', $dominionId)
+            ->where('structure_id', $structureId)
+            ->update($data) > 0;
     }
 
     public function sumStructureLevelBuff(int $dominionId, string $column): float
@@ -64,13 +87,5 @@ class EloquentDominionStructureRepository implements DominionStructureRepository
             ->first();
 
         return $res ? $res->toArray() : [];
-    }
-
-    public function updateOrCreate(int $dominionId, int $structureId, array $data): bool
-    {
-        return (bool)DominionStructure::updateOrCreate(
-            ['dominion_id' => $dominionId, 'structure_id' => $structureId],
-            $data
-        );
     }
 }

@@ -25,19 +25,25 @@ class EloquentDominionArmoryRepository implements DominionArmoryRepositoryInterf
     public function updateQuantity(int $dominionId, int $itemId, int $change): bool
     {
         $item = $this->findItem($dominionId, $itemId);
-        if (!$item) {
-            if ($change > 0) {
-                return $this->addItem($dominionId, $itemId, $change);
-            }
-            return false;
-        }
+        $currentQty = $item ? $item->quantity : 0;
+        $newQty = $currentQty + $change;
 
-        $newQty = $item->quantity + $change;
         if ($newQty <= 0) {
             return $this->removeItem($dominionId, $itemId);
         }
 
-        return $item->update(['quantity' => $newQty]);
+        if (!$item) {
+            return DominionArmoryItem::insert([
+                'kingdom_id' => $dominionId,
+                'item_id' => $itemId,
+                'quantity' => $newQty,
+                'is_equipped' => false
+            ]);
+        }
+
+        return DominionArmoryItem::where('kingdom_id', $dominionId)
+            ->where('item_id', $itemId)
+            ->update(['quantity' => $newQty]) > 0;
     }
 
     public function setQuantity(int $dominionId, int $itemId, int $quantity): bool
@@ -46,12 +52,22 @@ class EloquentDominionArmoryRepository implements DominionArmoryRepositoryInterf
             return $this->removeItem($dominionId, $itemId);
         }
 
-        $item = $this->findItem($dominionId, $itemId);
-        if ($item) {
-            return $item->update(['quantity' => $quantity]);
+        $exists = DominionArmoryItem::where('kingdom_id', $dominionId)
+            ->where('item_id', $itemId)
+            ->exists();
+
+        if (!$exists) {
+            return DominionArmoryItem::insert([
+                'kingdom_id' => $dominionId,
+                'item_id' => $itemId,
+                'quantity' => $quantity,
+                'is_equipped' => false
+            ]);
         }
 
-        return $this->addItem($dominionId, $itemId, $quantity);
+        return DominionArmoryItem::where('kingdom_id', $dominionId)
+            ->where('item_id', $itemId)
+            ->update(['quantity' => $quantity]) > 0;
     }
 
     public function toggleEquip(int $dominionId, int $itemId, bool $isEquipped): bool
@@ -70,12 +86,12 @@ class EloquentDominionArmoryRepository implements DominionArmoryRepositoryInterf
 
     public function addItem(int $dominionId, int $itemId, int $quantity, bool $isEquipped = false): bool
     {
-        $item = new DominionArmoryItem();
-        $item->kingdom_id = $dominionId;
-        $item->item_id = $itemId;
-        $item->quantity = $quantity;
-        $item->is_equipped = $isEquipped;
-        return $item->save();
+        return DominionArmoryItem::insert([
+            'kingdom_id' => $dominionId,
+            'item_id' => $itemId,
+            'quantity' => $quantity,
+            'is_equipped' => $isEquipped
+        ]);
     }
 
     public function getEquippedItemsByType(int $dominionId, string $unitTypeSlug): Collection
@@ -89,9 +105,19 @@ class EloquentDominionArmoryRepository implements DominionArmoryRepositoryInterf
 
     public function updateOrCreate(int $dominionId, int $itemId, array $data): bool
     {
-        return (bool)DominionArmoryItem::updateOrCreate(
-            ['kingdom_id' => $dominionId, 'item_id' => $itemId],
-            $data
-        );
+        $exists = DominionArmoryItem::where('kingdom_id', $dominionId)
+            ->where('item_id', $itemId)
+            ->exists();
+
+        if (!$exists) {
+            return DominionArmoryItem::insert(array_merge($data, [
+                'kingdom_id' => $dominionId,
+                'item_id' => $itemId
+            ]));
+        }
+
+        return DominionArmoryItem::where('kingdom_id', $dominionId)
+            ->where('item_id', $itemId)
+            ->update($data) > 0;
     }
 }
